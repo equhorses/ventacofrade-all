@@ -1,0 +1,67 @@
+{
+    "title": "seller_profiles",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "integer"
+        },
+        "user_id": {
+            "type": "string"
+        },
+        "shop_name": {
+            "type": "string",
+            "maxLength": 200
+        },
+        "shop_description": {
+            "type": "string"
+        },
+        "province": {
+            "type": "string",
+            "maxLength": 100
+        },
+        "city": {
+            "type": "string",
+            "maxLength": 100
+        },
+        "phone": {
+            "type": "string",
+            "maxLength": 20
+        },
+        "is_active": {
+            "type": "boolean",
+            "default": false
+        },
+        "subscription_status": {
+            "type": "string",
+            "maxLength": 20,
+            "default": "inactive",
+            "enum": [
+                "inactive",
+                "active",
+                "cancelled",
+                "expired"
+            ]
+        },
+        "subscription_end_date": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "activation_paid": {
+            "type": "boolean",
+            "default": false
+        },
+        "rating": {
+            "type": "number",
+            "default": 0
+        },
+        "total_sales": {
+            "type": "integer",
+            "default": 0
+        }
+    },
+    "required": [
+        "user_id",
+        "shop_name",
+        "province"
+    ]
+}

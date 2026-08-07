@@ -1,0 +1,33 @@
+{
+    "title": "categories",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "integer"
+        },
+        "name": {
+            "type": "string",
+            "maxLength": 100
+        },
+        "slug": {
+            "type": "string",
+            "maxLength": 100
+        },
+        "description": {
+            "type": "string",
+            "maxLength": 500
+        },
+        "icon": {
+            "type": "string",
+            "maxLength": 50
+        },
+        "order_index": {
+            "type": "integer",
+            "default": 0
+        }
+    },
+    "required": [
+        "name",
+        "slug"
+    ]
+}

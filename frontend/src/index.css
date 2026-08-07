@@ -1,0 +1,100 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 270 20% 99%;
+    --foreground: 270 50% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 270 50% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 270 50% 10%;
+
+    --primary: 270 70% 35%;
+    --primary-foreground: 45 100% 97%;
+
+    --secondary: 45 90% 55%;
+    --secondary-foreground: 270 50% 10%;
+
+    --muted: 270 10% 95%;
+    --muted-foreground: 270 10% 45%;
+
+    --accent: 45 90% 55%;
+    --accent-foreground: 270 50% 10%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 270 15% 90%;
+    --input: 270 15% 90%;
+    --ring: 270 70% 35%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 270 20% 97%;
+    --sidebar-foreground: 270 30% 20%;
+    --sidebar-primary: 270 70% 35%;
+    --sidebar-primary-foreground: 45 100% 97%;
+    --sidebar-accent: 270 15% 93%;
+    --sidebar-accent-foreground: 270 30% 20%;
+    --sidebar-border: 270 15% 90%;
+    --sidebar-ring: 270 70% 35%;
+  }
+
+  .dark {
+    --background: 270 30% 6%;
+    --foreground: 270 10% 95%;
+
+    --card: 270 30% 9%;
+    --card-foreground: 270 10% 95%;
+
+    --popover: 270 30% 9%;
+    --popover-foreground: 270 10% 95%;
+
+    --primary: 270 60% 60%;
+    --primary-foreground: 270 30% 6%;
+
+    --secondary: 45 80% 50%;
+    --secondary-foreground: 270 30% 6%;
+
+    --muted: 270 20% 15%;
+    --muted-foreground: 270 10% 60%;
+
+    --accent: 45 80% 50%;
+    --accent-foreground: 270 30% 6%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 270 20% 15%;
+    --input: 270 20% 15%;
+    --ring: 270 60% 60%;
+
+    --sidebar-background: 270 30% 8%;
+    --sidebar-foreground: 270 10% 90%;
+    --sidebar-primary: 270 60% 60%;
+    --sidebar-primary-foreground: 270 30% 6%;
+    --sidebar-accent: 270 20% 12%;
+    --sidebar-accent-foreground: 270 10% 90%;
+    --sidebar-border: 270 20% 15%;
+    --sidebar-ring: 270 60% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "kern" 1;
+  }
+
+  h1, h2, h3, h4 {
+    text-wrap: balance;
+  }
+}

@@ -1,0 +1,19 @@
+{
+    "title": "favorites",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "integer"
+        },
+        "user_id": {
+            "type": "string"
+        },
+        "product_id": {
+            "type": "integer"
+        }
+    },
+    "required": [
+        "user_id",
+        "product_id"
+    ]
+}

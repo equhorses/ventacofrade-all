@@ -1,0 +1,72 @@
+{
+    "title": "products",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "integer"
+        },
+        "user_id": {
+            "type": "string"
+        },
+        "title": {
+            "type": "string",
+            "maxLength": 200
+        },
+        "description": {
+            "type": "string"
+        },
+        "price": {
+            "type": "number"
+        },
+        "category_id": {
+            "type": "integer"
+        },
+        "condition": {
+            "type": "string",
+            "maxLength": 20,
+            "enum": [
+                "nuevo",
+                "usado",
+                "restaurado"
+            ]
+        },
+        "location_province": {
+            "type": "string",
+            "maxLength": 100
+        },
+        "location_city": {
+            "type": "string",
+            "maxLength": 100
+        },
+        "images": {
+            "type": "string"
+        },
+        "status": {
+            "type": "string",
+            "maxLength": 20,
+            "default": "active",
+            "enum": [
+                "active",
+                "sold",
+                "paused",
+                "deleted"
+            ]
+        },
+        "views_count": {
+            "type": "integer",
+            "default": 0
+        },
+        "is_featured": {
+            "type": "boolean",
+            "default": false
+        }
+    },
+    "required": [
+        "user_id",
+        "title",
+        "price",
+        "category_id",
+        "condition",
+        "location_province"
+    ]
+}

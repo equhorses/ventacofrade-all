@@ -1,0 +1,67 @@
+[
+    {
+        "user_id": "1410592",
+        "shop_name": "Artesanía Cofrade Sevilla",
+        "shop_description": "Tienda especializada en artículos cofrades desde 1985. Túnicas, cirios y complementos para hermandades de toda Andalucía.",
+        "province": "Sevilla",
+        "city": "Sevilla",
+        "phone": "654321098",
+        "is_active": true,
+        "subscription_status": "profesional",
+        "activation_paid": true,
+        "rating": 4.8,
+        "total_sales": 156
+    },
+    {
+        "user_id": "1410592",
+        "shop_name": "Orfebrería Hermanos López",
+        "shop_description": "Taller de orfebrería religiosa con más de 40 años de experiencia. Especialistas en candelabros, coronas y piezas de plata para pasos procesionales.",
+        "province": "Sevilla",
+        "city": "Dos Hermanas",
+        "phone": "678901234",
+        "is_active": true,
+        "subscription_status": "profesional",
+        "activation_paid": true,
+        "rating": 4.9,
+        "total_sales": 89
+    },
+    {
+        "user_id": "1410592",
+        "shop_name": "Bordados Andaluces",
+        "shop_description": "Taller artesano de bordados en oro y sedas. Mantos, palios, faldones y toda clase de bordados para hermandades y cofradías.",
+        "province": "Córdoba",
+        "city": "Córdoba",
+        "phone": "612345678",
+        "is_active": true,
+        "subscription_status": "profesional",
+        "activation_paid": true,
+        "rating": 5.0,
+        "total_sales": 45
+    },
+    {
+        "user_id": "1410592",
+        "shop_name": "Imaginería del Sur",
+        "shop_description": "Taller de imaginería religiosa. Reproducciones artesanales y restauración de imágenes procesionales.",
+        "province": "Málaga",
+        "city": "Antequera",
+        "phone": "698765432",
+        "is_active": true,
+        "subscription_status": "basico",
+        "activation_paid": true,
+        "rating": 4.5,
+        "total_sales": 23
+    },
+    {
+        "user_id": "1410592",
+        "shop_name": "CofradeSevilla",
+        "shop_description": "Particular cofrade. Vendo artículos que ya no uso de mi hermandad.",
+        "province": "Sevilla",
+        "city": "Sevilla",
+        "phone": "645678901",
+        "is_active": true,
+        "subscription_status": "basico",
+        "activation_paid": true,
+        "rating": 4.2,
+        "total_sales": 8
+    }
+]

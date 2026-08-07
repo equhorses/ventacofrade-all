@@ -1,0 +1,31 @@
+{
+    "title": "messages",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "integer"
+        },
+        "user_id": {
+            "type": "string"
+        },
+        "receiver_id": {
+            "type": "string"
+        },
+        "product_id": {
+            "type": "integer"
+        },
+        "content": {
+            "type": "string"
+        },
+        "is_read": {
+            "type": "boolean",
+            "default": false
+        }
+    },
+    "required": [
+        "user_id",
+        "receiver_id",
+        "product_id",
+        "content"
+    ]
+}
