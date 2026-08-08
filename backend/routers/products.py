@@ -182,15 +182,14 @@ async def query_productss_all(
 async def get_products(
     id: int,
     fields: str = Query(None, description="Comma-separated list of fields to return"),
-    current_user: UserResponse = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get a single products by ID (user can only see their own records)"""
+    """Get a single products by ID (public, anyone can view a product page)"""
     logger.debug(f"Fetching products with id: {id}, fields={fields}")
     
     service = ProductsService(db)
     try:
-        result = await service.get_by_id(id, user_id=str(current_user.id))
+        result = await service.get_by_id(id)
         if not result:
             logger.warning(f"Products with id {id} not found")
             raise HTTPException(status_code=404, detail="Products not found")

@@ -4,9 +4,13 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional, Tuple
 
+import uuid
+
 from core.auth import create_access_token
 from core.config import settings
 from core.database import db_manager
+from core.security import hash_password, verify_password
+from fastapi import HTTPException, status
 from models.auth import OIDCState, User
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +21,43 @@ logger = logging.getLogger(__name__)
 class AuthService:
     def __init__(self, db: AsyncSession):
         self.db = db
+
+    async def register_user(self, email: str, password: str, name: Optional[str] = None) -> User:
+        """Create a new user account with email + password."""
+        normalized_email = email.strip().lower()
+
+        result = await self.db.execute(select(User).where(User.email == normalized_email))
+        existing = result.scalar_one_or_none()
+        if existing:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ya existe una cuenta con ese email")
+
+        user = User(
+            id=str(uuid.uuid4()),
+            email=normalized_email,
+            password_hash=hash_password(password),
+            name=name or normalized_email.split("@", 1)[0],
+            role="user",
+            last_login=datetime.now(timezone.utc),
+        )
+        self.db.add(user)
+        await self.db.commit()
+        await self.db.refresh(user)
+        return user
+
+    async def authenticate_user(self, email: str, password: str) -> User:
+        """Verify email + password and return the matching user."""
+        normalized_email = email.strip().lower()
+
+        result = await self.db.execute(select(User).where(User.email == normalized_email))
+        user = result.scalar_one_or_none()
+
+        if not user or not user.password_hash or not verify_password(password, user.password_hash):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Email o contraseña incorrectos")
+
+        user.last_login = datetime.now(timezone.utc)
+        await self.db.commit()
+        await self.db.refresh(user)
+        return user
 
     async def get_or_create_user(self, platform_sub: str, email: str, name: Optional[str] = None) -> User:
         """Get existing user or create new one."""

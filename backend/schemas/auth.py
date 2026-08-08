@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, Field
 
 
 class UserResponse(BaseModel):
@@ -25,3 +25,26 @@ class TokenExchangeResponse(BaseModel):
     """Response body for issued application token."""
 
     token: str
+
+
+class RegisterRequest(BaseModel):
+    """Request body to create a new account with email + password."""
+
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+    name: Optional[str] = None
+
+
+class LoginRequest(BaseModel):
+    """Request body to log in with email + password."""
+
+    email: EmailStr
+    password: str = Field(min_length=1, max_length=128)
+
+
+class AuthTokenResponse(BaseModel):
+    """Response returned after successful register/login."""
+
+    token: str
+    token_type: str = "Bearer"
+    user: UserResponse

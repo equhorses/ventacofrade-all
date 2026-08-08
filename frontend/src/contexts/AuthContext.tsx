@@ -59,18 +59,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const login = async () => {
-    try {
-      setError(null);
-      await authApi.login();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed');
-    }
+    // The old flow redirected straight to an external OIDC provider.
+    // Now we just send the user to our own login/register page.
+    window.location.href = '/login';
   };
 
   const logout = async () => {
     try {
       setError(null);
       await authApi.logout();
+      setUser(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Logout failed');
     }

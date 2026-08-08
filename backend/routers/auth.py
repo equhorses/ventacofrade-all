@@ -21,7 +21,10 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from models.auth import User
 from schemas.auth import (
+    AuthTokenResponse,
+    LoginRequest,
     PlatformTokenExchangeRequest,
+    RegisterRequest,
     TokenExchangeResponse,
     UserResponse,
 )
@@ -71,6 +74,24 @@ def get_dynamic_backend_url(request: Request) -> str:
 
 def derive_name_from_email(email: str) -> str:
     return email.split("@", 1)[0] if email else ""
+
+
+@router.post("/register", response_model=AuthTokenResponse, status_code=status.HTTP_201_CREATED)
+async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db)):
+    """Create a new account with email + password and return a session token."""
+    auth_service = AuthService(db)
+    user = await auth_service.register_user(email=payload.email, password=payload.password, name=payload.name)
+    token, expires_at, _ = await auth_service.issue_app_token(user=user)
+    return AuthTokenResponse(token=token, user=UserResponse.model_validate(user))
+
+
+@router.post("/login", response_model=AuthTokenResponse)
+async def login_with_password(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
+    """Log in with email + password and return a session token."""
+    auth_service = AuthService(db)
+    user = await auth_service.authenticate_user(email=payload.email, password=payload.password)
+    token, expires_at, _ = await auth_service.issue_app_token(user=user)
+    return AuthTokenResponse(token=token, user=UserResponse.model_validate(user))
 
 
 @router.get("/login")

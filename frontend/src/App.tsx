@@ -10,6 +10,7 @@ import Publicar from './pages/Publicar';
 import Documentacion from './pages/Documentacion';
 import AuthCallback from './pages/AuthCallback';
 import AuthError from './pages/AuthError';
+import Login from './pages/Login';
 
 const queryClient = new QueryClient();
 
@@ -22,6 +23,7 @@ const AppRoutes = () => (
     <Route path="/publicar" element={<Publicar />} />
     <Route path="/documentacion" element={<Documentacion />} />
     <Route path="/favoritos" element={<Explorar />} />
+    <Route path="/login" element={<Login />} />
     <Route path="/auth/callback" element={<AuthCallback />} />
     <Route path="/auth/error" element={<AuthError />} />
   </Routes>
