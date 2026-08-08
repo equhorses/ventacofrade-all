@@ -7,6 +7,10 @@ export function getStoredToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
 }
 
+export function saveToken(token: string) {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
 function setStoredToken(token: string) {
   localStorage.setItem(TOKEN_KEY, token);
 }

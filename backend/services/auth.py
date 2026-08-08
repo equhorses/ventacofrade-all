@@ -57,6 +57,34 @@ class AuthService:
         await self.db.refresh(user)
         return user
 
+    async def get_or_create_google_user(self, email: str, name: Optional[str] = None) -> User:
+        """Find a user by email (created via Google or previously via password),
+        or create a new one. Google-authenticated accounts have no password_hash,
+        so they can only ever log in again via Google."""
+        normalized_email = email.strip().lower()
+
+        result = await self.db.execute(select(User).where(User.email == normalized_email))
+        user = result.scalar_one_or_none()
+
+        if user:
+            user.last_login = datetime.now(timezone.utc)
+            if name and not user.name:
+                user.name = name
+        else:
+            user = User(
+                id=str(uuid.uuid4()),
+                email=normalized_email,
+                password_hash=None,
+                name=name or normalized_email.split("@", 1)[0],
+                role="user",
+                last_login=datetime.now(timezone.utc),
+            )
+            self.db.add(user)
+
+        await self.db.commit()
+        await self.db.refresh(user)
+        return user
+
     async def issue_app_token(
         self,
         user: User,
