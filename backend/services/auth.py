@@ -1,18 +1,16 @@
 import logging
 import os
-import time
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional, Tuple
-
-import uuid
 
 from core.auth import create_access_token
 from core.config import settings
 from core.database import db_manager
 from core.security import hash_password, verify_password
 from fastapi import HTTPException, status
-from models.auth import OIDCState, User
-from sqlalchemy import delete, select
+from models.auth import User
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
@@ -59,32 +57,6 @@ class AuthService:
         await self.db.refresh(user)
         return user
 
-    async def get_or_create_user(self, platform_sub: str, email: str, name: Optional[str] = None) -> User:
-        """Get existing user or create new one."""
-        start_time = time.time()
-        logger.debug(f"[DB_OP] Starting get_or_create_user - platform_sub: {platform_sub}")
-        # Try to find existing user
-        result = await self.db.execute(select(User).where(User.id == platform_sub))
-        user = result.scalar_one_or_none()
-        logger.debug(f"[DB_OP] User lookup completed in {time.time() - start_time:.4f}s - found: {user is not None}")
-
-        if user:
-            # Update user info if needed
-            user.email = email
-            user.name = name
-            user.last_login = datetime.now(timezone.utc)
-        else:
-            # Create new user
-            user = User(id=platform_sub, email=email, name=name, last_login=datetime.now(timezone.utc))
-            self.db.add(user)
-
-        start_time_commit = time.time()
-        logger.debug("[DB_OP] Starting user commit/refresh")
-        await self.db.commit()
-        await self.db.refresh(user)
-        logger.debug(f"[DB_OP] User commit/refresh completed in {time.time() - start_time_commit:.4f}s")
-        return user
-
     async def issue_app_token(
         self,
         user: User,
@@ -110,39 +82,6 @@ class AuthService:
         token = create_access_token(claims, expires_minutes=expires_minutes)
 
         return token, expires_at, claims
-
-    async def store_oidc_state(self, state: str, nonce: str, code_verifier: str):
-        """Store OIDC state in database."""
-        # Clean up expired states first
-        await self.db.execute(delete(OIDCState).where(OIDCState.expires_at < datetime.now(timezone.utc)))
-
-        expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)  # 10 minute expiry
-
-        oidc_state = OIDCState(state=state, nonce=nonce, code_verifier=code_verifier, expires_at=expires_at)
-
-        self.db.add(oidc_state)
-        await self.db.commit()
-
-    async def get_and_delete_oidc_state(self, state: str) -> Optional[dict]:
-        """Get and delete OIDC state from database."""
-        # Clean up expired states first
-        await self.db.execute(delete(OIDCState).where(OIDCState.expires_at < datetime.now(timezone.utc)))
-
-        # Find and validate state
-        result = await self.db.execute(select(OIDCState).where(OIDCState.state == state))
-        oidc_state = result.scalar_one_or_none()
-
-        if not oidc_state:
-            return None
-
-        # Extract data before deleting
-        state_data = {"nonce": oidc_state.nonce, "code_verifier": oidc_state.code_verifier}
-
-        # Delete the used state (one-time use)
-        await self.db.delete(oidc_state)
-        await self.db.commit()
-
-        return state_data
 
 
 async def initialize_admin_user():

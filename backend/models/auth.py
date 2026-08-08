@@ -13,14 +13,3 @@ class User(Base):
     role = Column(String(50), default="user", nullable=False)  # user/admin
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     last_login = Column(DateTime(timezone=True), nullable=True)
-
-
-class OIDCState(Base):
-    __tablename__ = "oidc_states"
-
-    id = Column(Integer, primary_key=True, index=True)
-    state = Column(String(255), unique=True, index=True, nullable=False)
-    nonce = Column(String(255), nullable=False)
-    code_verifier = Column(String(255), nullable=False)
-    expires_at = Column(DateTime(timezone=True), nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+  <rect width="400" height="400" fill="#F2ECFA"/>
+  <g fill="none" stroke="#591B98" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.5">
+    <path d="M166.7 150h66.7" transform="translate(0 20) scale(3.5) translate(-33.3 -33.3)"/>
+  </g>
+  <g transform="translate(150,150)" fill="none" stroke="#591B98" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.55">
+    <path d="M50 45h20"/>
+    <path d="M60 35v25"/>
+    <path d="M70 110v-20a10 10 0 0 0-20 0v20"/>
+    <path d="M90 110V28.09a5 5 0 0 0-2.77-4.47l-22.76-11.39a10 10 0 0 0-8.94 0L32.77 23.62A5 5 0 0 0 30 28.09V110"/>
+    <path d="M90 35l17.24 8.62a5 5 0 0 1 2.76 4.47V100a10 10 0 0 1-10 10H20a10 10 0 0 1-10-10V48.09a5 5 0 0 1 2.76-4.47L30 35"/>
+  </g>
+  <text x="200" y="245" text-anchor="middle" font-family="sans-serif" font-size="15" fill="#591B98" opacity="0.6">Foto próximamente</text>
+</svg>
