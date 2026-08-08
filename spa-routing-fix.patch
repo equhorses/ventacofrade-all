@@ -1,0 +1,25 @@
+From 4f29e870ed695293eca680ba106e8aabae23a04c Mon Sep 17 00:00:00 2001
+From: VentaCofrade Dev <dev@ventacofrade.com>
+Date: Sat, 8 Aug 2026 10:46:09 +0000
+Subject: [PATCH] Anade rewrite SPA en Vercel para que /login y demas rutas del
+ frontend funcionen al entrar directamente
+
+---
+ frontend/vercel.json | 5 +++++
+ 1 file changed, 5 insertions(+)
+ create mode 100644 frontend/vercel.json
+
+diff --git a/frontend/vercel.json b/frontend/vercel.json
+new file mode 100644
+index 0000000..0d199b2
+--- /dev/null
++++ b/frontend/vercel.json
+@@ -0,0 +1,5 @@
++{
++  "rewrites": [
++    { "source": "/(.*)", "destination": "/index.html" }
++  ]
++}
+-- 
+2.43.0
+
