@@ -2,8 +2,17 @@ import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, Search, Heart, User, Plus, Church } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Menu, Search, Heart, User, Plus, Church, LogOut } from 'lucide-react';
 import { client } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -12,6 +21,7 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { user, logout } = useAuth();
 
   const navLinks = [
     { href: '/explorar', label: 'Explorar' },
@@ -72,9 +82,29 @@ export default function Layout({ children }: LayoutProps) {
               <Link to="/favoritos" className="p-2 rounded-md hover:bg-muted transition-colors cursor-pointer">
                 <Heart className="h-5 w-5 text-muted-foreground" />
               </Link>
-              <button onClick={handleLogin} className="p-2 rounded-md hover:bg-muted transition-colors cursor-pointer">
-                <User className="h-5 w-5 text-muted-foreground" />
-              </button>
+              {user ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="p-2 rounded-md hover:bg-muted transition-colors cursor-pointer">
+                      <User className="h-5 w-5 text-muted-foreground" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>
+                      {user.name || user.email}
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => logout()} className="cursor-pointer">
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Cerrar sesión
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <button onClick={handleLogin} className="p-2 rounded-md hover:bg-muted transition-colors cursor-pointer">
+                  <User className="h-5 w-5 text-muted-foreground" />
+                </button>
+              )}
 
               {/* Mobile menu */}
               <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>

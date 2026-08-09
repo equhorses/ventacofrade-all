@@ -11,6 +11,7 @@ import Documentacion from './pages/Documentacion';
 import AuthCallback from './pages/AuthCallback';
 import AuthError from './pages/AuthError';
 import Login from './pages/Login';
+import { AuthProvider } from './contexts/AuthContext';
 
 const queryClient = new QueryClient();
 
@@ -34,7 +35,9 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <BrowserRouter>
-        <AppRoutes />
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
