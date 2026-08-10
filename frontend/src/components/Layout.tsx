@@ -10,7 +10,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Menu, Search, Heart, User, Plus, Church, LogOut } from 'lucide-react';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import {
+  Menu,
+  Search,
+  Heart,
+  User,
+  Plus,
+  Church,
+  LogOut,
+  Package,
+  MessageCircle,
+  CreditCard,
+  ChevronDown,
+} from 'lucide-react';
 import { client } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -35,6 +48,10 @@ export default function Layout({ children }: LayoutProps) {
   const handleLogin = () => {
     client.auth.toLogin();
   };
+
+  const favoritesHref = user ? '/cuenta/favoritos' : '/login';
+
+  const initials = (user?.name?.trim() || user?.email || '?').slice(0, 1).toUpperCase();
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -79,22 +96,62 @@ export default function Layout({ children }: LayoutProps) {
               <Link to="/explorar" className="p-2 rounded-md hover:bg-muted transition-colors cursor-pointer">
                 <Search className="h-5 w-5 text-muted-foreground" />
               </Link>
-              <Link to="/favoritos" className="p-2 rounded-md hover:bg-muted transition-colors cursor-pointer">
+              <Link to={favoritesHref} className="p-2 rounded-md hover:bg-muted transition-colors cursor-pointer">
                 <Heart className="h-5 w-5 text-muted-foreground" />
               </Link>
               {user ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="p-2 rounded-md hover:bg-muted transition-colors cursor-pointer">
-                      <User className="h-5 w-5 text-muted-foreground" />
+                    <button className="flex items-center gap-1.5 p-1 pr-2 rounded-full hover:bg-muted transition-colors cursor-pointer">
+                      <Avatar className="h-7 w-7">
+                        <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
+                          {initials}
+                        </AvatarFallback>
+                      </Avatar>
+                      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>
-                      {user.name || user.email}
+                  <DropdownMenuContent align="end" className="w-64">
+                    <DropdownMenuLabel className="font-normal">
+                      <p className="font-semibold text-foreground truncate">{user.name || 'Mi cuenta'}</p>
+                      <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => logout()} className="cursor-pointer">
+                    <DropdownMenuItem asChild className="cursor-pointer">
+                      <Link to="/cuenta/perfil">
+                        <User className="h-4 w-4 mr-2" />
+                        Mi perfil
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild className="cursor-pointer">
+                      <Link to="/cuenta/anuncios">
+                        <Package className="h-4 w-4 mr-2" />
+                        Mis anuncios
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild className="cursor-pointer">
+                      <Link to="/cuenta/mensajes">
+                        <MessageCircle className="h-4 w-4 mr-2" />
+                        Mensajes
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild className="cursor-pointer">
+                      <Link to="/cuenta/favoritos">
+                        <Heart className="h-4 w-4 mr-2" />
+                        Favoritos
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild className="cursor-pointer">
+                      <Link to="/cuenta/suscripcion">
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        Suscripción
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => logout()}
+                      className="cursor-pointer text-destructive focus:bg-destructive/10 focus:text-destructive"
+                    >
                       <LogOut className="h-4 w-4 mr-2" />
                       Cerrar sesión
                     </DropdownMenuItem>

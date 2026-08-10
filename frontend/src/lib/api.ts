@@ -47,6 +47,21 @@ function makeEntity(entityName: string) {
       return { data: response.data };
     },
 
+    // The base endpoint (no "/all") requires auth and is automatically
+    // scoped to the logged-in user on the backend, so this returns only
+    // "my" products / favorites / messages, etc.
+    async mine(options: QueryOptions = {}) {
+      const params: Record<string, string | number> = {};
+      if (options.query) params.query = JSON.stringify(options.query);
+      if (options.sort) params.sort = options.sort;
+      if (options.limit !== undefined) params.limit = options.limit;
+      if (options.skip !== undefined) params.skip = options.skip;
+      if (options.fields) params.fields = options.fields;
+
+      const response = await http.get(`${baseUrl()}/api/v1/entities/${entityName}`, { params });
+      return { data: response.data };
+    },
+
     async get({ id }: { id: string | number }) {
       const response = await http.get(`${baseUrl()}/api/v1/entities/${entityName}/${id}`);
       return { data: response.data };
@@ -91,5 +106,15 @@ export const client = {
     favorites: makeEntity('favorites'),
     messages: makeEntity('messages'),
     seller_profiles: makeEntity('seller_profiles'),
+  },
+  users: {
+    async getProfile() {
+      const response = await http.get(`${baseUrl()}/api/v1/users/profile`);
+      return { data: response.data };
+    },
+    async updateProfile(data: { name?: string }) {
+      const response = await http.put(`${baseUrl()}/api/v1/users/profile`, data);
+      return { data: response.data };
+    },
   },
 };
