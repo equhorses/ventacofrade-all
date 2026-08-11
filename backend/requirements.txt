@@ -35,3 +35,6 @@ PyMuPDF
 
 # payment module dependencies
 stripe>=12.0.0
+
+# storage module dependencies (Cloudflare R2, S3-compatible)
+boto3>=1.34.0

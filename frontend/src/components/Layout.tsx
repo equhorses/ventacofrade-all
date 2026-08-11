@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   Menu,
   Search,
@@ -104,6 +104,7 @@ export default function Layout({ children }: LayoutProps) {
                   <DropdownMenuTrigger asChild>
                     <button className="flex items-center gap-1.5 p-1 pr-2 rounded-full hover:bg-muted transition-colors cursor-pointer">
                       <Avatar className="h-7 w-7">
+                        <AvatarImage src={user.avatar_url || undefined} alt={user.name || 'Avatar'} />
                         <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
                           {initials}
                         </AvatarFallback>

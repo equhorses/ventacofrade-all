@@ -8,6 +8,7 @@ class UserResponse(BaseModel):
     id: str  # Now a string UUID (platform sub)
     email: str
     name: Optional[str] = None
+    avatar_url: Optional[str] = None
     role: str = "user"  # user/admin
     last_login: Optional[datetime] = None
 

@@ -1,7 +1,7 @@
 import { ReactNode, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { User, Package, MessageCircle, Heart, CreditCard } from 'lucide-react';
 
@@ -58,6 +58,7 @@ export default function AccountLayout({ children, title, description }: AccountL
           <aside className="md:sticky md:top-24 md:self-start">
             <div className="flex items-center gap-3 mb-6 px-1">
               <Avatar className="h-11 w-11 border border-border">
+                <AvatarImage src={user.avatar_url || undefined} alt={user.name || 'Avatar'} />
                 <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
                   {initials(user.name, user.email)}
                 </AvatarFallback>

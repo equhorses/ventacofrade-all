@@ -194,10 +194,6 @@ class DatabaseManager:
                 logger.error("Database engine not initialized")
                 raise RuntimeError("Database engine not initialized")
 
-            # logger.info("🔧 Starting table structure repair...")
-            # await self.check_and_repair_existing_tables()
-            # logger.info("🔧 Table structure repair completed")
-
             try:
                 logger.info("🔧 Starting table creation...")
                 async with self.engine.begin() as conn:
@@ -211,6 +207,18 @@ class DatabaseManager:
             except Exception as e:
                 logger.error(f"Failed to create tables: {e}")
                 raise
+
+            # After ensuring all tables exist, add any columns that are
+            # present in the SQLAlchemy models but missing from the actual
+            # database (e.g. a column added to a model after the table was
+            # first created in production). This is additive-only (ALTER
+            # TABLE ... ADD COLUMN) and safe to run on every startup.
+            try:
+                logger.info("🔧 Starting table structure repair...")
+                await self.check_and_repair_existing_tables()
+                logger.info("🔧 Table structure repair completed")
+            except Exception as e:
+                logger.warning(f"Table structure repair skipped due to error: {e}")
         finally:
             self._table_creation_lock.release()
 

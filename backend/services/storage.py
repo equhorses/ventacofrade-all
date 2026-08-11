@@ -1,219 +1,105 @@
-import logging
-from typing import Literal, Optional, Union
-from urllib.parse import urljoin
+"""Storage service backed by Cloudflare R2 (S3-compatible object storage).
 
-import httpx
+Replaces the previous proxy to Atoms' internal OSS infrastructure, which is
+no longer available. Configure via environment variables:
+
+  R2_ACCOUNT_ID       - Cloudflare account ID
+  R2_ACCESS_KEY_ID    - R2 API token access key
+  R2_SECRET_ACCESS_KEY- R2 API token secret key
+  R2_BUCKET_NAME      - Name of the R2 bucket to store files in
+  R2_PUBLIC_URL       - Public base URL for the bucket (r2.dev URL or custom
+                         domain), WITHOUT a trailing slash, e.g.
+                         "https://pub-xxxxxxxx.r2.dev" or
+                         "https://cdn.ventacofrade.com"
+"""
+
+import logging
 import mimetypes
+import uuid
+
+import boto3
+from botocore.client import Config as BotoConfig
 from core.config import settings
-from schemas.storage import (
-    BucketInfo,
-    BucketListResponse,
-    BucketRequest,
-    BucketResponse,
-    DeleteResponse,
-    FileUpDownRequest,
-    FileUpDownResponse,
-    ObjectInfo,
-    ObjectListResponse,
-    ObjectRequest,
-    OSSBaseModel,
-    RenameRequest,
-    RenameResponse,
-)
 
 logger = logging.getLogger(__name__)
 
+ALLOWED_CONTENT_TYPES = {
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/gif",
+}
+
+ALLOWED_FOLDERS = {"products", "avatars"}
+
+MAX_UPLOAD_URL_EXPIRY_SECONDS = 300  # 5 minutes
+
+
+class StorageNotConfiguredError(RuntimeError):
+    """Raised when R2 environment variables are missing."""
+
 
 class StorageService:
-    """Service for handling file upload and display with ObjectStorage service integration."""
+    """Generates presigned upload URLs for Cloudflare R2."""
 
     def __init__(self):
-        if not settings.oss_service_url or not settings.oss_api_key:
-            raise ValueError("OSS service not configured. Set OSS_SERVICE_URL and OSS_API_KEY.")
+        account_id = getattr(settings, "r2_account_id", None)
+        access_key = getattr(settings, "r2_access_key_id", None)
+        secret_key = getattr(settings, "r2_secret_access_key", None)
+        self.bucket_name = getattr(settings, "r2_bucket_name", None)
+        self.public_url = getattr(settings, "r2_public_url", None)
 
-        self.headers = {
-            "Authorization": f"Bearer {settings.oss_api_key}",
-            "Content-Type": "application/json",
-        }
-
-    async def create_bucket(self, request: BucketRequest) -> BucketResponse:
-        """
-        Create a bucket name
-        """
-        endpoint = "api/v1/infra/client/oss/buckets"
-        payload = {"bucket_name": request.bucket_name, "visibility": request.visibility}
-        try:
-            result = await self._apost_oss_service(endpoint, payload)
-            return BucketResponse(bucket_name=result.get("bucket_name"), created_at=result.get("created_at"))
-        except Exception as e:
-            logger.error(f"Failed to create bucket: {e}")
-            raise
-
-    async def list_buckets(self) -> BucketListResponse:
-        """
-        List buckets of the user
-        """
-        endpoint = "api/v1/infra/client/oss/buckets"
-        try:
-            result = await self._aget_oss_service(endpoint=endpoint, params={})
-            list_buckets = BucketListResponse()
-            for item in result["buckets"]:
-                list_buckets.buckets.append(BucketInfo(bucket_name=item["bucket_name"], visibility=item["visibility"]))
-            return list_buckets
-        except Exception as e:
-            logger.error(f"Failed to list buckets: {e}")
-            raise
-
-    async def list_objects(self, request: OSSBaseModel) -> ObjectListResponse:
-        """
-        List objests from the bucket
-        """
-        endpoint = f"api/v1/infra/client/oss/buckets/{request.bucket_name}/objects"
-        try:
-            result = await self._aget_oss_service(endpoint=endpoint, params={})
-            list_objs = ObjectListResponse()
-            for item in result["objects"]:
-                list_objs.objects.append(
-                    ObjectInfo(
-                        bucket_name=request.bucket_name,
-                        object_key=item["key"],
-                        size=item["size"],
-                        last_modified=item["last_modified"],
-                        etag=item["etag"],
-                    )
-                )
-            return list_objs
-        except Exception as e:
-            logger.error(f"Failed to list bucket objects: {e}")
-            raise
-
-    async def get_object_info(self, request: ObjectRequest) -> ObjectInfo:
-        """
-        Get object metadata from the bucket
-        """
-        try:
-            endpoint = f"api/v1/infra/client/oss/buckets/{request.bucket_name}/objects/metadata"
-            params = {"object_key": request.object_key}
-            result = await self._aget_oss_service(endpoint, params)
-            return ObjectInfo(
-                bucket_name=request.bucket_name,
-                object_key=result["key"],
-                size=result["size"],
-                last_modified=result["last_modified"],
-                etag=result["etag"],
-            )
-        except Exception as e:
-            logger.error(f"Failed to get object metadata: {e}")
-            raise
-
-    async def rename_object(self, request: RenameRequest) -> dict:
-        endpoint = f"api/v1/infra/client/oss/buckets/{request.bucket_name}/objects/rename"
-        payload = {
-            "overwrite_key": request.overwrite_key,
-            "source_key": request.source_key,
-            "target_key": request.target_key,
-        }
-        try:
-            await self._apost_oss_service(endpoint, payload)
-            return RenameResponse(success=True)
-        except Exception as e:
-            logger.error(f"Failed to rename object: {e}")
-            raise
-
-    async def delete_object(self, request: ObjectRequest) -> DeleteResponse:
-        endpoint = f"api/v1/infra/client/oss/buckets/{request.bucket_name}/objects"
-        payload = {"object_keys": [request.object_key]}
-        try:
-            await self._adelete_oss_service(endpoint, payload)
-            return DeleteResponse(success=True)
-        except Exception as e:
-            logger.error(f"Failed to rename object: {e}")
-            raise
-
-    async def create_upload_url(self, request: FileUpDownRequest) -> FileUpDownResponse:
-        """
-        Create presigned URL for file upload with access URL.
-        """
-        endpoint = f"/api/v1/infra/client/oss/buckets/{request.bucket_name}/objects/upload_url"
-        payload = {"expires_in": 0, "object_key": request.object_key}
-        try:
-            result = await self._apost_oss_service(endpoint, payload)
-            # Format response according to ObjectStorage service response
-            return FileUpDownResponse(
-                upload_url=result.get("upload_url"),
-                expires_at=result.get("expires_at"),
-            )
-        except Exception as e:
-            logger.error(f"Failed to create upload URL: {e}")
-            raise
-
-    async def create_download_url(self, request: FileUpDownRequest) -> FileUpDownResponse:
-        """
-        Create presigned URL for file download with access URL.
-        """
-        endpoint = f"/api/v1/infra/client/oss/buckets/{request.bucket_name}/objects/download_url"
-        content_type, _ = mimetypes.guess_type(str(request.object_key))
-        if not content_type:
-            content_type = "application/octet-stream"
-        payload = {
-            "content_type": content_type,  # like "image/jpeg"
-            "expires_in": 0,
-            "object_key": request.object_key,
-        }
-        try:
-            result = await self._apost_oss_service(endpoint, payload)
-            # Format response according to ObjectStorage service response
-            return FileUpDownResponse(
-                download_url=result.get("download_url"),
-                expires_at=result.get("expires_at"),
+        if not all([account_id, access_key, secret_key, self.bucket_name, self.public_url]):
+            raise StorageNotConfiguredError(
+                "R2 storage is not configured. Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, "
+                "R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME and R2_PUBLIC_URL."
             )
 
-        except Exception as e:
-            logger.error(f"Failed to create upload URL: {e}")
-            raise
+        self.public_url = self.public_url.rstrip("/")
 
-    async def _aget_oss_service(self, endpoint: str, params: dict) -> dict:
-        return await self._arequest_oss_service("GET", endpoint, params=params)
+        endpoint_url = f"https://{account_id}.r2.cloudflarestorage.com"
+        self.client = boto3.client(
+            "s3",
+            endpoint_url=endpoint_url,
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key,
+            config=BotoConfig(signature_version="s3v4"),
+            region_name="auto",
+        )
 
-    async def _apost_oss_service(self, endpoint: str, payload: dict) -> Union[dict, list]:
-        return await self._arequest_oss_service("POST", endpoint, payload=payload)
+    def create_upload(self, filename: str, content_type: str, folder: str, user_id: str) -> dict:
+        """
+        Create a presigned URL the client can PUT a file to directly, plus
+        the resulting public URL where the file will be accessible.
+        """
+        if folder not in ALLOWED_FOLDERS:
+            raise ValueError(f"Invalid folder '{folder}'. Must be one of {sorted(ALLOWED_FOLDERS)}.")
 
-    async def _adelete_oss_service(self, endpoint: str, payload: dict) -> Union[dict, list]:
-        return await self._arequest_oss_service("DELETE", endpoint, payload=payload)
+        if content_type not in ALLOWED_CONTENT_TYPES:
+            raise ValueError("Only image uploads are allowed (JPEG, PNG, WEBP, GIF).")
 
-    async def _arequest_oss_service(
-        self,
-        method: Literal["GET", "POST", "DELETE"],
-        endpoint: str,
-        params: Optional[dict] = None,
-        payload: Optional[dict] = None,
-    ) -> Union[dict, list]:
-        """统一的 OSS 服务请求方法"""
-        url = urljoin(settings.oss_service_url, endpoint)
+        extension = mimetypes.guess_extension(content_type) or ""
+        if extension == ".jpe":
+            extension = ".jpg"
+
+        key = f"{folder}/{user_id}/{uuid.uuid4().hex}{extension}"
 
         try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
-                response = await client.request(
-                    method=method,
-                    url=url,
-                    headers=self.headers,
-                    params=params,
-                    json=payload,
-                )
-                response.raise_for_status()
-                result = response.json()
-
-                if result.get("code") != 0:
-                    logger.warning(f"ObjectStorage service error: {result}")
-                    error_msg = result.get("error", "Unknown error")
-                    message = result.get("message", "")
-                    raise ValueError(f"ObjectStorage service error: {error_msg}. {message}")
-
-                return result.get("data", [])
-        except httpx.HTTPStatusError as e:
-            error_msg = f"ObjectStorage service HTTP error: {e.response.status_code} - {e.response.text}"
-            logger.error(error_msg)
-            raise ValueError(error_msg)
+            upload_url = self.client.generate_presigned_url(
+                ClientMethod="put_object",
+                Params={
+                    "Bucket": self.bucket_name,
+                    "Key": key,
+                    "ContentType": content_type,
+                },
+                ExpiresIn=MAX_UPLOAD_URL_EXPIRY_SECONDS,
+            )
         except Exception as e:
-            logger.error(f"Failed to call ObjectStorage service: {e}")
+            logger.error(f"Failed to generate presigned upload URL: {e}")
             raise
+
+        return {
+            "upload_url": upload_url,
+            "public_url": f"{self.public_url}/{key}",
+            "key": key,
+        }

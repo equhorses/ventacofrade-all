@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Layout from '@/components/Layout';
 import { client } from '@/lib/api';
-import { Upload, ImagePlus } from 'lucide-react';
+import { Upload, ImagePlus, X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Category {
@@ -22,12 +22,18 @@ const provinces = [
   'Madrid', 'Barcelona', 'Valencia', 'Murcia', 'Otra',
 ];
 
+const MAX_IMAGES = 6;
+const MAX_FILE_SIZE_MB = 5;
+
 export default function PublicarPage() {
   const navigate = useNavigate();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<unknown>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [uploadingCount, setUploadingCount] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
     title: '',
@@ -37,7 +43,6 @@ export default function PublicarPage() {
     condition: '',
     location_province: '',
     location_city: '',
-    images: '',
   });
 
   useEffect(() => {
@@ -67,6 +72,49 @@ export default function PublicarPage() {
     }
   };
 
+  const handleFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = ''; // allow re-selecting the same file later
+    if (files.length === 0) return;
+
+    const remainingSlots = MAX_IMAGES - imageUrls.length;
+    if (remainingSlots <= 0) {
+      toast.error(`Máximo ${MAX_IMAGES} imágenes por anuncio`);
+      return;
+    }
+
+    const filesToUpload = files.slice(0, remainingSlots);
+    if (files.length > remainingSlots) {
+      toast.info(`Solo se subirán ${remainingSlots} imagen(es) más (máximo ${MAX_IMAGES})`);
+    }
+
+    for (const file of filesToUpload) {
+      if (!file.type.startsWith('image/')) {
+        toast.error(`${file.name} no es una imagen válida`);
+        continue;
+      }
+      if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+        toast.error(`${file.name} pesa demasiado (máx. ${MAX_FILE_SIZE_MB}MB)`);
+        continue;
+      }
+
+      setUploadingCount((c) => c + 1);
+      try {
+        const publicUrl = await client.storage.uploadImage(file, 'products');
+        setImageUrls((prev) => [...prev, publicUrl]);
+      } catch (err) {
+        console.error('Error uploading image:', err);
+        toast.error(`No se pudo subir ${file.name}`);
+      } finally {
+        setUploadingCount((c) => c - 1);
+      }
+    }
+  };
+
+  const handleRemoveImage = (url: string) => {
+    setImageUrls((prev) => prev.filter((u) => u !== url));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
@@ -77,6 +125,11 @@ export default function PublicarPage() {
 
     if (!form.title || !form.price || !form.category_id || !form.condition || !form.location_province) {
       toast.error('Completa todos los campos obligatorios');
+      return;
+    }
+
+    if (imageUrls.length === 0) {
+      toast.error('Añade al menos una foto del artículo');
       return;
     }
 
@@ -91,7 +144,7 @@ export default function PublicarPage() {
           condition: form.condition,
           location_province: form.location_province,
           location_city: form.location_city,
-          images: form.images,
+          images: imageUrls.join(','),
           status: 'active',
           views_count: 0,
           is_featured: false,
@@ -241,27 +294,65 @@ export default function PublicarPage() {
                 </div>
               </div>
 
-              {/* Images URL */}
+              {/* Images */}
               <div className="space-y-2">
-                <Label htmlFor="images">URL de imágenes</Label>
-                <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
-                  <ImagePlus className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                  <p className="text-sm text-muted-foreground mb-2">Introduce URLs de imágenes separadas por coma</p>
-                  <Input
-                    id="images"
-                    value={form.images}
-                    onChange={(e) => setForm({ ...form, images: e.target.value })}
-                    placeholder="https://ejemplo.com/foto1.jpg, https://ejemplo.com/foto2.jpg"
-                  />
-                </div>
+                <Label>Fotos *</Label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  multiple
+                  onChange={handleFilesSelected}
+                  className="hidden"
+                />
+
+                {(imageUrls.length > 0 || uploadingCount > 0) && (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 mb-3">
+                    {imageUrls.map((url) => (
+                      <div key={url} className="relative aspect-square rounded-lg overflow-hidden border border-border group">
+                        <img src={url} alt="Foto del artículo" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveImage(url)}
+                          className="absolute top-1 right-1 bg-black/60 hover:bg-black/80 text-white rounded-full p-1 cursor-pointer transition-colors"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                    {Array.from({ length: uploadingCount }).map((_, i) => (
+                      <div
+                        key={`uploading-${i}`}
+                        className="aspect-square rounded-lg border border-dashed border-border flex items-center justify-center bg-muted/50"
+                      >
+                        <Loader2 className="h-5 w-5 text-muted-foreground animate-spin" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {imageUrls.length < MAX_IMAGES && (
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-primary/40 hover:bg-muted/30 transition-colors"
+                  >
+                    <ImagePlus className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                    <p className="text-sm text-muted-foreground">
+                      Toca para elegir fotos desde tu dispositivo
+                    </p>
+                    <p className="text-xs text-muted-foreground/70 mt-1">
+                      JPG, PNG o WEBP · máx. {MAX_FILE_SIZE_MB}MB cada una · hasta {MAX_IMAGES} fotos
+                    </p>
+                  </div>
+                )}
               </div>
 
               <Button
                 type="submit"
-                disabled={loading}
+                disabled={loading || uploadingCount > 0}
                 className="w-full bg-primary hover:bg-primary/90 h-12 text-base cursor-pointer"
               >
-                {loading ? 'Publicando...' : 'Publicar anuncio'}
+                {loading ? 'Publicando...' : uploadingCount > 0 ? 'Subiendo fotos...' : 'Publicar anuncio'}
               </Button>
             </CardContent>
           </Card>

@@ -14,6 +14,7 @@ router = APIRouter(prefix="/api/v1/users", tags=["users"])
 
 class UpdateProfileRequest(BaseModel):
     name: Optional[str] = None
+    avatar_url: Optional[str] = None
 
 
 @router.get("/profile", response_model=UserResponse)
@@ -32,7 +33,9 @@ async def update_profile(
     current_user: User = Depends(get_current_user),
 ):
     """Update current user profile"""
-    profile = await UserService.update_user_profile(db, current_user.id, profile_data.name)
+    profile = await UserService.update_user_profile(
+        db, current_user.id, name=profile_data.name, avatar_url=profile_data.avatar_url
+    )
     if not profile:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User profile not found")
     return profile

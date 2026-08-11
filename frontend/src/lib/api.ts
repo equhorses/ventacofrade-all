@@ -112,9 +112,38 @@ export const client = {
       const response = await http.get(`${baseUrl()}/api/v1/users/profile`);
       return { data: response.data };
     },
-    async updateProfile(data: { name?: string }) {
+    async updateProfile(data: { name?: string; avatar_url?: string }) {
       const response = await http.put(`${baseUrl()}/api/v1/users/profile`, data);
       return { data: response.data };
+    },
+  },
+  storage: {
+    /**
+     * Uploads a single image file directly to Cloudflare R2 using a
+     * short-lived presigned URL obtained from our backend, and returns the
+     * public URL where the image will be accessible.
+     */
+    async uploadImage(file: File, folder: 'products' | 'avatars'): Promise<string> {
+      const presignResponse = await http.post(`${baseUrl()}/api/v1/storage/presigned-upload`, {
+        filename: file.name,
+        content_type: file.type,
+        folder,
+      });
+      const { upload_url, public_url } = presignResponse.data;
+
+      // Upload directly to R2 (not through our backend) using plain fetch,
+      // since this request must NOT include our own Authorization header.
+      const uploadResponse = await fetch(upload_url, {
+        method: 'PUT',
+        headers: { 'Content-Type': file.type },
+        body: file,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error('No se pudo subir la imagen');
+      }
+
+      return public_url;
     },
   },
 };

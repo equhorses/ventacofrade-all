@@ -11,6 +11,7 @@ interface User {
   id: string;
   email: string;
   name?: string;
+  avatar_url?: string;
   role: string;
   last_login?: string;
 }

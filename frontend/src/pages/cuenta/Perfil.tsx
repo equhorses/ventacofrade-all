@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import AccountLayout from '@/components/AccountLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   Select,
   SelectContent,
@@ -16,7 +17,7 @@ import {
 } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
 import { client } from '@/lib/api';
-import { Store, ShieldCheck } from 'lucide-react';
+import { Store, ShieldCheck, Camera, Loader2 } from 'lucide-react';
 
 const provinces = [
   'Almería',
@@ -46,6 +47,8 @@ export default function PerfilPage() {
   // Basic account info
   const [name, setName] = useState(user?.name || '');
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Seller / shop info
   const [sellerProfile, setSellerProfile] = useState<SellerProfile | null>(null);
@@ -78,6 +81,34 @@ export default function PerfilPage() {
     };
     loadSellerProfile();
   }, []);
+
+  const handleAvatarSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Elige un archivo de imagen válido');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('La imagen no puede pesar más de 5MB');
+      return;
+    }
+
+    setUploadingAvatar(true);
+    try {
+      const publicUrl = await client.storage.uploadImage(file, 'avatars');
+      await client.users.updateProfile({ avatar_url: publicUrl });
+      await refetch();
+      toast.success('Foto de perfil actualizada');
+    } catch (err) {
+      console.error('Error uploading avatar:', err);
+      toast.error('No se pudo subir la foto. Inténtalo de nuevo.');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -134,6 +165,43 @@ export default function PerfilPage() {
         {/* Basic account info */}
         <Card>
           <CardContent className="p-6">
+            <div className="flex items-center gap-4 mb-6">
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                onChange={handleAvatarSelected}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => avatarInputRef.current?.click()}
+                disabled={uploadingAvatar}
+                className="relative group cursor-pointer disabled:cursor-wait"
+                title="Cambiar foto de perfil"
+              >
+                <Avatar className="h-20 w-20 border border-border">
+                  <AvatarImage src={user?.avatar_url || undefined} alt={user?.name || 'Avatar'} />
+                  <AvatarFallback className="bg-primary text-primary-foreground text-2xl font-semibold">
+                    {(user?.name?.trim() || user?.email || '?').slice(0, 1).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="absolute inset-0 rounded-full bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                  {uploadingAvatar ? (
+                    <Loader2 className="h-5 w-5 text-white animate-spin" />
+                  ) : (
+                    <Camera className="h-5 w-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                  )}
+                </div>
+              </button>
+              <div>
+                <p className="font-medium text-foreground">Foto de perfil</p>
+                <p className="text-xs text-muted-foreground">
+                  Toca la imagen para cambiarla. JPG, PNG o WEBP, máx. 5MB.
+                </p>
+              </div>
+            </div>
+
             <form onSubmit={handleSave} className="space-y-5 max-w-md">
               <div className="space-y-2">
                 <Label htmlFor="name">Nombre</Label>
