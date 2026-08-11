@@ -1,7 +1,7 @@
 import logging
 from typing import Optional, Dict, Any, List
 
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.messages import Messages
@@ -42,7 +42,19 @@ class MessagesService:
             return False
 
     async def get_by_id(self, obj_id: int, user_id: Optional[str] = None) -> Optional[Messages]:
-        """Get messages by ID (user can only see their own records)"""
+        """Get messages by ID (visible to sender or receiver)"""
+        try:
+            query = select(Messages).where(Messages.id == obj_id)
+            if user_id:
+                query = query.where(or_(Messages.user_id == user_id, Messages.receiver_id == user_id))
+            result = await self.db.execute(query)
+            return result.scalar_one_or_none()
+        except Exception as e:
+            logger.error(f"Error fetching messages {obj_id}: {str(e)}")
+            raise
+
+    async def get_by_id_owned(self, obj_id: int, user_id: Optional[str] = None) -> Optional[Messages]:
+        """Get messages by ID, but only if the current user is the SENDER (for edit/delete)"""
         try:
             query = select(Messages).where(Messages.id == obj_id)
             if user_id:
@@ -50,7 +62,7 @@ class MessagesService:
             result = await self.db.execute(query)
             return result.scalar_one_or_none()
         except Exception as e:
-            logger.error(f"Error fetching messages {obj_id}: {str(e)}")
+            logger.error(f"Error fetching owned messages {obj_id}: {str(e)}")
             raise
 
     async def get_list(
@@ -67,8 +79,8 @@ class MessagesService:
             count_query = select(func.count(Messages.id))
             
             if user_id:
-                query = query.where(Messages.user_id == user_id)
-                count_query = count_query.where(Messages.user_id == user_id)
+                query = query.where(or_(Messages.user_id == user_id, Messages.receiver_id == user_id))
+                count_query = count_query.where(or_(Messages.user_id == user_id, Messages.receiver_id == user_id))
             
             if query_dict:
                 for field, value in query_dict.items():
@@ -104,14 +116,27 @@ class MessagesService:
             raise
 
     async def update(self, obj_id: int, update_data: Dict[str, Any], user_id: Optional[str] = None) -> Optional[Messages]:
-        """Update messages (requires ownership)"""
+        """
+        Update messages. Content edits are restricted to the sender; marking
+        a message as read is restricted to the receiver.
+        """
         try:
             obj = await self.get_by_id(obj_id, user_id=user_id)
             if not obj:
                 logger.warning(f"Messages {obj_id} not found for update")
                 return None
+
+            is_sender = user_id is not None and obj.user_id == user_id
+            is_receiver = user_id is not None and obj.receiver_id == user_id
+
             for key, value in update_data.items():
-                if hasattr(obj, key) and key != 'user_id':
+                if key == 'user_id':
+                    continue
+                if key == 'is_read':
+                    if is_receiver:
+                        obj.is_read = value
+                    continue
+                if is_sender and hasattr(obj, key):
                     setattr(obj, key, value)
 
             await self.db.commit()
@@ -124,9 +149,9 @@ class MessagesService:
             raise
 
     async def delete(self, obj_id: int, user_id: Optional[str] = None) -> bool:
-        """Delete messages (requires ownership)"""
+        """Delete messages (only the sender may delete their own message)"""
         try:
-            obj = await self.get_by_id(obj_id, user_id=user_id)
+            obj = await self.get_by_id_owned(obj_id, user_id=user_id)
             if not obj:
                 logger.warning(f"Messages {obj_id} not found for deletion")
                 return False

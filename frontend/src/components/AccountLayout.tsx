@@ -1,8 +1,9 @@
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/AuthContext';
+import { client } from '@/lib/api';
 import { User, Package, MessageCircle, Heart, CreditCard } from 'lucide-react';
 
 interface AccountLayoutProps {
@@ -28,12 +29,23 @@ export default function AccountLayout({ children, title, description }: AccountL
   const { user, loading } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     if (!loading && !user) {
       navigate('/login', { replace: true });
     }
   }, [loading, user, navigate]);
+
+  useEffect(() => {
+    if (!user) return;
+    client.conversations
+      .unreadCount()
+      .then((res) => setUnreadCount(res?.data?.count || 0))
+      .catch(() => {
+        // Non-critical: if this fails we just don't show a badge.
+      });
+  }, [user, location.pathname]);
 
   if (loading) {
     return (
@@ -70,8 +82,9 @@ export default function AccountLayout({ children, title, description }: AccountL
             </div>
             <nav className="flex md:flex-col gap-1 overflow-x-auto pb-2 md:pb-0">
               {navItems.map((item) => {
-                const active = location.pathname === item.href;
+                const active = location.pathname.startsWith(item.href);
                 const Icon = item.icon;
+                const showBadge = item.href === '/cuenta/mensajes' && unreadCount > 0;
                 return (
                   <Link
                     key={item.href}
@@ -84,6 +97,11 @@ export default function AccountLayout({ children, title, description }: AccountL
                   >
                     <Icon className="h-4 w-4 shrink-0" />
                     {item.label}
+                    {showBadge && (
+                      <span className="ml-auto bg-primary text-primary-foreground text-[10px] font-semibold rounded-full h-4 min-w-4 px-1 flex items-center justify-center">
+                        {unreadCount}
+                      </span>
+                    )}
                   </Link>
                 );
               })}

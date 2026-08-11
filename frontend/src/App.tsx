@@ -14,6 +14,7 @@ import Login from './pages/Login';
 import PerfilPage from './pages/cuenta/Perfil';
 import MisAnunciosPage from './pages/cuenta/MisAnuncios';
 import MensajesPage from './pages/cuenta/Mensajes';
+import ConversacionPage from './pages/cuenta/Conversacion';
 import FavoritosPage from './pages/cuenta/Favoritos';
 import SuscripcionPage from './pages/cuenta/Suscripcion';
 import { AuthProvider } from './contexts/AuthContext';
@@ -34,6 +35,7 @@ const AppRoutes = () => (
     <Route path="/cuenta/perfil" element={<PerfilPage />} />
     <Route path="/cuenta/anuncios" element={<MisAnunciosPage />} />
     <Route path="/cuenta/mensajes" element={<MensajesPage />} />
+    <Route path="/cuenta/mensajes/:productId/:otherUserId" element={<ConversacionPage />} />
     <Route path="/cuenta/favoritos" element={<FavoritosPage />} />
     <Route path="/cuenta/suscripcion" element={<SuscripcionPage />} />
     <Route path="/auth/callback" element={<AuthCallback />} />

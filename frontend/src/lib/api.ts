@@ -146,4 +146,18 @@ export const client = {
       return public_url;
     },
   },
+  conversations: {
+    async list() {
+      const response = await http.get(`${baseUrl()}/api/v1/messages/conversations`);
+      return { data: response.data };
+    },
+    async unreadCount() {
+      const response = await http.get(`${baseUrl()}/api/v1/messages/unread-count`);
+      return { data: response.data as { count: number } };
+    },
+    async getThread(productId: number | string, otherUserId: string) {
+      const response = await http.get(`${baseUrl()}/api/v1/messages/conversations/${productId}/${otherUserId}`);
+      return { data: response.data };
+    },
+  },
 };

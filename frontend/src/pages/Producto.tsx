@@ -33,6 +33,12 @@ const conditionLabels: Record<string, string> = {
   restaurado: 'Restaurado',
 };
 
+const QUICK_MESSAGES = [
+  'Hola, ¿sigue disponible?',
+  'Me interesa, ¿aceptas envío?',
+  '¿Es negociable el precio?',
+];
+
 export default function ProductoPage() {
   const { id } = useParams<{ id: string }>();
   const [product, setProduct] = useState<Product | null>(null);
@@ -221,6 +227,18 @@ export default function ProductoPage() {
                     <User className="h-4 w-4 text-primary" />
                   </div>
                   <span className="font-medium text-sm">Contactar vendedor</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {QUICK_MESSAGES.map((phrase) => (
+                    <button
+                      key={phrase}
+                      type="button"
+                      onClick={() => setMessage((prev) => (prev ? `${prev} ${phrase}` : phrase))}
+                      className="text-xs px-2.5 py-1 rounded-full border border-border text-muted-foreground hover:border-primary/40 hover:text-primary transition-colors cursor-pointer"
+                    >
+                      {phrase}
+                    </button>
+                  ))}
                 </div>
                 <Textarea
                   value={message}

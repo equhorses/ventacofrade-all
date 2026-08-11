@@ -213,7 +213,23 @@ export default function PublicarPage() {
 
               {/* Description */}
               <div className="space-y-2">
-                <Label htmlFor="description">Descripción</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="description">Descripción</Label>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setForm((f) => ({
+                        ...f,
+                        description:
+                          f.description ||
+                          'Estado: [nuevo/usado/restaurado]. Medidas aproximadas: [alto x ancho x fondo]. Material: [plata, madera, tela...]. Motivo de venta: [opcional]. Envío: a convenir con el comprador.',
+                      }))
+                    }
+                    className="text-xs text-primary hover:underline cursor-pointer"
+                  >
+                    Usar plantilla
+                  </button>
+                </div>
                 <Textarea
                   id="description"
                   value={form.description}

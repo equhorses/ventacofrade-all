@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -35,6 +35,17 @@ export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user, logout } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!user) return;
+    client.conversations
+      .unreadCount()
+      .then((res) => setUnreadCount(res?.data?.count || 0))
+      .catch(() => {
+        // Non-critical: if this fails we just don't show a badge.
+      });
+  }, [user, location.pathname]);
 
   const navLinks = [
     { href: '/explorar', label: 'Explorar' },
@@ -131,9 +142,14 @@ export default function Layout({ children }: LayoutProps) {
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild className="cursor-pointer">
-                      <Link to="/cuenta/mensajes">
+                      <Link to="/cuenta/mensajes" className="flex items-center">
                         <MessageCircle className="h-4 w-4 mr-2" />
                         Mensajes
+                        {unreadCount > 0 && (
+                          <span className="ml-auto bg-primary text-primary-foreground text-[10px] font-semibold rounded-full h-4 min-w-4 px-1 flex items-center justify-center">
+                            {unreadCount}
+                          </span>
+                        )}
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild className="cursor-pointer">
