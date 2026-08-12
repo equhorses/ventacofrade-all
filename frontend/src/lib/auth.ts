@@ -61,12 +61,13 @@ class RPApi {
     }
   }
 
-  async register(email: string, password: string, name?: string) {
+  async register(email: string, password: string, name?: string, turnstileToken?: string) {
     try {
       const response = await this.client.post(`${this.getBaseURL()}/api/v1/auth/register`, {
         email,
         password,
         name,
+        turnstile_token: turnstileToken,
       });
       setStoredToken(response.data.token);
       return response.data.user;

@@ -15,6 +15,7 @@ from schemas.auth import (
     UserResponse,
 )
 from services.auth import AuthService
+from services.turnstile import verify_turnstile_token
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/api/v1/auth", tags=["authentication"])
@@ -27,8 +28,16 @@ GOOGLE_STATE_COOKIE = "google_oauth_state"
 
 
 @router.post("/register", response_model=AuthTokenResponse, status_code=status.HTTP_201_CREATED)
-async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db)):
+async def register(payload: RegisterRequest, request: Request, db: AsyncSession = Depends(get_db)):
     """Create a new account with email + password and return a session token."""
+    client_ip = request.client.host if request.client else None
+    captcha_ok = await verify_turnstile_token(payload.turnstile_token, remote_ip=client_ip)
+    if not captcha_ok:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No se pudo verificar que eres una persona. Vuelve a intentarlo.",
+        )
+
     auth_service = AuthService(db)
     user = await auth_service.register_user(email=payload.email, password=payload.password, name=payload.name)
     token, expires_at, _ = await auth_service.issue_app_token(user=user)

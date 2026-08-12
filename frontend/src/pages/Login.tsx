@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,45 @@ import Layout from '@/components/Layout';
 import { toast } from 'sonner';
 import { authApi } from '@/lib/auth';
 import { getAPIBaseURL } from '@/lib/config';
+
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
+const TURNSTILE_SCRIPT_ID = 'cf-turnstile-script';
+
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (
+        container: HTMLElement,
+        options: {
+          sitekey: string;
+          callback: (token: string) => void;
+          'error-callback'?: () => void;
+          'expired-callback'?: () => void;
+        }
+      ) => string;
+      remove: (widgetId: string) => void;
+    };
+  }
+}
+
+function loadTurnstileScript(onReady: () => void) {
+  if (window.turnstile) {
+    onReady();
+    return;
+  }
+  const existing = document.getElementById(TURNSTILE_SCRIPT_ID);
+  if (existing) {
+    existing.addEventListener('load', onReady, { once: true });
+    return;
+  }
+  const script = document.createElement('script');
+  script.id = TURNSTILE_SCRIPT_ID;
+  script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+  script.async = true;
+  script.defer = true;
+  script.addEventListener('load', onReady, { once: true });
+  document.head.appendChild(script);
+}
 
 function GoogleIcon() {
   return (
@@ -40,11 +79,41 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileContainerRef = useRef<HTMLDivElement>(null);
+  const turnstileWidgetId = useRef<string | null>(null);
 
   useEffect(() => {
     const error = searchParams.get('error');
     if (error) toast.error(error);
   }, [searchParams]);
+
+  // Render the Turnstile widget only while in "register" mode, and clean
+  // it up when leaving that mode or unmounting.
+  useEffect(() => {
+    if (mode !== 'register' || !TURNSTILE_SITE_KEY) return;
+
+    let cancelled = false;
+    setTurnstileToken(null);
+
+    loadTurnstileScript(() => {
+      if (cancelled || !turnstileContainerRef.current || !window.turnstile) return;
+      turnstileWidgetId.current = window.turnstile.render(turnstileContainerRef.current, {
+        sitekey: TURNSTILE_SITE_KEY,
+        callback: (token) => setTurnstileToken(token),
+        'error-callback': () => setTurnstileToken(null),
+        'expired-callback': () => setTurnstileToken(null),
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      if (turnstileWidgetId.current && window.turnstile) {
+        window.turnstile.remove(turnstileWidgetId.current);
+        turnstileWidgetId.current = null;
+      }
+    };
+  }, [mode]);
 
   const handleGoogleLogin = () => {
     window.location.href = `${getAPIBaseURL()}/api/v1/auth/google/login`;
@@ -52,10 +121,16 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (mode === 'register' && TURNSTILE_SITE_KEY && !turnstileToken) {
+      toast.error('Confirma que no eres un robot antes de continuar');
+      return;
+    }
+
     setLoading(true);
     try {
       if (mode === 'register') {
-        await authApi.register(email, password, name || undefined);
+        await authApi.register(email, password, name || undefined, turnstileToken || undefined);
         toast.success('Cuenta creada correctamente');
       } else {
         await authApi.login(email, password);
@@ -144,6 +219,9 @@ export default function LoginPage() {
                   placeholder="Mínimo 8 caracteres"
                 />
               </div>
+              {mode === 'register' && TURNSTILE_SITE_KEY && (
+                <div ref={turnstileContainerRef} className="flex justify-center" />
+              )}
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? 'Un momento...' : mode === 'login' ? 'Entrar' : 'Crear cuenta'}
               </Button>

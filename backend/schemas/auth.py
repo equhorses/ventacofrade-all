@@ -34,6 +34,7 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     name: Optional[str] = None
+    turnstile_token: Optional[str] = None
 
 
 class LoginRequest(BaseModel):
