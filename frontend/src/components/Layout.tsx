@@ -39,12 +39,37 @@ export default function Layout({ children }: LayoutProps) {
 
   useEffect(() => {
     if (!user) return;
-    client.conversations
-      .unreadCount()
-      .then((res) => setUnreadCount(res?.data?.count || 0))
-      .catch(() => {
-        // Non-critical: if this fails we just don't show a badge.
-      });
+
+    const fetchUnread = () => {
+      client.conversations
+        .unreadCount()
+        .then((res) => setUnreadCount(res?.data?.count || 0))
+        .catch(() => {
+          // Non-critical: if this fails we just don't show a badge.
+        });
+    };
+
+    fetchUnread();
+
+    // Poll periodically so the badge updates even without navigating
+    // (there's no realtime push/websocket layer yet).
+    const intervalId = setInterval(fetchUnread, 20000);
+
+    // Also refresh right away when the tab regains focus/visibility.
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') fetchUnread();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', fetchUnread);
+    // Instant refresh right after sending/reading a message in this tab.
+    window.addEventListener('messages:updated', fetchUnread);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', fetchUnread);
+      window.removeEventListener('messages:updated', fetchUnread);
+    };
   }, [user, location.pathname]);
 
   const navLinks = [

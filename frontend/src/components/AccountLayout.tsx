@@ -39,12 +39,31 @@ export default function AccountLayout({ children, title, description }: AccountL
 
   useEffect(() => {
     if (!user) return;
-    client.conversations
-      .unreadCount()
-      .then((res) => setUnreadCount(res?.data?.count || 0))
-      .catch(() => {
-        // Non-critical: if this fails we just don't show a badge.
-      });
+
+    const fetchUnread = () => {
+      client.conversations
+        .unreadCount()
+        .then((res) => setUnreadCount(res?.data?.count || 0))
+        .catch(() => {
+          // Non-critical: if this fails we just don't show a badge.
+        });
+    };
+
+    fetchUnread();
+    const intervalId = setInterval(fetchUnread, 20000);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') fetchUnread();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', fetchUnread);
+    window.addEventListener('messages:updated', fetchUnread);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', fetchUnread);
+      window.removeEventListener('messages:updated', fetchUnread);
+    };
   }, [user, location.pathname]);
 
   if (loading) {

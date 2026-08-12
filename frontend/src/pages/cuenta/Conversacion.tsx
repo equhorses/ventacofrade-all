@@ -57,6 +57,9 @@ export default function ConversacionPage() {
       setMessages(res?.data?.messages || []);
       setProduct(res?.data?.product || null);
       setOtherUser(res?.data?.other_user || null);
+      // Opening a thread marks unread messages as read on the backend,
+      // so refresh the header's unread badge right away.
+      window.dispatchEvent(new Event('messages:updated'));
     } catch (err) {
       console.error('Error loading thread:', err);
       toast.error('No se pudo cargar la conversación');
@@ -87,6 +90,7 @@ export default function ConversacionPage() {
       });
       setContent('');
       await loadThread();
+      window.dispatchEvent(new Event('messages:updated'));
     } catch (err) {
       console.error('Error sending message:', err);
       toast.error('No se pudo enviar el mensaje');

@@ -89,6 +89,7 @@ export default function ProductoPage() {
         },
       });
       toast.success('Mensaje enviado al vendedor');
+      window.dispatchEvent(new Event('messages:updated'));
       setMessage('');
     } catch {
       toast.error('Inicia sesión para enviar mensajes');
