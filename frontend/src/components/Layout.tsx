@@ -110,6 +110,19 @@ export default function Layout({ children }: LayoutProps) {
               <Link to={favoritesHref} className="p-2 rounded-md hover:bg-muted transition-colors cursor-pointer">
                 <Heart className="h-5 w-5 text-muted-foreground" />
               </Link>
+              {user && (
+                <Link
+                  to="/cuenta/mensajes"
+                  className="relative p-2 rounded-md hover:bg-muted transition-colors cursor-pointer"
+                >
+                  <MessageCircle className="h-5 w-5 text-muted-foreground" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-0.5 right-0.5 bg-red-500 text-white text-[9px] font-bold rounded-full h-4 min-w-4 px-1 flex items-center justify-center leading-none">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </Link>
+              )}
               {user ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
