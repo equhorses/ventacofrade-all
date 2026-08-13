@@ -18,6 +18,8 @@ class Seller_profiles(Base):
     subscription_status = Column(String(20), nullable=True, default='inactive', server_default='inactive')
     subscription_end_date = Column(DateTime(timezone=True), nullable=True)
     activation_paid = Column(Boolean, nullable=True, default=False, server_default='false')
+    stripe_customer_id = Column(String(100), nullable=True)
+    stripe_subscription_id = Column(String(100), nullable=True)
     rating = Column(Float, nullable=True, default=0, server_default='0')
     total_sales = Column(Integer, nullable=True, default=0, server_default='0')
     created_at = Column(DateTime(timezone=True), default=datetime.now)

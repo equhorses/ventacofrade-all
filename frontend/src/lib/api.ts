@@ -160,4 +160,10 @@ export const client = {
       return { data: response.data };
     },
   },
+  payments: {
+    async createCheckout(plan: 'basico' | 'profesional') {
+      const response = await http.post(`${baseUrl()}/api/v1/payments/checkout`, { plan });
+      return { data: response.data as { url: string } };
+    },
+  },
 };
