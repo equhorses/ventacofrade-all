@@ -17,6 +17,7 @@ import {
   Music,
   Gem,
   Package,
+  Landmark,
   MapPin,
   Shield,
   Users,
@@ -55,6 +56,7 @@ const iconMap: Record<string, React.ReactNode> = {
   music: <Music className="h-6 w-6" />,
   gem: <Gem className="h-6 w-6" />,
   package: <Package className="h-6 w-6" />,
+  landmark: <Landmark className="h-6 w-6" />,
 };
 
 export default function HomePage() {
