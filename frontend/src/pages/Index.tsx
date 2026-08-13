@@ -16,6 +16,7 @@ import {
   Medal,
   Music,
   Gem,
+  Package,
   MapPin,
   Shield,
   Users,
@@ -53,6 +54,7 @@ const iconMap: Record<string, React.ReactNode> = {
   medal: <Medal className="h-6 w-6" />,
   music: <Music className="h-6 w-6" />,
   gem: <Gem className="h-6 w-6" />,
+  package: <Package className="h-6 w-6" />,
 };
 
 export default function HomePage() {
@@ -69,7 +71,7 @@ export default function HomePage() {
   const loadData = async () => {
     try {
       const [catRes, prodRes] = await Promise.all([
-        client.entities.categories.query({ sort: 'order_index', limit: 8 }),
+        client.entities.categories.query({ sort: 'order_index', limit: 12 }),
         client.entities.products.query({ query: { status: 'active' }, sort: '-created_at', limit: 6 }),
       ]);
       const cats = catRes?.data?.items || [];
