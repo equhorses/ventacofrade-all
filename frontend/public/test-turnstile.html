@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Prueba Turnstile en dominio real</title>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+  <style>
+    body { font-family: sans-serif; padding: 40px; text-align: center; }
+    h1 { color: #591B98; }
+  </style>
+</head>
+<body>
+  <h1>Prueba de Turnstile en el dominio REAL</h1>
+  <p>Esta pagina se sirve desde ventacofrade-all.vercel.app pero NO usa React.</p>
+  <p>Usa exactamente el mismo metodo de renderizado (JS explicito) que la web real.</p>
+  <div id="resultado" style="margin-bottom: 20px; font-weight: bold;"></div>
+  <hr />
+  <div id="widget-container" style="display: flex; justify-content: center;"></div>
+
+  <script>
+    function esperarTurnstile() {
+      if (window.turnstile) {
+        renderizar();
+      } else {
+        setTimeout(esperarTurnstile, 100);
+      }
+    }
+    function renderizar() {
+      window.turnstile.render(document.getElementById('widget-container'), {
+        sitekey: '0x4AAAAAAAEO5GqBz7UWzQchq',
+        callback: function(token) {
+          document.getElementById('resultado').textContent = 'EXITO! Token: ' + token.substring(0, 25) + '...';
+          document.getElementById('resultado').style.color = 'green';
+        },
+        'error-callback': function() {
+          document.getElementById('resultado').textContent = 'ERROR en el widget';
+          document.getElementById('resultado').style.color = 'red';
+        },
+        'expired-callback': function() {
+          document.getElementById('resultado').textContent = 'Token expirado';
+          document.getElementById('resultado').style.color = 'orange';
+        }
+      });
+    }
+    esperarTurnstile();
+  </script>
+</body>
+</html>
