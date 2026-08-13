@@ -9,12 +9,13 @@ import { toast } from 'sonner';
 import { authApi } from '@/lib/auth';
 import { getAPIBaseURL } from '@/lib/config';
 
-const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
-const TURNSTILE_SCRIPT_ID = 'cf-turnstile-script';
+const HCAPTCHA_SITE_KEY = import.meta.env.VITE_HCAPTCHA_SITE_KEY as string | undefined;
+const HCAPTCHA_SCRIPT_ID = 'hcaptcha-script';
+const HCAPTCHA_ONLOAD_CALLBACK_NAME = '__onHCaptchaLoad';
 
 declare global {
   interface Window {
-    turnstile?: {
+    hcaptcha?: {
       render: (
         container: HTMLElement,
         options: {
@@ -24,27 +25,32 @@ declare global {
           'expired-callback'?: () => void;
         }
       ) => string;
-      remove: (widgetId: string) => void;
+      reset: (widgetId: string) => void;
     };
+    [HCAPTCHA_ONLOAD_CALLBACK_NAME]?: () => void;
   }
 }
 
-function loadTurnstileScript(onReady: () => void) {
-  if (window.turnstile) {
+function loadHCaptchaScript(onReady: () => void) {
+  if (window.hcaptcha) {
     onReady();
     return;
   }
-  const existing = document.getElementById(TURNSTILE_SCRIPT_ID);
-  if (existing) {
-    existing.addEventListener('load', onReady, { once: true });
-    return;
-  }
+  // hCaptcha's own docs recommend waiting for their onload callback rather
+  // than the script tag's 'load' event, to avoid racing their SDK setup.
+  const existingCallback = window[HCAPTCHA_ONLOAD_CALLBACK_NAME];
+  window[HCAPTCHA_ONLOAD_CALLBACK_NAME] = () => {
+    existingCallback?.();
+    onReady();
+  };
+
+  if (document.getElementById(HCAPTCHA_SCRIPT_ID)) return;
+
   const script = document.createElement('script');
-  script.id = TURNSTILE_SCRIPT_ID;
-  script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+  script.id = HCAPTCHA_SCRIPT_ID;
+  script.src = `https://js.hcaptcha.com/1/api.js?render=explicit&onload=${HCAPTCHA_ONLOAD_CALLBACK_NAME}`;
   script.async = true;
   script.defer = true;
-  script.addEventListener('load', onReady, { once: true });
   document.head.appendChild(script);
 }
 
@@ -79,39 +85,35 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-  const turnstileContainerRef = useRef<HTMLDivElement>(null);
-  const turnstileWidgetId = useRef<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captchaContainerRef = useRef<HTMLDivElement>(null);
+  const captchaWidgetId = useRef<string | null>(null);
 
   useEffect(() => {
     const error = searchParams.get('error');
     if (error) toast.error(error);
   }, [searchParams]);
 
-  // Render the Turnstile widget only while in "register" mode, and clean
-  // it up when leaving that mode or unmounting.
+  // Render the hCaptcha widget only while in "register" mode.
   useEffect(() => {
-    if (mode !== 'register' || !TURNSTILE_SITE_KEY) return;
+    if (mode !== 'register' || !HCAPTCHA_SITE_KEY) return;
 
     let cancelled = false;
-    setTurnstileToken(null);
+    setCaptchaToken(null);
+    captchaWidgetId.current = null;
 
-    loadTurnstileScript(() => {
-      if (cancelled || !turnstileContainerRef.current || !window.turnstile) return;
-      turnstileWidgetId.current = window.turnstile.render(turnstileContainerRef.current, {
-        sitekey: TURNSTILE_SITE_KEY,
-        callback: (token) => setTurnstileToken(token),
-        'error-callback': () => setTurnstileToken(null),
-        'expired-callback': () => setTurnstileToken(null),
+    loadHCaptchaScript(() => {
+      if (cancelled || !captchaContainerRef.current || !window.hcaptcha) return;
+      captchaWidgetId.current = window.hcaptcha.render(captchaContainerRef.current, {
+        sitekey: HCAPTCHA_SITE_KEY,
+        callback: (token) => setCaptchaToken(token),
+        'error-callback': () => setCaptchaToken(null),
+        'expired-callback': () => setCaptchaToken(null),
       });
     });
 
     return () => {
       cancelled = true;
-      if (turnstileWidgetId.current && window.turnstile) {
-        window.turnstile.remove(turnstileWidgetId.current);
-        turnstileWidgetId.current = null;
-      }
     };
   }, [mode]);
 
@@ -122,7 +124,7 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (mode === 'register' && TURNSTILE_SITE_KEY && !turnstileToken) {
+    if (mode === 'register' && HCAPTCHA_SITE_KEY && !captchaToken) {
       toast.error('Confirma que no eres un robot antes de continuar');
       return;
     }
@@ -130,7 +132,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       if (mode === 'register') {
-        await authApi.register(email, password, name || undefined, turnstileToken || undefined);
+        await authApi.register(email, password, name || undefined, captchaToken || undefined);
         toast.success('Cuenta creada correctamente');
       } else {
         await authApi.login(email, password);
@@ -219,8 +221,8 @@ export default function LoginPage() {
                   placeholder="Mínimo 8 caracteres"
                 />
               </div>
-              {mode === 'register' && TURNSTILE_SITE_KEY && (
-                <div ref={turnstileContainerRef} className="flex justify-center" />
+              {mode === 'register' && HCAPTCHA_SITE_KEY && (
+                <div ref={captchaContainerRef} className="flex justify-center" />
               )}
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? 'Un momento...' : mode === 'login' ? 'Entrar' : 'Crear cuenta'}
