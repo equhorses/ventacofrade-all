@@ -81,7 +81,8 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
     try:
         await service.handle_webhook_event(event)
     except Exception as e:
-        logger.error(f"Error handling Stripe webhook event: {e}")
+        import traceback
+        logger.error(f"Error handling Stripe webhook event: {e}\n{traceback.format_exc()}")
         # Return 200 anyway so Stripe doesn't endlessly retry a permanently
         # failing event; the error is logged for investigation.
 
