@@ -83,7 +83,7 @@ export default function VenderPage() {
                     </li>
                   ))}
                 </ul>
-                <Link to="/publicar" className="block">
+                <Link to="/cuenta/suscripcion" className="block">
                   <Button className="w-full mt-4 bg-primary hover:bg-primary/90 cursor-pointer">
                     Empezar ahora
                   </Button>
@@ -123,7 +123,7 @@ export default function VenderPage() {
                     </li>
                   ))}
                 </ul>
-                <Link to="/publicar" className="block">
+                <Link to="/cuenta/suscripcion" className="block">
                   <Button className="w-full mt-4 bg-secondary text-secondary-foreground hover:bg-secondary/90 cursor-pointer">
                     Elegir Profesional
                   </Button>
