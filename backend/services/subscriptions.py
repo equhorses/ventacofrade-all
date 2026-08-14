@@ -93,53 +93,47 @@ class SubscriptionsService:
         )
         return session.url
     async def handle_webhook_event(self, event):
-        event_type = event["type"]
-        data = dict(event["data"]["object"])
+        event_type = event.type
+        data = event.data.object
         if event_type == "checkout.session.completed":
             await self._handle_checkout_completed(data)
         elif event_type in ("customer.subscription.deleted", "customer.subscription.updated"):
             await self._handle_subscription_change(data)
         else:
             logger.debug(f"Ignoring unhandled Stripe event type: {event_type}")
-    async def _handle_checkout_completed(self, session: dict):
-        metadata = session.get("metadata") or {}
-        user_id = metadata.get("user_id")
+    async def _handle_checkout_completed(self, session):
+        metadata = getattr(session, "metadata", None)
+        user_id = getattr(metadata, "user_id", None) if metadata else None
         if not user_id:
             logger.warning("checkout.session.completed without user_id metadata; ignoring.")
             return
-
         seller_profile = await self.get_seller_profile_by_user(user_id)
         if not seller_profile:
             logger.warning(f"No seller_profile found for user_id={user_id} on checkout completion.")
             return
-
         seller_profile.is_active = True
         seller_profile.activation_paid = True
         seller_profile.subscription_status = "active"
         seller_profile.subscription_end_date = datetime.now() + timedelta(days=31)
-        seller_profile.stripe_customer_id = session.get("customer")
-        seller_profile.stripe_subscription_id = session.get("subscription")
-
+        seller_profile.stripe_customer_id = getattr(session, "customer", None)
+        seller_profile.stripe_subscription_id = getattr(session, "subscription", None)
         await self.db.commit()
         logger.info(f"Activated subscription for user_id={user_id} (seller_profile {seller_profile.id})")
 
-    async def _handle_subscription_change(self, subscription: dict):
-        metadata = subscription.get("metadata") or {}
-        user_id = metadata.get("user_id")
+    async def _handle_subscription_change(self, subscription):
+        metadata = getattr(subscription, "metadata", None)
+        user_id = getattr(metadata, "user_id", None) if metadata else None
         if not user_id:
             return
-
         seller_profile = await self.get_seller_profile_by_user(user_id)
         if not seller_profile:
             return
-
-        status = subscription.get("status")
+        status = getattr(subscription, "status", None)
         if status in ("canceled", "unpaid", "incomplete_expired"):
             seller_profile.subscription_status = "inactive"
             seller_profile.is_active = False
         elif status == "active":
             seller_profile.subscription_status = "active"
             seller_profile.is_active = True
-
         await self.db.commit()
         logger.info(f"Updated subscription status for user_id={user_id} to {seller_profile.subscription_status}")
