@@ -92,17 +92,15 @@ class SubscriptionsService:
             subscription_data={"metadata": {"user_id": user_id, "plan": plan}},
         )
         return session.url
-    async def handle_webhook_event(self, event: dict):
-        event = event.to_dict_recursive() if hasattr(event, "to_dict_recursive") else dict(event)
-        event_type = event.get("type")
-        data = event.get("data", {}).get("object", {})
+    async def handle_webhook_event(self, event):
+        event_type = event["type"]
+        data = event["data"]["object"]
         if event_type == "checkout.session.completed":
             await self._handle_checkout_completed(data)
         elif event_type in ("customer.subscription.deleted", "customer.subscription.updated"):
             await self._handle_subscription_change(data)
         else:
             logger.debug(f"Ignoring unhandled Stripe event type: {event_type}")
-
     async def _handle_checkout_completed(self, session: dict):
         metadata = session.get("metadata") or {}
         user_id = metadata.get("user_id")
