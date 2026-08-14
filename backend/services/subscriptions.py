@@ -92,11 +92,10 @@ class SubscriptionsService:
             subscription_data={"metadata": {"user_id": user_id, "plan": plan}},
         )
         return session.url
-
-    async def handle_webhook_event(self, event: dict):
+async def handle_webhook_event(self, event: dict):
+        event = event.to_dict_recursive() if hasattr(event, "to_dict_recursive") else dict(event)
         event_type = event.get("type")
         data = event.get("data", {}).get("object", {})
-
         if event_type == "checkout.session.completed":
             await self._handle_checkout_completed(data)
         elif event_type in ("customer.subscription.deleted", "customer.subscription.updated"):
