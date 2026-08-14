@@ -94,7 +94,7 @@ class SubscriptionsService:
         return session.url
     async def handle_webhook_event(self, event):
         event_type = event["type"]
-        data = event["data"]["object"]
+        data = dict(event["data"]["object"])
         if event_type == "checkout.session.completed":
             await self._handle_checkout_completed(data)
         elif event_type in ("customer.subscription.deleted", "customer.subscription.updated"):
