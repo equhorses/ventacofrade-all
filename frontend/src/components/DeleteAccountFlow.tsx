@@ -12,6 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { client } from '@/lib/api';
+import { authApi } from '@/lib/auth';
 import { AlertTriangle } from 'lucide-react';
 
 const REASON_OPTIONS = [
@@ -81,10 +82,10 @@ export default function DeleteAccountFlow({ open, onOpenChange }: DeleteAccountF
     }
   };
 
-  const handleFinalClose = () => {
+  const handleFinalClose = async () => {
     resetAndClose();
     if (finalAction === 'deleted' || finalAction === 'suspended') {
-      localStorage.removeItem('token');
+      await authApi.logout();
       window.location.href = '/';
     }
   };
