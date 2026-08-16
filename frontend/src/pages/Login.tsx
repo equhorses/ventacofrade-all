@@ -138,8 +138,7 @@ export default function LoginPage() {
         await authApi.login(email, password);
         toast.success('Sesión iniciada');
       }
-      navigate(mode === 'register' ? '/?welcome=1' : '/');
-      window.location.reload(); // refresh so the header picks up the logged-in user
+      window.location.href = mode === 'register' ? '/?welcome=1' : '/';
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Algo salió mal');
     } finally {
