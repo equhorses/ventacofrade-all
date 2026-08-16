@@ -10,6 +10,7 @@ from core.database import db_manager
 from core.security import hash_password, verify_password
 from fastapi import HTTPException, status
 from models.auth import User
+from services.email import send_welcome_email
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -40,6 +41,7 @@ class AuthService:
         self.db.add(user)
         await self.db.commit()
         await self.db.refresh(user)
+        await send_welcome_email(to_email=user.email, name=user.name)
         return user
 
     async def authenticate_user(self, email: str, password: str) -> User:
@@ -66,11 +68,13 @@ class AuthService:
         result = await self.db.execute(select(User).where(User.email == normalized_email))
         user = result.scalar_one_or_none()
 
+        is_new_user = False
         if user:
             user.last_login = datetime.now(timezone.utc)
             if name and not user.name:
                 user.name = name
         else:
+            is_new_user = True
             user = User(
                 id=str(uuid.uuid4()),
                 email=normalized_email,
@@ -83,6 +87,8 @@ class AuthService:
 
         await self.db.commit()
         await self.db.refresh(user)
+        if is_new_user:
+            await send_welcome_email(to_email=user.email, name=user.name)
         return user
 
     async def issue_app_token(
