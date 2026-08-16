@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import Layout from '@/components/Layout';
+import WelcomeModal from '@/components/WelcomeModal';
 import { client } from '@/lib/api';
 import {
   Search,
@@ -97,9 +98,9 @@ export default function HomePage() {
       navigate('/explorar');
     }
   };
-
   return (
     <Layout>
+      <WelcomeModal />
       {/* Hero Section */}
       <section className="relative bg-gradient-to-br from-primary via-primary/95 to-primary/80 text-primary-foreground overflow-hidden">
         <div className="absolute inset-0 opacity-10">
