@@ -22,6 +22,8 @@ from typing import Optional
 import stripe
 from core.config import settings
 from models.seller_profiles import Seller_profiles
+from models.auth import User
+from services.email import send_subscription_confirmation_email
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -119,6 +121,12 @@ class SubscriptionsService:
         seller_profile.stripe_subscription_id = getattr(session, "subscription", None)
         await self.db.commit()
         logger.info(f"Activated subscription for user_id={user_id} (seller_profile {seller_profile.id})")
+
+        plan = getattr(metadata, "plan", None) if metadata else None
+        user_result = await self.db.execute(select(User).where(User.id == user_id))
+        user = user_result.scalar_one_or_none()
+        if user:
+            await send_subscription_confirmation_email(to_email=user.email, plan=plan or "basico", name=user.name)
 
     async def _handle_subscription_change(self, subscription):
         metadata = getattr(subscription, "metadata", None)
