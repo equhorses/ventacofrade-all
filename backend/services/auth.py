@@ -54,6 +54,10 @@ class AuthService:
         if not user or not user.password_hash or not verify_password(password, user.password_hash):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Email o contraseña incorrectos")
 
+        if user.account_status == "suspended":
+            user.account_status = "active"
+            user.suspended_at = None
+
         user.last_login = datetime.now(timezone.utc)
         await self.db.commit()
         await self.db.refresh(user)

@@ -45,3 +45,46 @@ class UserService:
             logger.debug(f"[DB_OP] User profile update completed in {time.time() - start_time_update:.4f}s")
 
         return user
+
+    @staticmethod
+    async def suspend_account(
+        db: AsyncSession, user_id: str, reasons: Optional[str] = None, feedback: Optional[str] = None
+    ) -> Optional[User]:
+        """Suspend a user's account. Reactivated automatically on next login."""
+        from datetime import datetime, timezone
+
+        result = await db.execute(select(User).where(User.id == user_id))
+        user = result.scalar_one_or_none()
+        if user:
+            user.account_status = "suspended"
+            user.suspended_at = datetime.now(timezone.utc)
+            if reasons is not None:
+                user.deletion_reasons = reasons
+            if feedback is not None:
+                user.deletion_feedback = feedback
+            await db.commit()
+            await db.refresh(user)
+        return user
+
+    @staticmethod
+    async def request_account_deletion(
+        db: AsyncSession, user_id: str, reasons: Optional[str] = None, feedback: Optional[str] = None
+    ) -> Optional[User]:
+        """Mark a user's account for deletion. Data is retained for 5 years
+        for tax/legal compliance before final purge (handled separately)."""
+        from datetime import datetime, timedelta, timezone
+
+        result = await db.execute(select(User).where(User.id == user_id))
+        user = result.scalar_one_or_none()
+        if user:
+            now = datetime.now(timezone.utc)
+            user.account_status = "pending_deletion"
+            user.deletion_requested_at = now
+            user.scheduled_purge_at = now + timedelta(days=365 * 5)
+            if reasons is not None:
+                user.deletion_reasons = reasons
+            if feedback is not None:
+                user.deletion_feedback = feedback
+            await db.commit()
+            await db.refresh(user)
+        return user
