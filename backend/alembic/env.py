@@ -11,6 +11,7 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import create_async_engine
+from core.config import settings
 
 
 def clear_backend_import_cache():
@@ -47,7 +48,10 @@ def alembic_include_object(object, name, type_, reflected, compare_to):
 
 
 async def run_migrations_online():
-    connectable = create_async_engine(config.get_main_option("sqlalchemy.url"), poolclass=pool.NullPool)
+    db_url = settings.database_url or config.get_main_option("sqlalchemy.url")
+    if db_url and db_url.startswith("postgresql://"):
+        db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    connectable = create_async_engine(db_url, poolclass=pool.NullPool)
     async with connectable.connect() as connection:
         await connection.run_sync(
             lambda sync_conn: context.configure(
