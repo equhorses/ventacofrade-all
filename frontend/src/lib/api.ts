@@ -116,6 +116,14 @@ export const client = {
       const response = await http.put(`${baseUrl()}/api/v1/users/profile`, data);
       return { data: response.data };
     },
+    async suspendAccount(reasons?: string, feedback?: string) {
+      const response = await http.post(`${baseUrl()}/api/v1/users/account/suspend`, { reasons, feedback });
+      return { data: response.data };
+    },
+    async deleteAccount(reasons?: string, feedback?: string) {
+      const response = await http.post(`${baseUrl()}/api/v1/users/account/delete`, { reasons, feedback });
+      return { data: response.data };
+    },
   },
   storage: {
     /**

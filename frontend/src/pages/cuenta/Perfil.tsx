@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useAuth } from '@/contexts/AuthContext';
+import DeleteAccountFlow from '@/components/DeleteAccountFlow';
 import { client } from '@/lib/api';
 import { Store, ShieldCheck, Camera, Loader2 } from 'lucide-react';
 
@@ -43,6 +44,7 @@ interface SellerProfile {
 
 export default function PerfilPage() {
   const { user, refetch } = useAuth();
+  const [deleteFlowOpen, setDeleteFlowOpen] = useState(false);
 
   // Basic account info
   const [name, setName] = useState(user?.name || '');
@@ -315,7 +317,27 @@ export default function PerfilPage() {
             )}
           </CardContent>
         </Card>
+
+        <Card className="border-destructive/30">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg text-destructive">Eliminar cuenta</CardTitle>
+            <p className="text-sm text-muted-foreground pt-1">
+              Si ya no quieres usar VentaCofrade, puedes suspender tu cuenta temporalmente o
+              eliminarla de forma definitiva.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="outline"
+              className="border-destructive text-destructive hover:bg-destructive/10 cursor-pointer"
+              onClick={() => setDeleteFlowOpen(true)}
+            >
+              Eliminar cuenta
+            </Button>
+          </CardContent>
+        </Card>
       </div>
+      <DeleteAccountFlow open={deleteFlowOpen} onOpenChange={setDeleteFlowOpen} />
     </AccountLayout>
   );
 }
