@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { client } from '@/lib/api';
-import { Church, Mail, CheckCircle2 } from 'lucide-react';
+import { Church, Mail, CheckCircle2, Shirt, Flame, Crown, Scissors } from 'lucide-react';
 
 export default function ComingSoon() {
   const [email, setEmail] = useState('');
@@ -40,10 +40,26 @@ export default function ComingSoon() {
         </p>
         <p className="text-2xl md:text-3xl font-semibold text-secondary mb-6">¡Muy pronto!</p>
         <p className="text-primary-foreground/70 mb-8 max-w-md mx-auto">
-          Estamos preparando el punto de encuentro para comprar y vender orfebrería, bordados,
-          túnicas y todo lo que necesitas para tu hermandad. Déjanos tu email y serás de los
-          primeros en saberlo.
+          Estamos preparando el punto de encuentro para comprar y vender todo lo que necesita
+          un cofrade. Déjanos tu email y serás de los primeros en saberlo.
         </p>
+
+        <div className="flex flex-wrap justify-center gap-3 mb-8">
+          {[
+            { icon: Shirt, label: 'Túnicas' },
+            { icon: Flame, label: 'Cirios' },
+            { icon: Crown, label: 'Orfebrería' },
+            { icon: Scissors, label: 'Bordados' },
+          ].map(({ icon: Icon, label }) => (
+            <div
+              key={label}
+              className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-2 border border-white/20"
+            >
+              <Icon className="h-4 w-4 text-secondary" />
+              <span className="text-sm">{label}</span>
+            </div>
+          ))}
+        </div>
 
         {joined ? (
           <div className="flex items-center justify-center gap-2 bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/20">
