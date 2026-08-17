@@ -293,13 +293,19 @@ export default function Layout({ children }: LayoutProps) {
               <h4 className="font-semibold mb-3 text-sm uppercase tracking-wider">Contacto</h4>
               <ul className="space-y-2 text-sm text-primary-foreground/70">
                 <li>Sevilla, Andalucía · España</li>
-                <li>hola@ventacofrade.com</li>
+                <li>contacto@ventacofrade.com</li>
               </ul>
             </div>
           </div>
           <div className="border-t border-primary-foreground/20 mt-8 pt-6 text-center text-sm text-primary-foreground/60">
             <p>© 2026 VentaCofrade. Todos los derechos reservados.</p>
             <p className="mt-1">Hecho con devoción en Andalucía.</p>
+            <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 mt-3 text-xs">
+              <Link to="/legal/aviso-legal" className="hover:text-primary-foreground transition-colors cursor-pointer">Aviso Legal</Link>
+              <Link to="/legal/privacidad" className="hover:text-primary-foreground transition-colors cursor-pointer">Privacidad</Link>
+              <Link to="/legal/terminos" className="hover:text-primary-foreground transition-colors cursor-pointer">Términos y Condiciones</Link>
+              <Link to="/cookies" className="hover:text-primary-foreground transition-colors cursor-pointer">Cookies</Link>
+            </div>
           </div>
         </div>
       </footer>

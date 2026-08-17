@@ -19,6 +19,11 @@ import FavoritosPage from './pages/cuenta/Favoritos';
 import SuscripcionPage from './pages/cuenta/Suscripcion';
 import { AuthProvider } from './contexts/AuthContext';
 import ComingSoonGate from './components/ComingSoonGate';
+import CookieBanner from './components/CookieBanner';
+import AvisoLegal from './pages/legal/AvisoLegal';
+import Privacidad from './pages/legal/Privacidad';
+import Terminos from './pages/legal/Terminos';
+import Cookies from './pages/legal/Cookies';
 
 const queryClient = new QueryClient();
 
@@ -30,6 +35,10 @@ const AppRoutes = () => (
     <Route path="/vender" element={<Vender />} />
     <Route path="/publicar" element={<Publicar />} />
     <Route path="/documentacion" element={<Documentacion />} />
+    <Route path="/legal/aviso-legal" element={<AvisoLegal />} />
+    <Route path="/legal/privacidad" element={<Privacidad />} />
+    <Route path="/legal/terminos" element={<Terminos />} />
+    <Route path="/cookies" element={<Cookies />} />
     <Route path="/favoritos" element={<Explorar />} />
     <Route path="/login" element={<Login />} />
     <Route path="/cuenta" element={<Navigate to="/cuenta/perfil" replace />} />
@@ -52,6 +61,7 @@ const App = () => (
         <AuthProvider>
           <ComingSoonGate>
             <AppRoutes />
+            <CookieBanner />
           </ComingSoonGate>
         </AuthProvider>
       </BrowserRouter>
