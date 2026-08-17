@@ -252,4 +252,5 @@ if __name__ == "__main__":
             host="0.0.0.0",
             port=int(settings.port),
             reload_excludes=["**/*.py"],
+            forwarded_allow_ips="*",
         )
