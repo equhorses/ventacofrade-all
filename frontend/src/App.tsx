@@ -18,6 +18,7 @@ import ConversacionPage from './pages/cuenta/Conversacion';
 import FavoritosPage from './pages/cuenta/Favoritos';
 import SuscripcionPage from './pages/cuenta/Suscripcion';
 import { AuthProvider } from './contexts/AuthContext';
+import ComingSoonGate from './components/ComingSoonGate';
 
 const queryClient = new QueryClient();
 
@@ -49,7 +50,9 @@ const App = () => (
       <Toaster />
       <BrowserRouter>
         <AuthProvider>
-          <AppRoutes />
+          <ComingSoonGate>
+            <AppRoutes />
+          </ComingSoonGate>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

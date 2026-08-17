@@ -174,4 +174,10 @@ export const client = {
       return { data: response.data as { url: string } };
     },
   },
+  waitlist: {
+    async join(email: string) {
+      const response = await http.post(`${baseUrl()}/api/v1/waitlist/join`, { email });
+      return { data: response.data as { success: boolean; message: string } };
+    },
+  },
 };
