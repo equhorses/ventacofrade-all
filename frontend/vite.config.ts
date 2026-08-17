@@ -45,7 +45,7 @@ export default defineConfig(({ command }) => {
       react(),
       ensureBuildOutDir(),
       Sitemap({
-        hostname: 'https://ventacofrade-all.vercel.app',
+        hostname: 'https://ventacofrade.com',
         lastmod: getSitemapLastmod(),
         readable: true,
         generateRobotsTxt: false,
