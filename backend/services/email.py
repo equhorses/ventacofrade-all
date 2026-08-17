@@ -107,3 +107,46 @@ async def send_subscription_confirmation_email(to_email: str, plan: str, name: O
     except httpx.HTTPError as exc:
         logger.error(f"Fallo al enviar email de confirmación a {to_email}: {exc}")
         return False
+
+
+async def send_waitlist_confirmation_email(to_email: str) -> bool:
+    """Send a waitlist signup confirmation email via Resend. Never raises."""
+    api_key = getattr(settings, "resend_api_key", None)
+    from_email = getattr(settings, "resend_from_email", None)
+
+    if not api_key or not from_email:
+        logger.warning("Resend no configurado; email de lista de espera omitido")
+        return False
+
+    html_content = """
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+      <h2 style="color: #6d28d9;">¡Ya estás en la lista!</h2>
+      <p>Gracias por apuntarte a VentaCofrade, el marketplace cofrade de referencia.</p>
+      <p>Te avisaremos por email en cuanto abramos la plataforma. ¡Muy pronto!</p>
+      <p style="margin-top: 24px; color: #666; font-size: 13px;">
+        Si tienes cualquier duda, escríbenos a
+        <a href="mailto:contacto@ventacofrade.com">contacto@ventacofrade.com</a>.
+      </p>
+    </div>
+    """
+
+    payload = {
+        "from": from_email,
+        "to": [to_email],
+        "subject": "¡Ya estás en la lista de espera de VentaCofrade!",
+        "html": html_content,
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                RESEND_API_URL,
+                headers={"Authorization": f"Bearer {api_key}"},
+                json=payload,
+            )
+            response.raise_for_status()
+        logger.info(f"Email de lista de espera enviado a {to_email}")
+        return True
+    except httpx.HTTPError as exc:
+        logger.error(f"Fallo al enviar email de lista de espera a {to_email}: {exc}")
+        return False
