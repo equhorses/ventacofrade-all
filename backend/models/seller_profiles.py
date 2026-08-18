@@ -17,6 +17,8 @@ class Seller_profiles(Base):
     is_active = Column(Boolean, nullable=True, default=False, server_default='false')
     subscription_status = Column(String(20), nullable=True, default='inactive', server_default='inactive')
     subscription_end_date = Column(DateTime(timezone=True), nullable=True)
+    plan = Column(String(20), nullable=True)
+    cancel_at_period_end = Column(Boolean, nullable=True, default=False, server_default='false')
     activation_paid = Column(Boolean, nullable=True, default=False, server_default='false')
     free_listing_used = Column(Boolean, nullable=True, default=False, server_default='false')
     free_access_until = Column(DateTime(timezone=True), nullable=True)

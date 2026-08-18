@@ -1,7 +1,6 @@
 """
-Handles Stripe Checkout Sessions for the two seller subscription plans
-(Basico / Profesional), each combining a recurring monthly price with a
-one-time activation fee in a single Checkout Session.
+Handles Stripe Checkout Sessions and lifecycle management (cancel, resume,
+change plan) for the two seller subscription plans (Basico / Profesional).
 
 Configure via these environment variables (all required for checkout to work):
   STRIPE_SECRET_KEY
@@ -16,7 +15,7 @@ clear 503 rather than crashing — same pattern used for R2/Turnstile/hCaptcha.
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 from typing import Optional
 
 import stripe
@@ -48,6 +47,25 @@ class SubscriptionsService:
         if not secret_key:
             raise SubscriptionsNotConfiguredError("STRIPE_SECRET_KEY no está configurada.")
         stripe.api_key = secret_key
+
+    def _recurring_price_id(self, plan: str) -> Optional[str]:
+        recurring_key, _ = PLAN_ENV_KEYS[plan]
+        return getattr(settings, recurring_key, None)
+
+    def _plan_for_price_id(self, price_id: Optional[str]) -> Optional[str]:
+        """Reverse-lookup: given a Stripe price ID, which plan name is it?"""
+        if not price_id:
+            return None
+        for plan, (recurring_key, _) in PLAN_ENV_KEYS.items():
+            if getattr(settings, recurring_key, None) == price_id:
+                return plan
+        return None
+
+    @staticmethod
+    def _to_datetime(unix_ts: Optional[int]):
+        if not unix_ts:
+            return None
+        return datetime.fromtimestamp(unix_ts, tz=timezone.utc)
 
     async def get_seller_profile_by_user(self, user_id: str) -> Optional[Seller_profiles]:
         result = await self.db.execute(select(Seller_profiles).where(Seller_profiles.user_id == user_id))
@@ -94,6 +112,95 @@ class SubscriptionsService:
             subscription_data={"metadata": {"user_id": user_id, "plan": plan}},
         )
         return session.url
+
+    async def cancel_subscription(self, user_id: str) -> Seller_profiles:
+        """Soft-cancel: keep access until the current paid period ends, but
+        don't charge the renewal. This is what 'cancelar suscripción' means
+        from the seller's point of view."""
+        self._ensure_stripe_configured()
+
+        seller_profile = await self.get_seller_profile_by_user(user_id)
+        if not seller_profile or not seller_profile.stripe_subscription_id:
+            raise ValueError("No tienes ninguna suscripción activa que cancelar.")
+
+        subscription = await stripe.Subscription.modify_async(
+            seller_profile.stripe_subscription_id,
+            cancel_at_period_end=True,
+        )
+
+        seller_profile.cancel_at_period_end = True
+        seller_profile.subscription_end_date = self._to_datetime(
+            getattr(subscription, "current_period_end", None)
+        )
+        await self.db.commit()
+        await self.db.refresh(seller_profile)
+        logger.info(f"Subscription for user_id={user_id} set to cancel at period end.")
+        return seller_profile
+
+    async def resume_subscription(self, user_id: str) -> Seller_profiles:
+        """Undo a scheduled cancellation, while the period hasn't ended yet."""
+        self._ensure_stripe_configured()
+
+        seller_profile = await self.get_seller_profile_by_user(user_id)
+        if not seller_profile or not seller_profile.stripe_subscription_id:
+            raise ValueError("No tienes ninguna suscripción que reactivar.")
+
+        subscription = await stripe.Subscription.modify_async(
+            seller_profile.stripe_subscription_id,
+            cancel_at_period_end=False,
+        )
+
+        seller_profile.cancel_at_period_end = False
+        seller_profile.subscription_end_date = self._to_datetime(
+            getattr(subscription, "current_period_end", None)
+        )
+        await self.db.commit()
+        await self.db.refresh(seller_profile)
+        logger.info(f"Subscription for user_id={user_id} resumed (cancellation undone).")
+        return seller_profile
+
+    async def change_plan(self, user_id: str, new_plan: str) -> Seller_profiles:
+        """Switch between Basico/Profesional. Stripe prorates automatically:
+        moving up charges the difference now, moving down credits the
+        difference toward the next invoice — no manual math needed."""
+        if new_plan not in PLAN_ENV_KEYS:
+            raise ValueError(f"Plan desconocido: {new_plan}")
+
+        self._ensure_stripe_configured()
+
+        seller_profile = await self.get_seller_profile_by_user(user_id)
+        if not seller_profile or not seller_profile.stripe_subscription_id:
+            raise ValueError("No tienes ninguna suscripción activa que cambiar.")
+
+        if seller_profile.plan == new_plan:
+            raise ValueError("Ya tienes activo ese plan.")
+
+        new_price_id = self._recurring_price_id(new_plan)
+        if not new_price_id:
+            raise SubscriptionsNotConfiguredError(
+                f"Falta la variable de precio de Stripe para el plan '{new_plan}'."
+            )
+
+        subscription = await stripe.Subscription.retrieve_async(seller_profile.stripe_subscription_id)
+        current_item = subscription["items"]["data"][0]
+
+        updated = await stripe.Subscription.modify_async(
+            seller_profile.stripe_subscription_id,
+            items=[{"id": current_item["id"], "price": new_price_id}],
+            proration_behavior="create_prorations",
+        )
+
+        seller_profile.plan = new_plan
+        seller_profile.subscription_status = "active"
+        seller_profile.cancel_at_period_end = bool(getattr(updated, "cancel_at_period_end", False))
+        seller_profile.subscription_end_date = self._to_datetime(
+            getattr(updated, "current_period_end", None)
+        )
+        await self.db.commit()
+        await self.db.refresh(seller_profile)
+        logger.info(f"Plan changed for user_id={user_id} to {new_plan} (prorated by Stripe).")
+        return seller_profile
+
     async def handle_webhook_event(self, event):
         event_type = event.type
         data = event.data.object
@@ -103,6 +210,7 @@ class SubscriptionsService:
             await self._handle_subscription_change(data)
         else:
             logger.debug(f"Ignoring unhandled Stripe event type: {event_type}")
+
     async def _handle_checkout_completed(self, session):
         metadata = getattr(session, "metadata", None)
         user_id = getattr(metadata, "user_id", None) if metadata else None
@@ -113,22 +221,40 @@ class SubscriptionsService:
         if not seller_profile:
             logger.warning(f"No seller_profile found for user_id={user_id} on checkout completion.")
             return
+
+        plan = getattr(metadata, "plan", None) if metadata else None
+        subscription_id = getattr(session, "subscription", None)
+
         seller_profile.is_active = True
         seller_profile.activation_paid = True
         seller_profile.subscription_status = "active"
-        seller_profile.subscription_end_date = datetime.now() + timedelta(days=31)
+        seller_profile.plan = plan
+        seller_profile.cancel_at_period_end = False
         seller_profile.stripe_customer_id = getattr(session, "customer", None)
-        seller_profile.stripe_subscription_id = getattr(session, "subscription", None)
+        seller_profile.stripe_subscription_id = subscription_id
+
+        if subscription_id:
+            try:
+                self._ensure_stripe_configured()
+                subscription = await stripe.Subscription.retrieve_async(subscription_id)
+                seller_profile.subscription_end_date = self._to_datetime(
+                    getattr(subscription, "current_period_end", None)
+                )
+            except Exception as e:
+                logger.warning(f"Could not fetch subscription period end for {subscription_id}: {e}")
+
         await self.db.commit()
         logger.info(f"Activated subscription for user_id={user_id} (seller_profile {seller_profile.id})")
 
-        plan = getattr(metadata, "plan", None) if metadata else None
         user_result = await self.db.execute(select(User).where(User.id == user_id))
         user = user_result.scalar_one_or_none()
         if user:
             await send_subscription_confirmation_email(to_email=user.email, plan=plan or "basico", name=user.name)
 
     async def _handle_subscription_change(self, subscription):
+        """Keeps our copy of status/dates in sync with Stripe on every
+        renewal, cancellation, or plan change — this is the single source
+        of truth for 'subscription_end_date' and 'cancel_at_period_end'."""
         metadata = getattr(subscription, "metadata", None)
         user_id = getattr(metadata, "user_id", None) if metadata else None
         if not user_id:
@@ -136,12 +262,29 @@ class SubscriptionsService:
         seller_profile = await self.get_seller_profile_by_user(user_id)
         if not seller_profile:
             return
-        status = getattr(subscription, "status", None)
-        if status in ("canceled", "unpaid", "incomplete_expired"):
+
+        status_value = getattr(subscription, "status", None)
+        if status_value in ("canceled", "unpaid", "incomplete_expired"):
             seller_profile.subscription_status = "inactive"
             seller_profile.is_active = False
-        elif status == "active":
+        elif status_value == "active":
             seller_profile.subscription_status = "active"
             seller_profile.is_active = True
+
+        seller_profile.cancel_at_period_end = bool(getattr(subscription, "cancel_at_period_end", False))
+        seller_profile.subscription_end_date = self._to_datetime(
+            getattr(subscription, "current_period_end", None)
+        )
+
+        try:
+            items = subscription.get("items", {}).get("data", []) if hasattr(subscription, "get") else []
+            if items:
+                price_id = items[0].get("price", {}).get("id")
+                plan = self._plan_for_price_id(price_id)
+                if plan:
+                    seller_profile.plan = plan
+        except Exception as e:
+            logger.debug(f"Could not resolve plan from subscription items: {e}")
+
         await self.db.commit()
         logger.info(f"Updated subscription status for user_id={user_id} to {seller_profile.subscription_status}")

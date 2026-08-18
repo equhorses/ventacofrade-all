@@ -64,6 +64,8 @@ class Seller_profilesResponse(BaseModel):
     is_active: Optional[bool] = None
     subscription_status: Optional[str] = None
     subscription_end_date: Optional[datetime] = None
+    plan: Optional[str] = None
+    cancel_at_period_end: Optional[bool] = None
     activation_paid: Optional[bool] = None
     rating: Optional[float] = None
     total_sales: Optional[int] = None

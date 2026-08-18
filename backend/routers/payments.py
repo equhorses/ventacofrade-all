@@ -25,6 +25,17 @@ class CreateCheckoutResponse(BaseModel):
     url: str
 
 
+class ChangePlanRequest(BaseModel):
+    plan: str  # "basico" | "profesional"
+
+
+class SubscriptionActionResponse(BaseModel):
+    subscription_status: str | None = None
+    plan: str | None = None
+    cancel_at_period_end: bool | None = None
+    subscription_end_date: str | None = None
+
+
 @router.post("/checkout", response_model=CreateCheckoutResponse)
 async def create_checkout(
     payload: CreateCheckoutRequest,
@@ -58,6 +69,76 @@ async def create_checkout(
     except Exception as e:
         logger.error(f"Error creating checkout session: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="No se pudo iniciar el pago.")
+
+
+def _to_action_response(seller_profile) -> "SubscriptionActionResponse":
+    return SubscriptionActionResponse(
+        subscription_status=seller_profile.subscription_status,
+        plan=seller_profile.plan,
+        cancel_at_period_end=bool(seller_profile.cancel_at_period_end),
+        subscription_end_date=(
+            seller_profile.subscription_end_date.isoformat() if seller_profile.subscription_end_date else None
+        ),
+    )
+
+
+@router.post("/subscription/cancel", response_model=SubscriptionActionResponse)
+async def cancel_subscription(
+    current_user: UserResponse = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Schedule cancellation for the end of the current paid period — access
+    continues until then, but the renewal will not be charged."""
+    service = SubscriptionsService(db)
+    try:
+        seller_profile = await service.cancel_subscription(str(current_user.id))
+        return _to_action_response(seller_profile)
+    except SubscriptionsNotConfiguredError as e:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error cancelling subscription: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="No se pudo cancelar la suscripción.")
+
+
+@router.post("/subscription/resume", response_model=SubscriptionActionResponse)
+async def resume_subscription(
+    current_user: UserResponse = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Undo a scheduled cancellation while the current period hasn't ended."""
+    service = SubscriptionsService(db)
+    try:
+        seller_profile = await service.resume_subscription(str(current_user.id))
+        return _to_action_response(seller_profile)
+    except SubscriptionsNotConfiguredError as e:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error resuming subscription: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="No se pudo reactivar la suscripción.")
+
+
+@router.post("/subscription/change-plan", response_model=SubscriptionActionResponse)
+async def change_plan(
+    payload: ChangePlanRequest,
+    current_user: UserResponse = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Switch plan; Stripe prorates the difference automatically."""
+    service = SubscriptionsService(db)
+    try:
+        seller_profile = await service.change_plan(str(current_user.id), payload.plan)
+        return _to_action_response(seller_profile)
+    except SubscriptionsNotConfiguredError as e:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error changing plan: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="No se pudo cambiar de plan.")
 
 
 @router.post("/webhook")

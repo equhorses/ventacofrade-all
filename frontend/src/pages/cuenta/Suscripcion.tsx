@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { client } from '@/lib/api';
-import { Check, Zap, Crown, CreditCard, ShieldCheck } from 'lucide-react';
+import { Check, Zap, Crown, CreditCard, ShieldCheck, AlertTriangle } from 'lucide-react';
 
 interface SellerProfile {
   id: number;
@@ -17,6 +17,23 @@ interface SellerProfile {
   activation_paid?: boolean;
   rating?: number;
   total_sales?: number;
+  plan?: 'basico' | 'profesional' | string | null;
+  cancel_at_period_end?: boolean | null;
+  subscription_end_date?: string | null;
+}
+
+const PLAN_LABELS: Record<string, string> = {
+  basico: 'Plan Básico',
+  profesional: 'Plan Profesional',
+};
+
+function formatDate(iso?: string | null) {
+  if (!iso) return null;
+  try {
+    return new Date(iso).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+  } catch {
+    return null;
+  }
 }
 
 const statusLabels: Record<string, { label: string; className: string }> = {
@@ -29,6 +46,7 @@ export default function SuscripcionPage() {
   const [sellerProfile, setSellerProfile] = useState<SellerProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [checkoutLoading, setCheckoutLoading] = useState<'basico' | 'profesional' | null>(null);
+  const [actionLoading, setActionLoading] = useState<'cancel' | 'resume' | 'basico' | 'profesional' | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -81,6 +99,62 @@ export default function SuscripcionPage() {
         'No se pudo iniciar el pago. Inténtalo de nuevo.';
       toast.error(message);
       setCheckoutLoading(null);
+    }
+  };
+
+  const handleCancelSubscription = async () => {
+    setActionLoading('cancel');
+    try {
+      const { data } = await client.payments.cancelSubscription();
+      setSellerProfile((prev) => (prev ? { ...prev, ...data } : prev));
+      const untilDate = formatDate(data.subscription_end_date);
+      toast.success(
+        untilDate
+          ? `Suscripción cancelada. Seguirás teniendo acceso hasta el ${untilDate} y no se te cobrará la renovación.`
+          : 'Suscripción cancelada. No se te cobrará la próxima renovación.'
+      );
+    } catch (err: unknown) {
+      console.error('Error cancelling subscription:', err);
+      const message =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+        'No se pudo cancelar la suscripción.';
+      toast.error(message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleResumeSubscription = async () => {
+    setActionLoading('resume');
+    try {
+      const { data } = await client.payments.resumeSubscription();
+      setSellerProfile((prev) => (prev ? { ...prev, ...data } : prev));
+      toast.success('Suscripción reactivada. Se seguirá renovando con normalidad.');
+    } catch (err: unknown) {
+      console.error('Error resuming subscription:', err);
+      const message =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+        'No se pudo reactivar la suscripción.';
+      toast.error(message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleChangePlan = async (plan: 'basico' | 'profesional') => {
+    setActionLoading(plan);
+    try {
+      const { data } = await client.payments.changePlan(plan);
+      setSellerProfile((prev) => (prev ? { ...prev, ...data } : prev));
+      toast.success(`Has cambiado a ${PLAN_LABELS[plan]}. El ajuste de precio se prorratea automáticamente.`);
+    } catch (err: unknown) {
+      console.error('Error changing plan:', err);
+      const message =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+        'No se pudo cambiar de plan.';
+      toast.error(message);
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -155,11 +229,68 @@ export default function SuscripcionPage() {
             )}
 
             {isActive && (
-              <div className="mt-5 pt-5 border-t border-border">
-                <p className="text-xs text-muted-foreground">
-                  Para cancelar o cambiar de tarjeta, escríbenos a hola@ventacofrade.com — la gestión
-                  automática desde aquí llegará pronto.
-                </p>
+              <div className="mt-5 pt-5 border-t border-border space-y-4">
+                {sellerProfile?.plan && (
+                  <p className="text-sm text-foreground">
+                    Plan actual: <span className="font-semibold">{PLAN_LABELS[sellerProfile.plan] || sellerProfile.plan}</span>
+                  </p>
+                )}
+
+                {sellerProfile?.cancel_at_period_end ? (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 p-4 flex items-start gap-3">
+                    <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm text-amber-800">
+                        Tu suscripción está programada para cancelarse
+                        {formatDate(sellerProfile.subscription_end_date)
+                          ? ` el ${formatDate(sellerProfile.subscription_end_date)}`
+                          : ' al final del periodo actual'}
+                        . No se te cobrará la renovación, pero seguirás teniendo acceso hasta entonces.
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-3 cursor-pointer"
+                        disabled={actionLoading !== null}
+                        onClick={handleResumeSubscription}
+                      >
+                        {actionLoading === 'resume' ? 'Reactivando…' : 'Reactivar suscripción'}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-3">
+                    {formatDate(sellerProfile?.subscription_end_date) && (
+                      <p className="text-xs text-muted-foreground">
+                        Próxima renovación: {formatDate(sellerProfile?.subscription_end_date)}
+                      </p>
+                    )}
+                    {sellerProfile?.plan && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="cursor-pointer"
+                        disabled={actionLoading !== null}
+                        onClick={() => handleChangePlan(sellerProfile.plan === 'basico' ? 'profesional' : 'basico')}
+                      >
+                        {actionLoading === 'basico' || actionLoading === 'profesional'
+                          ? 'Cambiando…'
+                          : sellerProfile.plan === 'basico'
+                          ? 'Subir a Profesional'
+                          : 'Bajar a Básico'}
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="cursor-pointer text-destructive hover:text-destructive"
+                      disabled={actionLoading !== null}
+                      onClick={handleCancelSubscription}
+                    >
+                      {actionLoading === 'cancel' ? 'Cancelando…' : 'Cancelar suscripción'}
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </CardContent>

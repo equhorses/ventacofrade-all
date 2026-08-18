@@ -173,6 +173,18 @@ export const client = {
       const response = await http.post(`${baseUrl()}/api/v1/payments/checkout`, { plan });
       return { data: response.data as { url: string } };
     },
+    async cancelSubscription() {
+      const response = await http.post(`${baseUrl()}/api/v1/payments/subscription/cancel`, {});
+      return { data: response.data as SubscriptionActionResult };
+    },
+    async resumeSubscription() {
+      const response = await http.post(`${baseUrl()}/api/v1/payments/subscription/resume`, {});
+      return { data: response.data as SubscriptionActionResult };
+    },
+    async changePlan(plan: 'basico' | 'profesional') {
+      const response = await http.post(`${baseUrl()}/api/v1/payments/subscription/change-plan`, { plan });
+      return { data: response.data as SubscriptionActionResult };
+    },
   },
   waitlist: {
     async join(email: string) {
@@ -222,4 +234,11 @@ export interface AdminInvitation {
   status: string;
   created_at?: string | null;
   redeemed_at?: string | null;
+}
+
+export interface SubscriptionActionResult {
+  subscription_status?: string | null;
+  plan?: string | null;
+  cancel_at_period_end?: boolean | null;
+  subscription_end_date?: string | null;
 }
