@@ -57,7 +57,42 @@ async def get_current_user(token: str = Depends(get_bearer_token)) -> UserRespon
 
 
 async def get_admin_user(current_user: UserResponse = Depends(get_current_user)) -> UserResponse:
-    """Dependency to ensure current user has admin role."""
+    """Dependency to ensure current user is the super admin ('admin' role).
+    Reserved for the most sensitive actions: assigning roles to other people,
+    and anything not explicitly opened up to other staff roles."""
     if current_user.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
     return current_user
+
+
+# All non-customer roles that can see the internal admin panel at all.
+# "admin" here means super admin (top of the hierarchy, can assign roles).
+STAFF_ROLES = {"admin", "marketing", "seguridad", "moderacion", "soporte"}
+
+ROLE_LABELS = {
+    "admin": "Super admin",
+    "marketing": "Marketing",
+    "seguridad": "Seguridad",
+    "moderacion": "Moderación",
+    "soporte": "Soporte",
+    "user": "Usuario",
+}
+
+
+async def get_staff_user(current_user: UserResponse = Depends(get_current_user)) -> UserResponse:
+    """Dependency to ensure current user has ANY staff role (not just super admin)."""
+    if current_user.role not in STAFF_ROLES:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Staff access required")
+    return current_user
+
+
+def require_roles(*allowed_roles: str):
+    """Dependency factory: restrict an endpoint to a specific subset of staff roles.
+    Usage: Depends(require_roles("admin", "marketing"))"""
+
+    async def _dependency(current_user: UserResponse = Depends(get_current_user)) -> UserResponse:
+        if current_user.role not in allowed_roles:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tienes permiso para esta acción")
+        return current_user
+
+    return _dependency

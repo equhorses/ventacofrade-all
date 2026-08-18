@@ -213,6 +213,14 @@ export const client = {
       const response = await http.post(`${baseUrl()}/api/v1/admin/invitations`, { email, months });
       return { data: response.data as AdminInvitation };
     },
+    async listStaff() {
+      const response = await http.get(`${baseUrl()}/api/v1/admin/staff`);
+      return { data: response.data as StaffMember[] };
+    },
+    async assignRole(email: string, role: string) {
+      const response = await http.post(`${baseUrl()}/api/v1/admin/staff/assign-role`, { email, role });
+      return { data: response.data as StaffMember };
+    },
   },
 };
 
@@ -234,6 +242,14 @@ export interface AdminInvitation {
   status: string;
   created_at?: string | null;
   redeemed_at?: string | null;
+}
+
+export interface StaffMember {
+  id: string;
+  email: string;
+  name?: string | null;
+  role: string;
+  role_label: string;
 }
 
 export interface SubscriptionActionResult {

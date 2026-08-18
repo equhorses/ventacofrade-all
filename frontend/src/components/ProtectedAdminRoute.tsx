@@ -7,13 +7,16 @@ import { Shield, User, LogIn } from 'lucide-react';
 
 interface ProtectedAdminRouteProps {
   children: React.ReactNode;
+  requireSuperAdmin?: boolean;
 }
 
 const ProtectedAdminRoute: React.FC<ProtectedAdminRouteProps> = ({
   children,
+  requireSuperAdmin = false,
 }) => {
-  const { user, loading, isAdmin, login } = useAuth();
+  const { user, loading, isStaff, isSuperAdmin, login } = useAuth();
   const location = useLocation();
+  const hasAccess = requireSuperAdmin ? isSuperAdmin : isStaff;
 
   // Loading state
   if (loading) {
@@ -32,8 +35,8 @@ const ProtectedAdminRoute: React.FC<ProtectedAdminRouteProps> = ({
     return <Navigate to="/" replace />;
   }
 
-  // If the user is not an admin, show an insufficient-permissions page
-  if (!isAdmin) {
+  // If the user doesn't have the required access level, show an insufficient-permissions page
+  if (!hasAccess) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <Card className="w-full max-w-md mx-4">

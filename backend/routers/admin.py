@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
-from dependencies.auth import get_admin_user
+from dependencies.auth import get_admin_user, get_staff_user, require_roles, STAFF_ROLES, ROLE_LABELS
 from schemas.auth import UserResponse
 from models.auth import User
 from models.seller_profiles import Seller_profiles
@@ -58,10 +58,26 @@ class CreateInvitationRequest(BaseModel):
     months: int = 1
 
 
+class StaffMemberResponse(BaseModel):
+    id: str
+    email: str
+    name: Optional[str] = None
+    role: str
+    role_label: str
+
+    class Config:
+        from_attributes = True
+
+
+class AssignRoleRequest(BaseModel):
+    email: EmailStr
+    role: str
+
+
 @router.get("/sellers", response_model=List[AdminSellerResponse])
 async def list_sellers(
     search: Optional[str] = Query(None, description="Filtra por email, nombre o tienda"),
-    current_user: UserResponse = Depends(get_admin_user),
+    current_user: UserResponse = Depends(require_roles("admin", "marketing")),
     db: AsyncSession = Depends(get_db),
 ):
     """List seller profiles with their account email/name, for the admin panel."""
@@ -97,7 +113,7 @@ async def list_sellers(
 async def grant_free_access(
     seller_profile_id: int,
     payload: GrantFreeAccessRequest,
-    current_user: UserResponse = Depends(get_admin_user),
+    current_user: UserResponse = Depends(require_roles("admin", "marketing")),
     db: AsyncSession = Depends(get_db),
 ):
     """Grant (or revoke) complimentary publishing access to a seller."""
@@ -139,7 +155,7 @@ async def grant_free_access(
 
 @router.get("/invitations", response_model=List[InvitationResponse])
 async def list_invitations(
-    current_user: UserResponse = Depends(get_admin_user),
+    current_user: UserResponse = Depends(require_roles("admin", "marketing")),
     db: AsyncSession = Depends(get_db),
 ):
     """List all invitations sent, most recent first."""
@@ -150,7 +166,7 @@ async def list_invitations(
 @router.post("/invitations", response_model=InvitationResponse, status_code=201)
 async def create_invitation(
     payload: CreateInvitationRequest,
-    current_user: UserResponse = Depends(get_admin_user),
+    current_user: UserResponse = Depends(require_roles("admin", "marketing")),
     db: AsyncSession = Depends(get_db),
 ):
     """Invite someone by email with N months of free publishing access.
@@ -176,3 +192,70 @@ async def create_invitation(
         logger.warning("Invitacion creada pero el email no se pudo enviar a %s", normalized_email)
 
     return invitation
+
+
+@router.get("/staff", response_model=List[StaffMemberResponse])
+async def list_staff(
+    current_user: UserResponse = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List every account that has a staff role (not a regular 'user').
+    Super-admin only, since this reveals who has internal access."""
+    result = await db.execute(select(User).where(User.role.in_(STAFF_ROLES)).order_by(User.email))
+    users = result.scalars().all()
+    return [
+        StaffMemberResponse(
+            id=u.id,
+            email=u.email,
+            name=u.name,
+            role=u.role,
+            role_label=ROLE_LABELS.get(u.role, u.role),
+        )
+        for u in users
+    ]
+
+
+@router.post("/staff/assign-role", response_model=StaffMemberResponse)
+async def assign_role(
+    payload: AssignRoleRequest,
+    current_user: UserResponse = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Assign a staff role to an existing account (or 'user' to revoke staff
+    access). Super-admin only. The target account must have logged in at
+    least once already, so it exists in our database.
+
+    Note: role changes only take effect the next time that person logs in,
+    since the role travels inside their login token."""
+    normalized_email = payload.email.strip().lower()
+
+    if payload.role not in STAFF_ROLES and payload.role != "user":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Rol desconocido. Usa uno de: {', '.join(sorted(STAFF_ROLES))}, o 'user' para revocar.",
+        )
+
+    result = await db.execute(select(User).where(User.email == normalized_email))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="Esa cuenta todavía no existe. Esa persona debe iniciar sesión al menos una vez primero.",
+        )
+
+    if user.id == current_user.id and payload.role != "admin":
+        raise HTTPException(status_code=400, detail="No puedes quitarte a ti mismo el rol de super admin.")
+
+    user.role = payload.role
+    await db.commit()
+    await db.refresh(user)
+
+    logger.info("Admin %s set role=%s for %s", current_user.email, payload.role, normalized_email)
+
+    return StaffMemberResponse(
+        id=user.id,
+        email=user.email,
+        name=user.name,
+        role=user.role,
+        role_label=ROLE_LABELS.get(user.role, user.role),
+    )

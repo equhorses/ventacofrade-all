@@ -18,6 +18,7 @@ import ConversacionPage from './pages/cuenta/Conversacion';
 import FavoritosPage from './pages/cuenta/Favoritos';
 import SuscripcionPage from './pages/cuenta/Suscripcion';
 import AdminVendedoresPage from './pages/admin/Vendedores';
+import AdminEquipoPage from './pages/admin/Equipo';
 import ProtectedAdminRoute from './components/ProtectedAdminRoute';
 import { AuthProvider } from './contexts/AuthContext';
 import ComingSoonGate from './components/ComingSoonGate';
@@ -55,6 +56,14 @@ const AppRoutes = () => (
       element={
         <ProtectedAdminRoute>
           <AdminVendedoresPage />
+        </ProtectedAdminRoute>
+      }
+    />
+    <Route
+      path="/admin/equipo"
+      element={
+        <ProtectedAdminRoute requireSuperAdmin>
+          <AdminEquipoPage />
         </ProtectedAdminRoute>
       }
     />

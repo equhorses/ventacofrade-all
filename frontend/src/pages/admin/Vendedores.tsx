@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/table';
 import { client, type AdminSeller, type AdminInvitation } from '@/lib/api';
 import { Gift, Search, XCircle, Mail, Send } from 'lucide-react';
+import AdminNav from '@/components/admin/AdminNav';
 
 const MONTH_OPTIONS = [1, 3, 6, 12];
 
@@ -104,7 +105,9 @@ export default function AdminVendedoresPage() {
     !!seller.free_access_until && new Date(seller.free_access_until) > new Date();
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
+    <>
+      <AdminNav />
+      <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
       <div>
         <h1 className="text-2xl font-bold mb-1">Vendedores</h1>
         <p className="text-muted-foreground">
@@ -286,6 +289,7 @@ export default function AdminVendedoresPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

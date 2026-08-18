@@ -24,7 +24,11 @@ interface AuthContextType {
   logout: () => Promise<void>;
   refetch: () => Promise<void>;
   isAdmin: boolean;
+  isSuperAdmin: boolean;
+  isStaff: boolean;
 }
+
+const STAFF_ROLES = new Set(['admin', 'marketing', 'seguridad', 'moderacion', 'soporte']);
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
@@ -87,6 +91,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     logout,
     refetch: checkAuthStatus,
     isAdmin: user?.role === 'admin',
+    isSuperAdmin: user?.role === 'admin',
+    isStaff: !!user && STAFF_ROLES.has(user.role),
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
