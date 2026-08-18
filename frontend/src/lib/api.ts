@@ -180,4 +180,46 @@ export const client = {
       return { data: response.data as { success: boolean; message: string } };
     },
   },
+  admin: {
+    async listSellers(search?: string) {
+      const response = await http.get(`${baseUrl()}/api/v1/admin/sellers`, {
+        params: search ? { search } : {},
+      });
+      return { data: response.data as AdminSeller[] };
+    },
+    async grantFreeAccess(sellerProfileId: number, months: number | null) {
+      const response = await http.post(`${baseUrl()}/api/v1/admin/sellers/${sellerProfileId}/free-access`, {
+        months,
+      });
+      return { data: response.data as AdminSeller };
+    },
+    async listInvitations() {
+      const response = await http.get(`${baseUrl()}/api/v1/admin/invitations`);
+      return { data: response.data as AdminInvitation[] };
+    },
+    async createInvitation(email: string, months: number) {
+      const response = await http.post(`${baseUrl()}/api/v1/admin/invitations`, { email, months });
+      return { data: response.data as AdminInvitation };
+    },
+  },
 };
+
+export interface AdminSeller {
+  id: number;
+  user_id: string;
+  email?: string | null;
+  name?: string | null;
+  shop_name: string;
+  subscription_status?: string | null;
+  free_listing_used: boolean;
+  free_access_until?: string | null;
+}
+
+export interface AdminInvitation {
+  id: number;
+  email: string;
+  months: number;
+  status: string;
+  created_at?: string | null;
+  redeemed_at?: string | null;
+}

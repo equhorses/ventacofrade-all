@@ -1,12 +1,23 @@
 import { useEffect, useState, ReactNode } from 'react';
 import ComingSoon from '@/components/ComingSoon';
+import { getAPIBaseURL } from '@/lib/config';
 
 const COMING_SOON_ENABLED = import.meta.env.VITE_COMING_SOON_MODE === 'true';
 const BYPASS_KEY = import.meta.env.VITE_COMING_SOON_BYPASS_KEY as string | undefined;
 const BYPASS_STORAGE_KEY = 'vc_bypass_coming_soon';
 const BYPASS_QUERY_PARAM = 'acceso';
+const INVITE_QUERY_PARAM = 'invite';
 
-function hasBypass(): boolean {
+function stripQueryParam(param: string) {
+  const params = new URLSearchParams(window.location.search);
+  params.delete(param);
+  const newSearch = params.toString();
+  const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '') + window.location.hash;
+  window.history.replaceState({}, '', newUrl);
+}
+
+/** Fast, synchronous check: the shared team key, or a bypass already remembered from before. */
+function hasStoredOrKeyBypass(): boolean {
   if (typeof window === 'undefined') return false;
 
   const params = new URLSearchParams(window.location.search);
@@ -14,15 +25,36 @@ function hasBypass(): boolean {
 
   if (BYPASS_KEY && queryValue === BYPASS_KEY) {
     localStorage.setItem(BYPASS_STORAGE_KEY, 'true');
-    params.delete(BYPASS_QUERY_PARAM);
-    const newSearch = params.toString();
-    const newUrl =
-      window.location.pathname + (newSearch ? `?${newSearch}` : '') + window.location.hash;
-    window.history.replaceState({}, '', newUrl);
+    stripQueryParam(BYPASS_QUERY_PARAM);
     return true;
   }
 
   return localStorage.getItem(BYPASS_STORAGE_KEY) === 'true';
+}
+
+/** Slower check: a personal, single-invitee token sent by email (?invite=...). */
+async function checkInviteToken(): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get(INVITE_QUERY_PARAM);
+  if (!token) return false;
+
+  try {
+    const response = await fetch(
+      `${getAPIBaseURL()}/api/v1/invitations/verify?token=${encodeURIComponent(token)}`
+    );
+    if (!response.ok) return false;
+    const data = await response.json();
+    if (data.valid) {
+      localStorage.setItem(BYPASS_STORAGE_KEY, 'true');
+      stripQueryParam(INVITE_QUERY_PARAM);
+      return true;
+    }
+  } catch (err) {
+    console.error('Error verifying invite token:', err);
+  }
+  return false;
 }
 
 export default function ComingSoonGate({ children }: { children: ReactNode }) {
@@ -30,8 +62,16 @@ export default function ComingSoonGate({ children }: { children: ReactNode }) {
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
-    setBypassed(hasBypass());
-    setChecked(true);
+    if (hasStoredOrKeyBypass()) {
+      setBypassed(true);
+      setChecked(true);
+      return;
+    }
+
+    checkInviteToken().then((valid) => {
+      setBypassed(valid);
+      setChecked(true);
+    });
   }, []);
 
   if (!COMING_SOON_ENABLED) {

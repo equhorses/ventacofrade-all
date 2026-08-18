@@ -17,6 +17,8 @@ import MensajesPage from './pages/cuenta/Mensajes';
 import ConversacionPage from './pages/cuenta/Conversacion';
 import FavoritosPage from './pages/cuenta/Favoritos';
 import SuscripcionPage from './pages/cuenta/Suscripcion';
+import AdminVendedoresPage from './pages/admin/Vendedores';
+import ProtectedAdminRoute from './components/ProtectedAdminRoute';
 import { AuthProvider } from './contexts/AuthContext';
 import ComingSoonGate from './components/ComingSoonGate';
 import CookieBanner from './components/CookieBanner';
@@ -48,6 +50,14 @@ const AppRoutes = () => (
     <Route path="/cuenta/mensajes/:productId/:otherUserId" element={<ConversacionPage />} />
     <Route path="/cuenta/favoritos" element={<FavoritosPage />} />
     <Route path="/cuenta/suscripcion" element={<SuscripcionPage />} />
+    <Route
+      path="/admin/vendedores"
+      element={
+        <ProtectedAdminRoute>
+          <AdminVendedoresPage />
+        </ProtectedAdminRoute>
+      }
+    />
     <Route path="/auth/callback" element={<AuthCallback />} />
     <Route path="/auth/error" element={<AuthError />} />
   </Routes>

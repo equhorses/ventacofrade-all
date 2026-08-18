@@ -150,3 +150,64 @@ async def send_waitlist_confirmation_email(to_email: str) -> bool:
     except httpx.HTTPError as exc:
         logger.error(f"Fallo al enviar email de lista de espera a {to_email}: {exc}")
         return False
+
+
+async def send_invitation_email(to_email: str, months: int, token: str) -> bool:
+    """Send a branded 'you're invited, free access' email via Resend.
+
+    The link carries a unique, single-use token (not the shared team bypass
+    key), so access can be tracked and revoked per invitee.
+    """
+    api_key = getattr(settings, "resend_api_key", None)
+    from_email = getattr(settings, "resend_from_email", None)
+
+    if not api_key or not from_email:
+        logger.warning("Resend no configurado; email de invitacion omitido")
+        return False
+
+    site_url = "https://ventacofrade.com"
+    access_url = f"{site_url}/?invite={token}"
+
+    duration_text = "1 mes" if months == 1 else f"{months} meses"
+
+    html_content = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+      <h2 style="color: #6d28d9;">¡Te invitamos a VentaCofrade!</h2>
+      <p>Hemos reservado un hueco especial para ti antes de nuestro lanzamiento oficial.</p>
+      <p>Como invitado, puedes publicar tus artículos cofrades <strong>totalmente gratis
+      durante {duration_text}</strong>, sin necesidad de suscripción.</p>
+      <p style="margin-top: 24px;">
+        <a href="{access_url}" style="background-color:#6d28d9;color:#fff;
+        padding:10px 20px;border-radius:6px;text-decoration:none;">Entrar a VentaCofrade</a>
+      </p>
+      <p style="margin-top: 16px; color: #444; font-size: 14px;">
+        Entra con tu cuenta de Google usando este mismo correo ({to_email}) y completa tu perfil
+        de vendedor: el acceso gratuito se activará automáticamente.
+      </p>
+      <p style="margin-top: 24px; color: #666; font-size: 13px;">
+        Si tienes cualquier duda, escríbenos a
+        <a href="mailto:contacto@ventacofrade.com">contacto@ventacofrade.com</a>.
+      </p>
+    </div>
+    """
+
+    payload = {
+        "from": from_email,
+        "to": [to_email],
+        "subject": "Estás invitado a VentaCofrade — publica gratis",
+        "html": html_content,
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                RESEND_API_URL,
+                headers={"Authorization": f"Bearer {api_key}"},
+                json=payload,
+            )
+            response.raise_for_status()
+        logger.info(f"Email de invitacion enviado a {to_email}")
+        return True
+    except httpx.HTTPError as exc:
+        logger.error(f"Fallo al enviar email de invitacion a {to_email}: {exc}")
+        return False

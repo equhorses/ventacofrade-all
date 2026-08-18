@@ -2,16 +2,18 @@ import json
 import logging
 from typing import List, Optional
 
-from datetime import datetime, date
+from datetime import datetime, date, timedelta, timezone
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
 from services.seller_profiles import Seller_profilesService
 from dependencies.auth import get_current_user
 from schemas.auth import UserResponse
+from models.invitations import Invitation
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -217,7 +219,26 @@ async def create_seller_profiles(
         result = await service.create(data.model_dump(), user_id=str(current_user.id))
         if not result:
             raise HTTPException(status_code=400, detail="Failed to create seller_profiles")
-        
+
+        # If this user's email had a pending invitation, redeem it automatically:
+        # apply the free access window and mark the invitation as used.
+        normalized_email = (current_user.email or "").strip().lower()
+        if normalized_email:
+            invite_result = await db.execute(
+                select(Invitation).where(
+                    Invitation.email == normalized_email, Invitation.status == "pending"
+                )
+            )
+            invitation = invite_result.scalar_one_or_none()
+            if invitation:
+                result.free_access_until = datetime.now(timezone.utc) + timedelta(days=30 * invitation.months)
+                invitation.status = "redeemed"
+                invitation.redeemed_by_user_id = str(current_user.id)
+                invitation.redeemed_at = datetime.now(timezone.utc)
+                await db.commit()
+                await db.refresh(result)
+                logger.info(f"Invitacion redimida automaticamente para {normalized_email}")
+
         logger.info(f"Seller_profiles created successfully with id: {result.id}")
         return result
     except ValueError as e:

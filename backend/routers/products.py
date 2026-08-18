@@ -2,7 +2,7 @@ import json
 import logging
 from typing import List, Optional
 
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -224,7 +224,13 @@ async def create_products(
     has_active_subscription = seller_profile.subscription_status == "active"
     has_used_free_listing = bool(seller_profile.free_listing_used)
 
-    if not has_active_subscription and has_used_free_listing:
+    now = datetime.now(timezone.utc)
+    free_access_until = seller_profile.free_access_until
+    if free_access_until and free_access_until.tzinfo is None:
+        free_access_until = free_access_until.replace(tzinfo=timezone.utc)
+    has_complimentary_access = bool(free_access_until and free_access_until > now)
+
+    if not has_active_subscription and not has_complimentary_access and has_used_free_listing:
         raise HTTPException(
             status_code=403,
             detail="Ya has usado tu publicación gratuita. Activa un plan para seguir publicando anuncios.",
@@ -236,7 +242,7 @@ async def create_products(
         if not result:
             raise HTTPException(status_code=400, detail="Failed to create products")
 
-        if not has_active_subscription and not has_used_free_listing:
+        if not has_active_subscription and not has_complimentary_access and not has_used_free_listing:
             await seller_service.update(
                 seller_profile.id,
                 {"free_listing_used": True},
