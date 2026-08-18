@@ -51,7 +51,18 @@ class AuthService:
         result = await self.db.execute(select(User).where(User.email == normalized_email))
         user = result.scalar_one_or_none()
 
-        if not user or not user.password_hash or not verify_password(password, user.password_hash):
+        if not user or not user.password_hash:
+            # Either the email doesn't exist, or it exists but was created via
+            # Google (no password set) — give an honest, actionable message
+            # instead of the generic "wrong credentials" in the latter case.
+            if user and not user.password_hash:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Esta cuenta se creó con Google. Inicia sesión con el botón 'Continuar con Google'.",
+                )
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Email o contraseña incorrectos")
+
+        if not verify_password(password, user.password_hash):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Email o contraseña incorrectos")
 
         if user.account_status == "suspended":
