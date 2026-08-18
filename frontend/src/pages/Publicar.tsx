@@ -154,7 +154,8 @@ export default function PublicarPage() {
       navigate('/explorar');
     } catch (err) {
       console.error('Error creating product:', err);
-      toast.error('Error al publicar. Inténtalo de nuevo.');
+      const backendMessage = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(backendMessage || 'Error al publicar. Inténtalo de nuevo.');
     } finally {
       setLoading(false);
     }
