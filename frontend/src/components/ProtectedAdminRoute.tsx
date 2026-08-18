@@ -8,15 +8,21 @@ import { Shield, User, LogIn } from 'lucide-react';
 interface ProtectedAdminRouteProps {
   children: React.ReactNode;
   requireSuperAdmin?: boolean;
+  allowedRoles?: string[];
 }
 
 const ProtectedAdminRoute: React.FC<ProtectedAdminRouteProps> = ({
   children,
   requireSuperAdmin = false,
+  allowedRoles,
 }) => {
   const { user, loading, isStaff, isSuperAdmin, login } = useAuth();
   const location = useLocation();
-  const hasAccess = requireSuperAdmin ? isSuperAdmin : isStaff;
+  const hasAccess = requireSuperAdmin
+    ? isSuperAdmin
+    : allowedRoles
+    ? isSuperAdmin || (!!user && allowedRoles.includes(user.role))
+    : isStaff;
 
   // Loading state
   if (loading) {

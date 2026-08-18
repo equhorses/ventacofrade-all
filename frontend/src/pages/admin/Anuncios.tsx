@@ -15,6 +15,7 @@ import {
 import { client, type AdminProduct } from '@/lib/api';
 import { Search, EyeOff, RotateCcw, Trash2 } from 'lucide-react';
 import AdminNav from '@/components/admin/AdminNav';
+import { useAuth } from '@/contexts/AuthContext';
 
 const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   active: { label: 'Activo', className: 'bg-green-100 text-green-700' },
@@ -26,6 +27,8 @@ const STATUS_LABELS: Record<string, { label: string; className: string }> = {
 const PAGE_SIZE = 50;
 
 export default function AdminAnunciosPage() {
+  const { user, isSuperAdmin } = useAuth();
+  const canModerate = isSuperAdmin || user?.role === 'moderacion';
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -145,36 +148,40 @@ export default function AdminAnunciosPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        {p.status === 'removed' ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={actingId === p.id}
-                            onClick={() => handleRestore(p)}
-                          >
-                            <RotateCcw className="h-3 w-3 mr-1" /> Restaurar
-                          </Button>
-                        ) : (
+                      {!canModerate ? (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      ) : (
+                        <div className="flex justify-end gap-1">
+                          {p.status === 'removed' ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={actingId === p.id}
+                              onClick={() => handleRestore(p)}
+                            >
+                              <RotateCcw className="h-3 w-3 mr-1" /> Restaurar
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={actingId === p.id}
+                              onClick={() => handleRemove(p)}
+                            >
+                              <EyeOff className="h-3 w-3 mr-1" /> Retirar
+                            </Button>
+                          )}
                           <Button
                             size="sm"
                             variant="ghost"
+                            className="text-destructive hover:text-destructive"
                             disabled={actingId === p.id}
-                            onClick={() => handleRemove(p)}
+                            onClick={() => handleDelete(p)}
                           >
-                            <EyeOff className="h-3 w-3 mr-1" /> Retirar
+                            <Trash2 className="h-3 w-3" />
                           </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-destructive hover:text-destructive"
-                          disabled={actingId === p.id}
-                          onClick={() => handleDelete(p)}
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
+                        </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

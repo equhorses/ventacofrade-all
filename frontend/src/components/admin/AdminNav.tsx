@@ -1,29 +1,37 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 
-const TABS = [
-  { to: '/admin', label: 'Resumen', superAdminOnly: false },
-  { to: '/admin/usuarios', label: 'Usuarios', superAdminOnly: false },
-  { to: '/admin/anuncios', label: 'Anuncios', superAdminOnly: false },
-  { to: '/admin/mensajes', label: 'Mensajes', superAdminOnly: false },
-  { to: '/admin/vendedores', label: 'Vendedores', superAdminOnly: false },
-  { to: '/admin/equipo', label: 'Equipo', superAdminOnly: true },
+// allowedRoles omitted = every staff role can see this tab.
+// allowedRoles set = only those roles (super admin always sees everything too).
+const TABS: { to: string; label: string; allowedRoles?: string[] }[] = [
+  { to: '/admin', label: 'Resumen' },
+  { to: '/admin/usuarios', label: 'Usuarios' },
+  { to: '/admin/anuncios', label: 'Anuncios' },
+  { to: '/admin/mensajes', label: 'Mensajes', allowedRoles: ['soporte'] },
+  { to: '/admin/vendedores', label: 'Vendedores', allowedRoles: ['marketing'] },
+  { to: '/admin/equipo', label: 'Equipo', allowedRoles: [] }, // super admin only
 ];
 
 export default function AdminNav() {
   const location = useLocation();
-  const { isSuperAdmin } = useAuth();
+  const { user, isSuperAdmin } = useAuth();
+
+  const visibleTabs = TABS.filter((tab) => {
+    if (isSuperAdmin) return true;
+    if (!tab.allowedRoles) return true; // open to any staff role
+    return !!user && tab.allowedRoles.includes(user.role);
+  });
 
   return (
     <div className="border-b border-border mb-2">
-      <div className="max-w-6xl mx-auto px-4 flex gap-1">
-        {TABS.filter((tab) => !tab.superAdminOnly || isSuperAdmin).map((tab) => {
+      <div className="max-w-6xl mx-auto px-4 flex gap-1 overflow-x-auto">
+        {visibleTabs.map((tab) => {
           const active = location.pathname === tab.to;
           return (
             <Link
               key={tab.to}
               to={tab.to}
-              className={`px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              className={`px-4 py-3 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition-colors ${
                 active
                   ? 'border-primary text-primary'
                   : 'border-transparent text-muted-foreground hover:text-foreground'

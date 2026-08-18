@@ -82,7 +82,7 @@ const AppRoutes = () => (
     <Route
       path="/admin/mensajes"
       element={
-        <ProtectedAdminRoute>
+        <ProtectedAdminRoute allowedRoles={['soporte']}>
           <AdminMensajesPage />
         </ProtectedAdminRoute>
       }
@@ -90,7 +90,7 @@ const AppRoutes = () => (
     <Route
       path="/admin/vendedores"
       element={
-        <ProtectedAdminRoute>
+        <ProtectedAdminRoute allowedRoles={['marketing']}>
           <AdminVendedoresPage />
         </ProtectedAdminRoute>
       }

@@ -15,6 +15,7 @@ import {
 import { client, type AdminUser } from '@/lib/api';
 import { Search, Ban, RotateCcw } from 'lucide-react';
 import AdminNav from '@/components/admin/AdminNav';
+import { useAuth } from '@/contexts/AuthContext';
 
 const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   active: { label: 'Activa', className: 'bg-green-100 text-green-700' },
@@ -35,6 +36,8 @@ const ROLE_LABELS: Record<string, string> = {
 const PAGE_SIZE = 50;
 
 export default function AdminUsuariosPage() {
+  const { user, isSuperAdmin } = useAuth();
+  const canModerate = isSuperAdmin || user?.role === 'seguridad';
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -153,6 +156,8 @@ export default function AdminUsuariosPage() {
                     <TableCell className="text-right">
                       {u.role !== 'user' ? (
                         <span className="text-xs text-muted-foreground">Cuenta de equipo</span>
+                      ) : !canModerate ? (
+                        <span className="text-xs text-muted-foreground">—</span>
                       ) : u.account_status === 'banned' ? (
                         <Button
                           size="sm"
