@@ -233,6 +233,22 @@ export const client = {
       const response = await http.post(`${baseUrl()}/api/v1/admin/users/${userId}/unban`, {});
       return { data: response.data as AdminUser };
     },
+    async listProducts(params: { search?: string; status?: string; skip?: number; limit?: number } = {}) {
+      const response = await http.get(`${baseUrl()}/api/v1/admin/products`, { params });
+      return { data: response.data as { items: AdminProduct[]; total: number } };
+    },
+    async removeProduct(productId: number) {
+      const response = await http.post(`${baseUrl()}/api/v1/admin/products/${productId}/remove`, {});
+      return { data: response.data as AdminProduct };
+    },
+    async restoreProduct(productId: number) {
+      const response = await http.post(`${baseUrl()}/api/v1/admin/products/${productId}/restore`, {});
+      return { data: response.data as AdminProduct };
+    },
+    async deleteProductAdmin(productId: number) {
+      const response = await http.delete(`${baseUrl()}/api/v1/admin/products/${productId}`);
+      return { data: response.data as { message: string; id: number } };
+    },
     async assignRole(email: string, role: string) {
       const response = await http.post(`${baseUrl()}/api/v1/admin/staff/assign-role`, { email, role });
       return { data: response.data as StaffMember };
@@ -291,6 +307,17 @@ export interface AdminUser {
   account_status: string;
   created_at?: string | null;
   last_login?: string | null;
+}
+
+export interface AdminProduct {
+  id: number;
+  user_id: string;
+  seller_email?: string | null;
+  title: string;
+  price: number;
+  status?: string | null;
+  images?: string | null;
+  created_at?: string | null;
 }
 
 export interface SubscriptionActionResult {

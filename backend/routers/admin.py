@@ -178,6 +178,155 @@ async def unban_user(
     return user
 
 
+class AdminProductResponse(BaseModel):
+    id: int
+    user_id: str
+    seller_email: Optional[str] = None
+    title: str
+    price: float
+    status: Optional[str] = None
+    images: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class AdminProductsListResponse(BaseModel):
+    items: List[AdminProductResponse]
+    total: int
+
+
+class RemoveProductRequest(BaseModel):
+    reason: Optional[str] = None
+
+
+@router.get("/products", response_model=AdminProductsListResponse)
+async def list_products_admin(
+    search: Optional[str] = Query(None, description="Filtra por título"),
+    status_filter: Optional[str] = Query(None, alias="status"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    current_user: UserResponse = Depends(get_staff_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List every listing (including removed/paused ones), with the seller's
+    email, for moderation. Visible to any staff role."""
+    query = select(Products, User.email).join(User, User.id == Products.user_id, isouter=True)
+    count_query = select(func.count()).select_from(Products)
+
+    if search:
+        like = f"%{search.strip().lower()}%"
+        query = query.where(Products.title.ilike(like))
+        count_query = count_query.where(Products.title.ilike(like))
+
+    if status_filter:
+        query = query.where(Products.status == status_filter)
+        count_query = count_query.where(Products.status == status_filter)
+
+    total = (await db.execute(count_query)).scalar_one()
+
+    query = query.order_by(Products.created_at.desc()).offset(skip).limit(limit)
+    result = await db.execute(query)
+    rows = result.all()
+
+    return AdminProductsListResponse(
+        items=[
+            AdminProductResponse(
+                id=p.id,
+                user_id=p.user_id,
+                seller_email=email,
+                title=p.title,
+                price=p.price,
+                status=p.status,
+                images=p.images,
+                created_at=p.created_at,
+            )
+            for p, email in rows
+        ],
+        total=total,
+    )
+
+
+@router.post("/products/{product_id}/remove", response_model=AdminProductResponse)
+async def remove_product(
+    product_id: int,
+    payload: RemoveProductRequest,
+    current_user: UserResponse = Depends(require_roles("admin", "moderacion")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Hide a listing from public view (moderation action). Doesn't delete it,
+    just marks it 'removed' so the seller can see what happened."""
+    result = await db.execute(select(Products).where(Products.id == product_id))
+    product = result.scalar_one_or_none()
+    if not product:
+        raise HTTPException(status_code=404, detail="Anuncio no encontrado")
+
+    product.status = "removed"
+    await db.commit()
+    await db.refresh(product)
+
+    logger.info(
+        "Admin %s removed product %s (reason: %s)", current_user.email, product_id, payload.reason
+    )
+    return AdminProductResponse(
+        id=product.id,
+        user_id=product.user_id,
+        title=product.title,
+        price=product.price,
+        status=product.status,
+        images=product.images,
+        created_at=product.created_at,
+    )
+
+
+@router.post("/products/{product_id}/restore", response_model=AdminProductResponse)
+async def restore_product(
+    product_id: int,
+    current_user: UserResponse = Depends(require_roles("admin", "moderacion")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Undo a moderation removal, making the listing active again."""
+    result = await db.execute(select(Products).where(Products.id == product_id))
+    product = result.scalar_one_or_none()
+    if not product:
+        raise HTTPException(status_code=404, detail="Anuncio no encontrado")
+
+    product.status = "active"
+    await db.commit()
+    await db.refresh(product)
+
+    logger.info("Admin %s restored product %s", current_user.email, product_id)
+    return AdminProductResponse(
+        id=product.id,
+        user_id=product.user_id,
+        title=product.title,
+        price=product.price,
+        status=product.status,
+        images=product.images,
+        created_at=product.created_at,
+    )
+
+
+@router.delete("/products/{product_id}")
+async def delete_product_admin(
+    product_id: int,
+    current_user: UserResponse = Depends(require_roles("admin", "moderacion")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Permanently delete a listing (e.g. spam, illegal content)."""
+    result = await db.execute(select(Products).where(Products.id == product_id))
+    product = result.scalar_one_or_none()
+    if not product:
+        raise HTTPException(status_code=404, detail="Anuncio no encontrado")
+
+    await db.delete(product)
+    await db.commit()
+
+    logger.info("Admin %s permanently deleted product %s", current_user.email, product_id)
+    return {"message": "Anuncio eliminado", "id": product_id}
+
+
 class DashboardStats(BaseModel):
     total_users: int
     new_users_last_7_days: int
