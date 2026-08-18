@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
 from services.products import ProductsService
+from services.seller_profiles import Seller_profilesService
 from dependencies.auth import get_current_user
 from schemas.auth import UserResponse
 
@@ -210,13 +211,38 @@ async def create_products(
 ):
     """Create a new products"""
     logger.debug(f"Creating new products with data: {data}")
-    
+
+    seller_service = Seller_profilesService(db)
+    seller_profile = await seller_service.get_by_field("user_id", str(current_user.id))
+
+    if not seller_profile:
+        raise HTTPException(
+            status_code=400,
+            detail="Completa primero tu perfil de vendedor antes de publicar un anuncio.",
+        )
+
+    has_active_subscription = seller_profile.subscription_status == "active"
+    has_used_free_listing = bool(seller_profile.free_listing_used)
+
+    if not has_active_subscription and has_used_free_listing:
+        raise HTTPException(
+            status_code=403,
+            detail="Ya has usado tu publicación gratuita. Activa un plan para seguir publicando anuncios.",
+        )
+
     service = ProductsService(db)
     try:
         result = await service.create(data.model_dump(), user_id=str(current_user.id))
         if not result:
             raise HTTPException(status_code=400, detail="Failed to create products")
-        
+
+        if not has_active_subscription and not has_used_free_listing:
+            await seller_service.update(
+                seller_profile.id,
+                {"free_listing_used": True},
+                user_id=str(current_user.id),
+            )
+
         logger.info(f"Products created successfully with id: {result.id}")
         return result
     except ValueError as e:
