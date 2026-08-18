@@ -249,6 +249,12 @@ export const client = {
       const response = await http.delete(`${baseUrl()}/api/v1/admin/products/${productId}`);
       return { data: response.data as { message: string; id: number } };
     },
+    async listConversationsAdmin(search?: string) {
+      const response = await http.get(`${baseUrl()}/api/v1/admin/conversations`, {
+        params: search ? { search } : {},
+      });
+      return { data: response.data as AdminConversation[] };
+    },
     async assignRole(email: string, role: string) {
       const response = await http.post(`${baseUrl()}/api/v1/admin/staff/assign-role`, { email, role });
       return { data: response.data as StaffMember };
@@ -318,6 +324,16 @@ export interface AdminProduct {
   status?: string | null;
   images?: string | null;
   created_at?: string | null;
+}
+
+export interface AdminConversation {
+  product_id: number;
+  product_title: string;
+  buyer_email?: string | null;
+  seller_email?: string | null;
+  last_message: string;
+  last_message_at?: string | null;
+  message_count: number;
 }
 
 export interface SubscriptionActionResult {

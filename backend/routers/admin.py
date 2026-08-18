@@ -16,6 +16,7 @@ from models.seller_profiles import Seller_profiles
 from models.invitations import Invitation
 from models.products import Products
 from models.waitlist import Waitlist
+from models.messages import Messages
 from services.email import send_invitation_email
 
 logger = logging.getLogger(__name__)
@@ -325,6 +326,106 @@ async def delete_product_admin(
 
     logger.info("Admin %s permanently deleted product %s", current_user.email, product_id)
     return {"message": "Anuncio eliminado", "id": product_id}
+
+
+class AdminConversationResponse(BaseModel):
+    product_id: int
+    product_title: str
+    buyer_email: Optional[str] = None
+    seller_email: Optional[str] = None
+    last_message: str
+    last_message_at: Optional[datetime] = None
+    message_count: int
+
+
+class AdminMessageResponse(BaseModel):
+    id: int
+    user_id: str
+    sender_email: Optional[str] = None
+    content: str
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/conversations", response_model=List[AdminConversationResponse])
+async def list_conversations_admin(
+    search: Optional[str] = Query(None, description="Filtra por título de anuncio o email"),
+    current_user: UserResponse = Depends(require_roles("admin", "soporte")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Read-only overview of every conversation on the platform, for support.
+    Admin/soporte only — this is sensitive (people's private messages)."""
+    result = await db.execute(select(Messages).order_by(Messages.created_at.desc()).limit(2000))
+    messages = result.scalars().all()
+
+    groups: dict = {}
+    for m in messages:
+        key = (m.product_id, tuple(sorted([m.user_id, m.receiver_id])))
+        if key not in groups:
+            groups[key] = {
+                "product_id": m.product_id,
+                "participants": {m.user_id, m.receiver_id},
+                "last_message": m.content,
+                "last_message_at": m.created_at,
+                "message_count": 0,
+            }
+        groups[key]["message_count"] += 1
+
+    conversations = list(groups.values())
+
+    product_ids = {c["product_id"] for c in conversations}
+    all_user_ids: set = set()
+    for c in conversations:
+        all_user_ids |= c["participants"]
+
+    products_by_id = {}
+    if product_ids:
+        prod_result = await db.execute(select(Products).where(Products.id.in_(product_ids)))
+        products_by_id = {p.id: p for p in prod_result.scalars().all()}
+
+    users_by_id = {}
+    if all_user_ids:
+        user_result = await db.execute(select(User).where(User.id.in_(all_user_ids)))
+        users_by_id = {u.id: u for u in user_result.scalars().all()}
+
+    responses = []
+    for c in conversations:
+        product = products_by_id.get(c["product_id"])
+        participant_ids = list(c["participants"])
+        seller_email = None
+        buyer_email = None
+        if product:
+            seller_user = users_by_id.get(product.user_id)
+            seller_email = seller_user.email if seller_user else None
+            other_ids = [pid for pid in participant_ids if pid != product.user_id]
+            if other_ids:
+                buyer_user = users_by_id.get(other_ids[0])
+                buyer_email = buyer_user.email if buyer_user else None
+
+        title = product.title if product else "Anuncio eliminado"
+
+        if search:
+            like = search.strip().lower()
+            haystack = f"{title} {seller_email or ''} {buyer_email or ''}".lower()
+            if like not in haystack:
+                continue
+
+        responses.append(
+            AdminConversationResponse(
+                product_id=c["product_id"],
+                product_title=title,
+                buyer_email=buyer_email,
+                seller_email=seller_email,
+                last_message=c["last_message"],
+                last_message_at=c["last_message_at"],
+                message_count=c["message_count"],
+            )
+        )
+
+    responses.sort(key=lambda r: r.last_message_at or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+    return responses[:200]
 
 
 class DashboardStats(BaseModel):
