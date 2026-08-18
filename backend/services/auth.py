@@ -65,6 +65,12 @@ class AuthService:
         if not verify_password(password, user.password_hash):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Email o contraseña incorrectos")
 
+        if user.account_status == "banned":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Esta cuenta ha sido suspendida por el equipo de VentaCofrade. Contacta con soporte.",
+            )
+
         if user.account_status == "suspended":
             user.account_status = "active"
             user.suspended_at = None
@@ -85,6 +91,11 @@ class AuthService:
 
         is_new_user = False
         if user:
+            if user.account_status == "banned":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Esta cuenta ha sido suspendida por el equipo de VentaCofrade. Contacta con soporte.",
+                )
             user.last_login = datetime.now(timezone.utc)
             if name and not user.name:
                 user.name = name

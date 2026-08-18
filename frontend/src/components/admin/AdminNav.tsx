@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 const TABS = [
   { to: '/admin', label: 'Resumen', superAdminOnly: false },
+  { to: '/admin/usuarios', label: 'Usuarios', superAdminOnly: false },
   { to: '/admin/vendedores', label: 'Vendedores', superAdminOnly: false },
   { to: '/admin/equipo', label: 'Equipo', superAdminOnly: true },
 ];

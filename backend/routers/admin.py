@@ -76,6 +76,108 @@ class AssignRoleRequest(BaseModel):
     role: str
 
 
+class AdminUserResponse(BaseModel):
+    id: str
+    email: str
+    name: Optional[str] = None
+    role: str
+    account_status: str
+    created_at: Optional[datetime] = None
+    last_login: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class AdminUsersListResponse(BaseModel):
+    items: List[AdminUserResponse]
+    total: int
+
+
+class BanUserRequest(BaseModel):
+    reason: Optional[str] = None
+
+
+@router.get("/users", response_model=AdminUsersListResponse)
+async def list_users(
+    search: Optional[str] = Query(None, description="Filtra por email o nombre"),
+    status_filter: Optional[str] = Query(None, alias="status", description="active | suspended | banned | pending_deletion"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    current_user: UserResponse = Depends(get_staff_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List every user account — not just sellers. Visible to any staff role."""
+    query = select(User)
+    count_query = select(func.count()).select_from(User)
+
+    if search:
+        like = f"%{search.strip().lower()}%"
+        query = query.where((User.email.ilike(like)) | (User.name.ilike(like)))
+        count_query = count_query.where((User.email.ilike(like)) | (User.name.ilike(like)))
+
+    if status_filter:
+        query = query.where(User.account_status == status_filter)
+        count_query = count_query.where(User.account_status == status_filter)
+
+    total = (await db.execute(count_query)).scalar_one()
+
+    query = query.order_by(User.created_at.desc()).offset(skip).limit(limit)
+    result = await db.execute(query)
+    users = result.scalars().all()
+
+    return AdminUsersListResponse(items=users, total=total)
+
+
+@router.post("/users/{user_id}/ban", response_model=AdminUserResponse)
+async def ban_user(
+    user_id: str,
+    payload: BanUserRequest,
+    current_user: UserResponse = Depends(require_roles("admin", "seguridad")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Ban a user account — blocks login until an admin lifts it. Different
+    from the self-service 'suspend my own account', which auto-reactivates
+    on next login. Admin/seguridad only."""
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    if user.role in STAFF_ROLES:
+        raise HTTPException(status_code=400, detail="No puedes banear a una cuenta del equipo.")
+
+    user.account_status = "banned"
+    user.suspended_at = datetime.now(timezone.utc)
+    if payload.reason:
+        user.deletion_reasons = payload.reason
+    await db.commit()
+    await db.refresh(user)
+
+    logger.info("Admin %s banned user %s (reason: %s)", current_user.email, user.email, payload.reason)
+    return user
+
+
+@router.post("/users/{user_id}/unban", response_model=AdminUserResponse)
+async def unban_user(
+    user_id: str,
+    current_user: UserResponse = Depends(require_roles("admin", "seguridad")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lift a ban, restoring normal access."""
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    user.account_status = "active"
+    user.suspended_at = None
+    await db.commit()
+    await db.refresh(user)
+
+    logger.info("Admin %s unbanned user %s", current_user.email, user.email)
+    return user
+
+
 class DashboardStats(BaseModel):
     total_users: int
     new_users_last_7_days: int

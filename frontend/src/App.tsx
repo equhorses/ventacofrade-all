@@ -20,6 +20,7 @@ import SuscripcionPage from './pages/cuenta/Suscripcion';
 import AdminVendedoresPage from './pages/admin/Vendedores';
 import AdminEquipoPage from './pages/admin/Equipo';
 import AdminResumenPage from './pages/admin/Resumen';
+import AdminUsuariosPage from './pages/admin/Usuarios';
 import ProtectedAdminRoute from './components/ProtectedAdminRoute';
 import { AuthProvider } from './contexts/AuthContext';
 import ComingSoonGate from './components/ComingSoonGate';
@@ -57,6 +58,14 @@ const AppRoutes = () => (
       element={
         <ProtectedAdminRoute>
           <AdminResumenPage />
+        </ProtectedAdminRoute>
+      }
+    />
+    <Route
+      path="/admin/usuarios"
+      element={
+        <ProtectedAdminRoute>
+          <AdminUsuariosPage />
         </ProtectedAdminRoute>
       }
     />

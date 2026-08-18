@@ -221,6 +221,18 @@ export const client = {
       const response = await http.get(`${baseUrl()}/api/v1/admin/dashboard`);
       return { data: response.data as DashboardStats };
     },
+    async listUsers(params: { search?: string; status?: string; skip?: number; limit?: number } = {}) {
+      const response = await http.get(`${baseUrl()}/api/v1/admin/users`, { params });
+      return { data: response.data as { items: AdminUser[]; total: number } };
+    },
+    async banUser(userId: string, reason?: string) {
+      const response = await http.post(`${baseUrl()}/api/v1/admin/users/${userId}/ban`, { reason });
+      return { data: response.data as AdminUser };
+    },
+    async unbanUser(userId: string) {
+      const response = await http.post(`${baseUrl()}/api/v1/admin/users/${userId}/unban`, {});
+      return { data: response.data as AdminUser };
+    },
     async assignRole(email: string, role: string) {
       const response = await http.post(`${baseUrl()}/api/v1/admin/staff/assign-role`, { email, role });
       return { data: response.data as StaffMember };
@@ -269,6 +281,16 @@ export interface DashboardStats {
   waitlist_count: number;
   invitations_sent: number;
   invitations_redeemed: number;
+}
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  name?: string | null;
+  role: string;
+  account_status: string;
+  created_at?: string | null;
+  last_login?: string | null;
 }
 
 export interface SubscriptionActionResult {
