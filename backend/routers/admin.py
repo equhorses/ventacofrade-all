@@ -5,7 +5,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, EmailStr
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
@@ -14,6 +14,8 @@ from schemas.auth import UserResponse
 from models.auth import User
 from models.seller_profiles import Seller_profiles
 from models.invitations import Invitation
+from models.products import Products
+from models.waitlist import Waitlist
 from services.email import send_invitation_email
 
 logger = logging.getLogger(__name__)
@@ -72,6 +74,85 @@ class StaffMemberResponse(BaseModel):
 class AssignRoleRequest(BaseModel):
     email: EmailStr
     role: str
+
+
+class DashboardStats(BaseModel):
+    total_users: int
+    new_users_last_7_days: int
+    total_sellers: int
+    active_subscriptions: int
+    basico_count: int
+    profesional_count: int
+    estimated_mrr: float
+    total_products: int
+    active_products: int
+    waitlist_count: int
+    invitations_sent: int
+    invitations_redeemed: int
+
+
+@router.get("/dashboard", response_model=DashboardStats)
+async def get_dashboard_stats(
+    current_user: UserResponse = Depends(get_staff_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """High-level numbers for the admin panel's overview page.
+    Available to any staff role — everyone benefits from seeing the big picture."""
+    seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
+
+    total_users = (await db.execute(select(func.count()).select_from(User))).scalar_one()
+    new_users_last_7_days = (
+        await db.execute(select(func.count()).select_from(User).where(User.created_at >= seven_days_ago))
+    ).scalar_one()
+
+    total_sellers = (await db.execute(select(func.count()).select_from(Seller_profiles))).scalar_one()
+    active_subscriptions = (
+        await db.execute(
+            select(func.count()).select_from(Seller_profiles).where(Seller_profiles.subscription_status == "active")
+        )
+    ).scalar_one()
+    basico_count = (
+        await db.execute(
+            select(func.count()).select_from(Seller_profiles).where(
+                Seller_profiles.subscription_status == "active", Seller_profiles.plan == "basico"
+            )
+        )
+    ).scalar_one()
+    profesional_count = (
+        await db.execute(
+            select(func.count()).select_from(Seller_profiles).where(
+                Seller_profiles.subscription_status == "active", Seller_profiles.plan == "profesional"
+            )
+        )
+    ).scalar_one()
+    estimated_mrr = round(basico_count * 4.99 + profesional_count * 9.99, 2)
+
+    total_products = (await db.execute(select(func.count()).select_from(Products))).scalar_one()
+    active_products = (
+        await db.execute(select(func.count()).select_from(Products).where(Products.status == "active"))
+    ).scalar_one()
+
+    waitlist_count = (await db.execute(select(func.count()).select_from(Waitlist))).scalar_one()
+
+    invitations_sent = (await db.execute(select(func.count()).select_from(Invitation))).scalar_one()
+    invitations_redeemed = (
+        await db.execute(select(func.count()).select_from(Invitation).where(Invitation.status == "redeemed"))
+    ).scalar_one()
+
+    return DashboardStats(
+        total_users=total_users,
+        new_users_last_7_days=new_users_last_7_days,
+        total_sellers=total_sellers,
+        active_subscriptions=active_subscriptions,
+        basico_count=basico_count,
+        profesional_count=profesional_count,
+        estimated_mrr=estimated_mrr,
+        total_products=total_products,
+        active_products=active_products,
+        waitlist_count=waitlist_count,
+        invitations_sent=invitations_sent,
+        invitations_redeemed=invitations_redeemed,
+    )
 
 
 @router.get("/sellers", response_model=List[AdminSellerResponse])

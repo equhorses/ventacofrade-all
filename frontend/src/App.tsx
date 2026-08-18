@@ -19,6 +19,7 @@ import FavoritosPage from './pages/cuenta/Favoritos';
 import SuscripcionPage from './pages/cuenta/Suscripcion';
 import AdminVendedoresPage from './pages/admin/Vendedores';
 import AdminEquipoPage from './pages/admin/Equipo';
+import AdminResumenPage from './pages/admin/Resumen';
 import ProtectedAdminRoute from './components/ProtectedAdminRoute';
 import { AuthProvider } from './contexts/AuthContext';
 import ComingSoonGate from './components/ComingSoonGate';
@@ -51,6 +52,14 @@ const AppRoutes = () => (
     <Route path="/cuenta/mensajes/:productId/:otherUserId" element={<ConversacionPage />} />
     <Route path="/cuenta/favoritos" element={<FavoritosPage />} />
     <Route path="/cuenta/suscripcion" element={<SuscripcionPage />} />
+    <Route
+      path="/admin"
+      element={
+        <ProtectedAdminRoute>
+          <AdminResumenPage />
+        </ProtectedAdminRoute>
+      }
+    />
     <Route
       path="/admin/vendedores"
       element={

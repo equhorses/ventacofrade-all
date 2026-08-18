@@ -217,6 +217,10 @@ export const client = {
       const response = await http.get(`${baseUrl()}/api/v1/admin/staff`);
       return { data: response.data as StaffMember[] };
     },
+    async getDashboard() {
+      const response = await http.get(`${baseUrl()}/api/v1/admin/dashboard`);
+      return { data: response.data as DashboardStats };
+    },
     async assignRole(email: string, role: string) {
       const response = await http.post(`${baseUrl()}/api/v1/admin/staff/assign-role`, { email, role });
       return { data: response.data as StaffMember };
@@ -250,6 +254,21 @@ export interface StaffMember {
   name?: string | null;
   role: string;
   role_label: string;
+}
+
+export interface DashboardStats {
+  total_users: number;
+  new_users_last_7_days: number;
+  total_sellers: number;
+  active_subscriptions: number;
+  basico_count: number;
+  profesional_count: number;
+  estimated_mrr: number;
+  total_products: number;
+  active_products: number;
+  waitlist_count: number;
+  invitations_sent: number;
+  invitations_redeemed: number;
 }
 
 export interface SubscriptionActionResult {
