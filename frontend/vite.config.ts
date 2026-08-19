@@ -49,6 +49,15 @@ export default defineConfig(({ command }) => {
         lastmod: getSitemapLastmod(),
         readable: true,
         generateRobotsTxt: false,
+        dynamicRoutes: [
+          '/explorar',
+          '/vender',
+          '/legal/aviso-legal',
+          '/legal/privacidad',
+          '/legal/terminos',
+          '/cookies',
+        ],
+        exclude: ['/blog', '/blog/'],
       }),
       ...(blogPrerenderRoutes.length > 0
         ? vitePrerenderPlugin({
