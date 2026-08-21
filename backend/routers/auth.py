@@ -15,6 +15,7 @@ from schemas.auth import (
     UserResponse,
 )
 from services.auth import AuthService
+from services.audit import log_login_attempt
 from services.hcaptcha import verify_hcaptcha_token
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -45,10 +46,25 @@ async def register(payload: RegisterRequest, request: Request, db: AsyncSession 
 
 
 @router.post("/login", response_model=AuthTokenResponse)
-async def login_with_password(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login_with_password(payload: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)):
     """Log in with email + password and return a session token."""
+    client_ip = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent", "")[:255]
+
     auth_service = AuthService(db)
-    user = await auth_service.authenticate_user(email=payload.email, password=payload.password)
+    try:
+        user = await auth_service.authenticate_user(email=payload.email, password=payload.password)
+    except HTTPException as exc:
+        await log_login_attempt(
+            db, email=payload.email, method="password", success=False,
+            reason=str(exc.detail)[:255], ip_address=client_ip, user_agent=user_agent,
+        )
+        raise
+
+    await log_login_attempt(
+        db, email=payload.email, method="password", success=True,
+        ip_address=client_ip, user_agent=user_agent,
+    )
     token, expires_at, _ = await auth_service.issue_app_token(user=user)
     return AuthTokenResponse(token=token, user=UserResponse.model_validate(user))
 
@@ -154,8 +170,23 @@ async def google_callback(
     if not email:
         return redirect_with_error("Google no proporciono un email")
 
+    client_ip = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent", "")[:255]
+
     auth_service = AuthService(db)
-    user = await auth_service.get_or_create_google_user(email=email, name=userinfo.get("name"))
+    try:
+        user = await auth_service.get_or_create_google_user(email=email, name=userinfo.get("name"))
+    except HTTPException as exc:
+        await log_login_attempt(
+            db, email=email, method="google", success=False,
+            reason=str(exc.detail)[:255], ip_address=client_ip, user_agent=user_agent,
+        )
+        return redirect_with_error(str(exc.detail))
+
+    await log_login_attempt(
+        db, email=email, method="google", success=True,
+        ip_address=client_ip, user_agent=user_agent,
+    )
     token, expires_at, _ = await auth_service.issue_app_token(user=user)
 
     redirect_response = RedirectResponse(

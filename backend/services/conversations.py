@@ -67,7 +67,10 @@ class ConversationsService:
         for c in conversations:
             product = products_by_id.get(c["product_id"])
             other_user = users_by_id.get(c["other_user_id"])
-            c["product_title"] = product.title if product else "Anuncio eliminado"
+            if c["product_id"] == 0:
+                c["product_title"] = "Soporte VentaCofrade"
+            else:
+                c["product_title"] = product.title if product else "Anuncio eliminado"
             c["product_image"] = (product.images.split(",")[0] if product and product.images else None)
             c["other_user_name"] = (other_user.name if other_user and other_user.name else None) or (
                 other_user.email if other_user else "Usuario"

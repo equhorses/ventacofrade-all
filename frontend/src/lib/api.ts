@@ -255,6 +255,22 @@ export const client = {
       });
       return { data: response.data as AdminConversation[] };
     },
+    async getSupportThread(userId: string) {
+      const response = await http.get(`${baseUrl()}/api/v1/admin/users/${userId}/messages`);
+      return { data: response.data as AdminChatMessage[] };
+    },
+    async sendSupportMessage(userId: string, content: string) {
+      const response = await http.post(`${baseUrl()}/api/v1/admin/users/${userId}/messages`, { content });
+      return { data: response.data as AdminChatMessage };
+    },
+    async getAuditLog(skip = 0, limit = 100) {
+      const response = await http.get(`${baseUrl()}/api/v1/admin/audit-log`, { params: { skip, limit } });
+      return { data: response.data as AuditLogEntry[] };
+    },
+    async getSecurityOverview() {
+      const response = await http.get(`${baseUrl()}/api/v1/admin/security`);
+      return { data: response.data as SecurityOverview };
+    },
     async assignRole(email: string, role: string) {
       const response = await http.post(`${baseUrl()}/api/v1/admin/staff/assign-role`, { email, role });
       return { data: response.data as StaffMember };
@@ -303,6 +319,8 @@ export interface DashboardStats {
   waitlist_count: number;
   invitations_sent: number;
   invitations_redeemed: number;
+  google_accounts: number;
+  password_accounts: number;
 }
 
 export interface AdminUser {
@@ -334,6 +352,40 @@ export interface AdminConversation {
   last_message: string;
   last_message_at?: string | null;
   message_count: number;
+}
+
+export interface AdminChatMessage {
+  id: number;
+  user_id: string;
+  sender_email?: string | null;
+  content: string;
+  created_at?: string | null;
+  is_from_staff: boolean;
+}
+
+export interface AuditLogEntry {
+  id: number;
+  actor_email?: string | null;
+  action: string;
+  target?: string | null;
+  details?: string | null;
+  created_at?: string | null;
+}
+
+export interface LoginAttemptEntry {
+  id: number;
+  email: string;
+  method: string;
+  success: boolean;
+  reason?: string | null;
+  ip_address?: string | null;
+  created_at?: string | null;
+}
+
+export interface SecurityOverview {
+  recent_attempts: LoginAttemptEntry[];
+  failed_last_24h: number;
+  suspicious_emails: string[];
 }
 
 export interface SubscriptionActionResult {

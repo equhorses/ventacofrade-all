@@ -12,10 +12,16 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { client, type AdminUser } from '@/lib/api';
-import { Search, Ban, RotateCcw } from 'lucide-react';
+import { client, type AdminUser, type AdminChatMessage } from '@/lib/api';
+import { Search, Ban, RotateCcw, MessageCircle, Send } from 'lucide-react';
 import AdminNav from '@/components/admin/AdminNav';
 import { useAuth } from '@/contexts/AuthContext';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   active: { label: 'Activa', className: 'bg-green-100 text-green-700' },
@@ -38,7 +44,13 @@ const PAGE_SIZE = 50;
 export default function AdminUsuariosPage() {
   const { user, isSuperAdmin } = useAuth();
   const canModerate = isSuperAdmin || user?.role === 'seguridad';
+  const canChat = isSuperAdmin || user?.role === 'soporte';
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [chatUser, setChatUser] = useState<AdminUser | null>(null);
+  const [chatMessages, setChatMessages] = useState<AdminChatMessage[]>([]);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+  const [sending, setSending] = useState(false);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -100,6 +112,35 @@ export default function AdminUsuariosPage() {
     }
   };
 
+  const openChat = async (targetUser: AdminUser) => {
+    setChatUser(targetUser);
+    setChatLoading(true);
+    try {
+      const { data } = await client.admin.getSupportThread(targetUser.id);
+      setChatMessages(data);
+    } catch (err) {
+      console.error('Error loading support thread:', err);
+      toast.error('No se pudo cargar la conversación');
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!chatUser || !chatInput.trim()) return;
+    setSending(true);
+    try {
+      const { data } = await client.admin.sendSupportMessage(chatUser.id, chatInput.trim());
+      setChatMessages((prev) => [...prev, data]);
+      setChatInput('');
+    } catch (err) {
+      console.error('Error sending message:', err);
+      toast.error('No se pudo enviar el mensaje');
+    } finally {
+      setSending(false);
+    }
+  };
+
   return (
     <>
       <AdminNav />
@@ -154,30 +195,37 @@ export default function AdminUsuariosPage() {
                       {u.created_at ? new Date(u.created_at).toLocaleDateString('es-ES') : '—'}
                     </TableCell>
                     <TableCell className="text-right">
-                      {u.role !== 'user' ? (
-                        <span className="text-xs text-muted-foreground">Cuenta de equipo</span>
-                      ) : !canModerate ? (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      ) : u.account_status === 'banned' ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={actingId === u.id}
-                          onClick={() => handleUnban(u)}
-                        >
-                          <RotateCcw className="h-3 w-3 mr-1" /> Quitar baneo
-                        </Button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-destructive hover:text-destructive"
-                          disabled={actingId === u.id}
-                          onClick={() => handleBan(u)}
-                        >
-                          <Ban className="h-3 w-3 mr-1" /> Banear
-                        </Button>
-                      )}
+                      <div className="flex justify-end items-center gap-1">
+                        {canChat && u.role === 'user' && (
+                          <Button size="sm" variant="ghost" onClick={() => openChat(u)}>
+                            <MessageCircle className="h-3 w-3 mr-1" /> Mensaje
+                          </Button>
+                        )}
+                        {u.role !== 'user' ? (
+                          <span className="text-xs text-muted-foreground">Cuenta de equipo</span>
+                        ) : !canModerate ? (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        ) : u.account_status === 'banned' ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={actingId === u.id}
+                            onClick={() => handleUnban(u)}
+                          >
+                            <RotateCcw className="h-3 w-3 mr-1" /> Quitar baneo
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive hover:text-destructive"
+                            disabled={actingId === u.id}
+                            onClick={() => handleBan(u)}
+                          >
+                            <Ban className="h-3 w-3 mr-1" /> Banear
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -217,6 +265,44 @@ export default function AdminUsuariosPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={!!chatUser} onOpenChange={(open) => !open && setChatUser(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{chatUser?.name || chatUser?.email}</DialogTitle>
+          </DialogHeader>
+          <div className="h-80 overflow-y-auto border rounded-md p-3 space-y-2 bg-muted/30">
+            {chatLoading && <p className="text-sm text-muted-foreground">Cargando…</p>}
+            {!chatLoading && chatMessages.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center mt-8">
+                Todavía no hay mensajes con esta persona.
+              </p>
+            )}
+            {chatMessages.map((m) => (
+              <div key={m.id} className={`flex ${m.is_from_staff ? 'justify-end' : 'justify-start'}`}>
+                <div
+                  className={`max-w-[75%] rounded-lg px-3 py-2 text-sm ${
+                    m.is_from_staff ? 'bg-primary text-primary-foreground' : 'bg-background border'
+                  }`}
+                >
+                  {m.content}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <Input
+              placeholder="Escribe un mensaje..."
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && !sending && handleSendMessage()}
+            />
+            <Button onClick={handleSendMessage} disabled={sending || !chatInput.trim()}>
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

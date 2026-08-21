@@ -17,7 +17,9 @@ from models.invitations import Invitation
 from models.products import Products
 from models.waitlist import Waitlist
 from models.messages import Messages
+from models.audit import AuditLog, LoginAttempt
 from services.email import send_invitation_email
+from services.audit import log_admin_action
 
 logger = logging.getLogger(__name__)
 
@@ -155,6 +157,9 @@ async def ban_user(
     await db.refresh(user)
 
     logger.info("Admin %s banned user %s (reason: %s)", current_user.email, user.email, payload.reason)
+    await log_admin_action(
+        db, current_user.id, current_user.email, "ban_user", target=user.email, details=payload.reason
+    )
     return user
 
 
@@ -176,6 +181,7 @@ async def unban_user(
     await db.refresh(user)
 
     logger.info("Admin %s unbanned user %s", current_user.email, user.email)
+    await log_admin_action(db, current_user.id, current_user.email, "unban_user", target=user.email)
     return user
 
 
@@ -270,6 +276,10 @@ async def remove_product(
     logger.info(
         "Admin %s removed product %s (reason: %s)", current_user.email, product_id, payload.reason
     )
+    await log_admin_action(
+        db, current_user.id, current_user.email, "remove_product",
+        target=f"product:{product_id} ({product.title})", details=payload.reason,
+    )
     return AdminProductResponse(
         id=product.id,
         user_id=product.user_id,
@@ -298,6 +308,10 @@ async def restore_product(
     await db.refresh(product)
 
     logger.info("Admin %s restored product %s", current_user.email, product_id)
+    await log_admin_action(
+        db, current_user.id, current_user.email, "restore_product",
+        target=f"product:{product_id} ({product.title})",
+    )
     return AdminProductResponse(
         id=product.id,
         user_id=product.user_id,
@@ -321,10 +335,15 @@ async def delete_product_admin(
     if not product:
         raise HTTPException(status_code=404, detail="Anuncio no encontrado")
 
+    product_title = product.title
     await db.delete(product)
     await db.commit()
 
     logger.info("Admin %s permanently deleted product %s", current_user.email, product_id)
+    await log_admin_action(
+        db, current_user.id, current_user.email, "delete_product",
+        target=f"product:{product_id} ({product_title})",
+    )
     return {"message": "Anuncio eliminado", "id": product_id}
 
 
@@ -404,7 +423,10 @@ async def list_conversations_admin(
                 buyer_user = users_by_id.get(other_ids[0])
                 buyer_email = buyer_user.email if buyer_user else None
 
-        title = product.title if product else "Anuncio eliminado"
+        if c["product_id"] == 0:
+            title = "Soporte VentaCofrade"
+        else:
+            title = product.title if product else "Anuncio eliminado"
 
         if search:
             like = search.strip().lower()
@@ -428,6 +450,178 @@ async def list_conversations_admin(
     return responses[:200]
 
 
+class AdminChatMessage(BaseModel):
+    id: int
+    user_id: str
+    sender_email: Optional[str] = None
+    content: str
+    created_at: Optional[datetime] = None
+    is_from_staff: bool
+
+
+class SendMessageRequest(BaseModel):
+    content: str
+
+
+SUPPORT_PRODUCT_ID = 0
+
+
+@router.get("/users/{user_id}/messages", response_model=List[AdminChatMessage])
+async def get_support_thread(
+    user_id: str,
+    current_user: UserResponse = Depends(require_roles("admin", "soporte")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Read the direct support conversation with a specific user (not tied
+    to any product listing — that's what SUPPORT_PRODUCT_ID represents)."""
+    result = await db.execute(
+        select(Messages)
+        .where(
+            Messages.product_id == SUPPORT_PRODUCT_ID,
+            (Messages.user_id == user_id) | (Messages.receiver_id == user_id),
+        )
+        .order_by(Messages.created_at.asc())
+    )
+    messages = result.scalars().all()
+
+    sender_ids = {m.user_id for m in messages}
+    users_by_id = {}
+    if sender_ids:
+        user_result = await db.execute(select(User).where(User.id.in_(sender_ids)))
+        users_by_id = {u.id: u for u in user_result.scalars().all()}
+
+    return [
+        AdminChatMessage(
+            id=m.id,
+            user_id=m.user_id,
+            sender_email=users_by_id[m.user_id].email if m.user_id in users_by_id else None,
+            content=m.content,
+            created_at=m.created_at,
+            is_from_staff=m.user_id != user_id,
+        )
+        for m in messages
+    ]
+
+
+@router.post("/users/{user_id}/messages", response_model=AdminChatMessage, status_code=201)
+async def send_support_message(
+    user_id: str,
+    payload: SendMessageRequest,
+    current_user: UserResponse = Depends(require_roles("admin", "soporte")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Send a direct message to a user, as VentaCofrade support."""
+    result = await db.execute(select(User).where(User.id == user_id))
+    target_user = result.scalar_one_or_none()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    if not payload.content.strip():
+        raise HTTPException(status_code=400, detail="El mensaje no puede estar vacío")
+
+    message = Messages(
+        user_id=current_user.id,
+        receiver_id=user_id,
+        product_id=SUPPORT_PRODUCT_ID,
+        content=payload.content.strip(),
+        is_read=False,
+    )
+    db.add(message)
+    await db.commit()
+    await db.refresh(message)
+
+    await log_admin_action(
+        db, current_user.id, current_user.email, "send_support_message", target=target_user.email
+    )
+
+    return AdminChatMessage(
+        id=message.id,
+        user_id=message.user_id,
+        sender_email=current_user.email,
+        content=message.content,
+        created_at=message.created_at,
+        is_from_staff=True,
+    )
+
+
+class AuditLogEntry(BaseModel):
+    id: int
+    actor_email: Optional[str] = None
+    action: str
+    target: Optional[str] = None
+    details: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/audit-log", response_model=List[AuditLogEntry])
+async def get_audit_log(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    current_user: UserResponse = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Who did what, and when. Super-admin only — this is the audit trail
+    over everyone's actions, including other admins'."""
+    result = await db.execute(
+        select(AuditLog).order_by(AuditLog.created_at.desc()).offset(skip).limit(limit)
+    )
+    return result.scalars().all()
+
+
+class LoginAttemptEntry(BaseModel):
+    id: int
+    email: str
+    method: str
+    success: bool
+    reason: Optional[str] = None
+    ip_address: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class SecurityOverview(BaseModel):
+    recent_attempts: List[LoginAttemptEntry]
+    failed_last_24h: int
+    suspicious_emails: List[str]  # emails with 3+ failed attempts in the last 24h
+
+
+@router.get("/security", response_model=SecurityOverview)
+async def get_security_overview(
+    current_user: UserResponse = Depends(require_roles("admin", "seguridad")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Recent login activity and a simple 'possible brute force' signal:
+    emails with 3+ failed attempts in the last 24 hours."""
+    since = datetime.now(timezone.utc) - timedelta(hours=24)
+
+    recent_result = await db.execute(
+        select(LoginAttempt).order_by(LoginAttempt.created_at.desc()).limit(100)
+    )
+    recent_attempts = recent_result.scalars().all()
+
+    failed_result = await db.execute(
+        select(LoginAttempt).where(LoginAttempt.success.is_(False), LoginAttempt.created_at >= since)
+    )
+    failed_attempts = failed_result.scalars().all()
+
+    failed_by_email: dict = {}
+    for attempt in failed_attempts:
+        failed_by_email[attempt.email] = failed_by_email.get(attempt.email, 0) + 1
+
+    suspicious_emails = [email for email, count in failed_by_email.items() if count >= 3]
+
+    return SecurityOverview(
+        recent_attempts=recent_attempts,
+        failed_last_24h=len(failed_attempts),
+        suspicious_emails=suspicious_emails,
+    )
+
+
 class DashboardStats(BaseModel):
     total_users: int
     new_users_last_7_days: int
@@ -441,6 +635,8 @@ class DashboardStats(BaseModel):
     waitlist_count: int
     invitations_sent: int
     invitations_redeemed: int
+    google_accounts: int
+    password_accounts: int
 
 
 @router.get("/dashboard", response_model=DashboardStats)
@@ -491,6 +687,11 @@ async def get_dashboard_stats(
         await db.execute(select(func.count()).select_from(Invitation).where(Invitation.status == "redeemed"))
     ).scalar_one()
 
+    google_accounts = (
+        await db.execute(select(func.count()).select_from(User).where(User.password_hash.is_(None)))
+    ).scalar_one()
+    password_accounts = total_users - google_accounts
+
     return DashboardStats(
         total_users=total_users,
         new_users_last_7_days=new_users_last_7_days,
@@ -504,6 +705,8 @@ async def get_dashboard_stats(
         waitlist_count=waitlist_count,
         invitations_sent=invitations_sent,
         invitations_redeemed=invitations_redeemed,
+        google_accounts=google_accounts,
+        password_accounts=password_accounts,
     )
 
 
@@ -573,6 +776,11 @@ async def grant_free_access(
         seller.free_access_until,
         seller_profile_id,
     )
+    await log_admin_action(
+        db, current_user.id, current_user.email, "grant_free_access",
+        target=f"seller_profile:{seller_profile_id} ({user.email if user else '?'})",
+        details=f"months={months}",
+    )
 
     return AdminSellerResponse(
         id=seller.id,
@@ -623,6 +831,11 @@ async def create_invitation(
     sent = await send_invitation_email(to_email=normalized_email, months=invitation.months, token=invitation.token)
     if not sent:
         logger.warning("Invitacion creada pero el email no se pudo enviar a %s", normalized_email)
+
+    await log_admin_action(
+        db, current_user.id, current_user.email, "create_invitation",
+        target=normalized_email, details=f"months={invitation.months}",
+    )
 
     return invitation
 
@@ -684,6 +897,10 @@ async def assign_role(
     await db.refresh(user)
 
     logger.info("Admin %s set role=%s for %s", current_user.email, payload.role, normalized_email)
+    await log_admin_action(
+        db, current_user.id, current_user.email, "assign_role",
+        target=normalized_email, details=f"role={payload.role}",
+    )
 
     return StaffMemberResponse(
         id=user.id,
