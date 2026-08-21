@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from schemas.auth import UserResponse
 from services.subscriptions import SubscriptionsNotConfiguredError, SubscriptionsService
+from services.featured_listings import FeaturedListingsNotConfiguredError, FeaturedListingsService, FEATURE_PRICES_CENTS
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
@@ -68,6 +69,53 @@ async def create_checkout(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         logger.error(f"Error creating checkout session: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="No se pudo iniciar el pago.")
+
+
+class FeatureListingRequest(BaseModel):
+    product_id: int
+    days: int  # 3 | 7 | 30
+
+
+@router.get("/feature-listing/prices")
+async def get_feature_prices():
+    """Public pricing table for featuring a listing, in euros."""
+    return {str(days): cents / 100 for days, cents in FEATURE_PRICES_CENTS.items()}
+
+
+@router.post("/feature-listing", response_model=CreateCheckoutResponse)
+async def create_feature_checkout(
+    payload: FeatureListingRequest,
+    request: Request,
+    current_user: UserResponse = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a one-time Stripe Checkout Session to feature a listing."""
+    origin = request.headers.get("origin") or FRONTEND_URL_FALLBACK
+    success_url = f"{origin}/cuenta/anuncios?feature=success"
+    cancel_url = f"{origin}/cuenta/anuncios?feature=cancelled"
+
+    service = FeaturedListingsService(db)
+    try:
+        url = await service.create_feature_checkout(
+            product_id=payload.product_id,
+            days=payload.days,
+            user_id=str(current_user.id),
+            user_email=current_user.email,
+            success_url=success_url,
+            cancel_url=cancel_url,
+        )
+        return CreateCheckoutResponse(url=url)
+    except FeaturedListingsNotConfiguredError as e:
+        logger.error(f"Stripe not configured: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Los pagos todavía no están disponibles. Inténtalo más tarde.",
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error creating feature-listing checkout: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="No se pudo iniciar el pago.")
 
 
@@ -159,8 +207,18 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid signature")
 
     service = SubscriptionsService(db)
+    featured_service = FeaturedListingsService(db)
     try:
-        await service.handle_webhook_event(event)
+        if event.type == "checkout.session.completed":
+            session = event.data.object
+            metadata = getattr(session, "metadata", None)
+            purpose = getattr(metadata, "purpose", None) if metadata else None
+            if purpose == "feature_listing":
+                await featured_service.handle_feature_payment_completed(session)
+            else:
+                await service.handle_webhook_event(event)
+        else:
+            await service.handle_webhook_event(event)
     except Exception as e:
         import traceback
         logger.error(f"Error handling Stripe webhook event: {e}\n{traceback.format_exc()}")

@@ -173,6 +173,17 @@ export const client = {
       const response = await http.post(`${baseUrl()}/api/v1/payments/checkout`, { plan });
       return { data: response.data as { url: string } };
     },
+    async getFeaturePrices() {
+      const response = await http.get(`${baseUrl()}/api/v1/payments/feature-listing/prices`);
+      return { data: response.data as Record<string, number> };
+    },
+    async featureListing(productId: number, days: 3 | 7 | 30) {
+      const response = await http.post(`${baseUrl()}/api/v1/payments/feature-listing`, {
+        product_id: productId,
+        days,
+      });
+      return { data: response.data as { url: string } };
+    },
     async cancelSubscription() {
       const response = await http.post(`${baseUrl()}/api/v1/payments/subscription/cancel`, {});
       return { data: response.data as SubscriptionActionResult };

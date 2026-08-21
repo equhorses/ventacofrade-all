@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Layout from '@/components/Layout';
+import AdSlot from '@/components/AdSlot';
 import { client } from '@/lib/api';
 import { Search, MapPin, Church, SlidersHorizontal } from 'lucide-react';
 
@@ -195,6 +196,8 @@ export default function ExplorarPage() {
             </Select>
           </div>
         </div>
+
+        <AdSlot label="Publicidad" />
 
         {/* Category Tabs */}
         <div className="flex flex-wrap gap-2 mb-8">

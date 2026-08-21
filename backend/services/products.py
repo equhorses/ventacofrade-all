@@ -1,7 +1,8 @@
 import logging
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List
 
-from sqlalchemy import select, func
+from sqlalchemy import select, func, case
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.products import Products
@@ -60,6 +61,7 @@ class ProductsService:
         user_id: Optional[str] = None,
         query_dict: Optional[Dict[str, Any]] = None,
         sort: Optional[str] = None,
+        boost_featured: bool = False,
     ) -> Dict[str, Any]:
         """Get paginated list of productss (user can only see their own records)"""
         try:
@@ -79,16 +81,26 @@ class ProductsService:
             count_result = await self.db.execute(count_query)
             total = count_result.scalar()
 
+            order_clauses = []
+            if boost_featured:
+                now = datetime.now(timezone.utc)
+                order_clauses.append(
+                    case((Products.featured_until.isnot(None) & (Products.featured_until > now), 0), else_=1)
+                )
+
             if sort:
                 if sort.startswith('-'):
                     field_name = sort[1:]
                     if hasattr(Products, field_name):
-                        query = query.order_by(getattr(Products, field_name).desc())
+                        order_clauses.append(getattr(Products, field_name).desc())
                 else:
                     if hasattr(Products, sort):
-                        query = query.order_by(getattr(Products, sort))
-            else:
-                query = query.order_by(Products.id.desc())
+                        order_clauses.append(getattr(Products, sort))
+            elif not boost_featured:
+                order_clauses.append(Products.id.desc())
+
+            if order_clauses:
+                query = query.order_by(*order_clauses)
 
             result = await self.db.execute(query.offset(skip).limit(limit))
             items = result.scalars().all()

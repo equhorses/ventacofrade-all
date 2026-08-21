@@ -20,6 +20,16 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/entities/products", tags=["products"])
 
 
+def _refresh_featured_flag(product):
+    """is_featured is derived from featured_until — recompute it here so the
+    API never returns a stale 'true' after the paid period expired."""
+    until = getattr(product, "featured_until", None)
+    if until and until.tzinfo is None:
+        until = until.replace(tzinfo=timezone.utc)
+    product.is_featured = bool(until and until > datetime.now(timezone.utc))
+    return product
+
+
 # ---------- Pydantic Schemas ----------
 class ProductsData(BaseModel):
     """Entity data schema (for create/update)"""
@@ -66,6 +76,7 @@ class ProductsResponse(BaseModel):
     status: Optional[str] = None
     views_count: Optional[int] = None
     is_featured: Optional[bool] = None
+    featured_until: Optional[datetime] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -133,6 +144,7 @@ async def query_productss(
             sort=sort,
             user_id=str(current_user.id),
         )
+        result["items"] = [_refresh_featured_flag(p) for p in result["items"]]
         logger.debug(f"Found {result['total']} productss")
         return result
     except HTTPException:
@@ -168,8 +180,10 @@ async def query_productss_all(
             skip=skip,
             limit=limit,
             query_dict=query_dict,
-            sort=sort
+            sort=sort,
+            boost_featured=True,
         )
+        result["items"] = [_refresh_featured_flag(p) for p in result["items"]]
         logger.debug(f"Found {result['total']} productss")
         return result
     except HTTPException:
@@ -195,7 +209,7 @@ async def get_products(
             logger.warning(f"Products with id {id} not found")
             raise HTTPException(status_code=404, detail="Products not found")
         
-        return result
+        return _refresh_featured_flag(result)
     except HTTPException:
         raise
     except Exception as e:

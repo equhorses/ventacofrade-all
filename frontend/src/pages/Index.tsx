@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import Layout from '@/components/Layout';
 import WelcomeModal from '@/components/WelcomeModal';
+import AdSlot from '@/components/AdSlot';
 import { client } from '@/lib/api';
 import {
   Search,
@@ -147,6 +148,10 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <AdSlot label="Publicidad" />
+      </div>
 
       {/* Categories Section */}
       <section className="py-16 bg-background">

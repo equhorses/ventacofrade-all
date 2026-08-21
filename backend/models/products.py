@@ -20,5 +20,6 @@ class Products(Base):
     status = Column(String(20), nullable=True, default='active', server_default='active')
     views_count = Column(Integer, nullable=True, default=0, server_default='0')
     is_featured = Column(Boolean, nullable=True, default=False, server_default='false')
+    featured_until = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=datetime.now)
     updated_at = Column(DateTime(timezone=True), default=datetime.now, onupdate=datetime.now)

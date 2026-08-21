@@ -1,12 +1,18 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import AccountLayout from '@/components/AccountLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { client } from '@/lib/api';
-import { Church, Plus, Eye, Trash2 } from 'lucide-react';
+import { Church, Plus, Eye, Trash2, Sparkles } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface Product {
   id: number;
@@ -15,6 +21,8 @@ interface Product {
   images: string;
   status: string;
   views_count: number;
+  is_featured?: boolean;
+  featured_until?: string | null;
 }
 
 const statusLabels: Record<string, { label: string; className: string }> = {
@@ -27,6 +35,22 @@ export default function MisAnunciosPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [featuringId, setFeaturingId] = useState<number | null>(null);
+  const [prices, setPrices] = useState<Record<string, number>>({});
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    const feature = searchParams.get('feature');
+    if (feature === 'success') {
+      toast.success('¡Anuncio destacado! Puede tardar unos segundos en reflejarse.');
+      setSearchParams({}, { replace: true });
+      setTimeout(load, 2000);
+    } else if (feature === 'cancelled') {
+      toast.info('Has cancelado el pago para destacar el anuncio.');
+      setSearchParams({}, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const load = async () => {
     setLoading(true);
@@ -43,7 +67,26 @@ export default function MisAnunciosPage() {
 
   useEffect(() => {
     load();
+    client.payments
+      .getFeaturePrices()
+      .then(({ data }) => setPrices(data))
+      .catch((err) => console.error('Error loading feature prices:', err));
   }, []);
+
+  const handleFeature = async (productId: number, days: 3 | 7 | 30) => {
+    setFeaturingId(productId);
+    try {
+      const { data } = await client.payments.featureListing(productId, days);
+      window.location.href = data.url;
+    } catch (err: unknown) {
+      console.error('Error starting feature checkout:', err);
+      const message =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+        'No se pudo iniciar el pago.';
+      toast.error(message);
+      setFeaturingId(null);
+    }
+  };
 
   const handleDelete = async (id: number) => {
     if (!confirm('¿Seguro que quieres eliminar este anuncio? Esta acción no se puede deshacer.')) return;
@@ -124,6 +167,11 @@ export default function MisAnunciosPage() {
                         {product.price?.toFixed(2)} €
                       </span>
                       <Badge className={`text-xs font-normal ${status.className}`}>{status.label}</Badge>
+                      {product.is_featured && (
+                        <Badge className="text-xs font-normal bg-amber-100 text-amber-700 flex items-center gap-1">
+                          <Sparkles className="h-3 w-3" /> Destacado
+                        </Badge>
+                      )}
                       <span className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Eye className="h-3 w-3" />
                         {product.views_count ?? 0}
@@ -131,6 +179,30 @@ export default function MisAnunciosPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="cursor-pointer gap-1"
+                          disabled={featuringId === product.id}
+                        >
+                          <Sparkles className="h-3 w-3" />
+                          {product.is_featured ? 'Ampliar' : 'Destacar'}
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {[3, 7, 30].map((days) => (
+                          <DropdownMenuItem
+                            key={days}
+                            className="cursor-pointer"
+                            onClick={() => handleFeature(product.id, days as 3 | 7 | 30)}
+                          >
+                            {days} días — {prices[String(days)]?.toFixed(2) ?? '…'} €
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                     <Link to={`/producto/${product.id}`}>
                       <Button variant="ghost" size="icon" className="cursor-pointer" title="Ver anuncio">
                         <Eye className="h-4 w-4" />
