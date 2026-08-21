@@ -294,7 +294,7 @@ export default function DocumentacionPage() {
                 <p>VentaCofrade protege a vendedores y compradores:</p>
                 <ul className="list-disc pl-5 space-y-1">
                   <li><strong className="text-foreground">Verificación de vendedores:</strong> El pago de activación ayuda a filtrar cuentas falsas.</li>
-                  <li><strong className="text-foreground">Sistema de valoraciones:</strong> Los compradores pueden valorar su experiencia.</li>
+                  <li><strong className="text-foreground">Mensajería directa:</strong> Contacta con la otra persona sin salir de la plataforma.</li>
                   <li><strong className="text-foreground">Moderación:</strong> Revisamos anuncios para mantener la calidad del marketplace.</li>
                   <li><strong className="text-foreground">Datos protegidos:</strong> Tu información personal nunca se comparte sin tu consentimiento.</li>
                 </ul>

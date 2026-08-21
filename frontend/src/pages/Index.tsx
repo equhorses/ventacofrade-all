@@ -21,7 +21,7 @@ import {
   Package,
   Landmark,
   MapPin,
-  Shield,
+  MessageCircle,
   Users,
   Star,
 } from 'lucide-react';
@@ -81,11 +81,11 @@ export default function HomePage() {
       const cats = catRes?.data?.items || [];
       const prods = prodRes?.data?.items || [];
       setCategories(cats.length > 0 ? cats : defaultCategories);
-      setFeaturedProducts(prods.length > 0 ? prods : defaultProducts);
+      setFeaturedProducts(prods);
     } catch (err) {
       console.error('Error loading data:', err);
       setCategories(defaultCategories);
-      setFeaturedProducts(defaultProducts);
+      setFeaturedProducts([]);
     } finally {
       setLoading(false);
     }
@@ -223,10 +223,10 @@ export default function HomePage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="text-center">
               <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-primary/10 text-primary flex items-center justify-center">
-                <Shield className="h-7 w-7" />
+                <MessageCircle className="h-7 w-7" />
               </div>
-              <h3 className="font-semibold text-foreground mb-2">Compra segura</h3>
-              <p className="text-sm text-muted-foreground">Verificamos vendedores y protegemos tus transacciones</p>
+              <h3 className="font-semibold text-foreground mb-2">Trato directo</h3>
+              <p className="text-sm text-muted-foreground">Contacta con la persona vendedora y acordad el pago y la entrega entre vosotros</p>
             </div>
             <div className="text-center">
               <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-primary/10 text-primary flex items-center justify-center">
@@ -318,77 +318,3 @@ const defaultCategories: Category[] = [
   { id: 8, name: 'Complementos', slug: 'complementos', description: 'Fajines, guantes y más', icon: 'gem', order_index: 8 },
 ];
 
-const defaultProducts: Product[] = [
-  {
-    id: 1,
-    title: 'Túnica nazarena morada - Hermandad del Silencio',
-    price: 120.00,
-    category_id: 1,
-    condition: 'usado',
-    location_province: 'Sevilla',
-    location_city: 'Sevilla',
-    images: '/placeholder-product.svg',
-    is_featured: true,
-    views_count: 45,
-  },
-  {
-    id: 2,
-    title: 'Candelabro de cola bañado en plata',
-    price: 850.00,
-    category_id: 3,
-    condition: 'usado',
-    location_province: 'Sevilla',
-    location_city: 'Dos Hermanas',
-    images: '/placeholder-product.svg',
-    is_featured: true,
-    views_count: 128,
-  },
-  {
-    id: 3,
-    title: 'Manto bordado en oro fino - Virgen de los Dolores',
-    price: 4500.00,
-    category_id: 4,
-    condition: 'restaurado',
-    location_province: 'Córdoba',
-    location_city: 'Córdoba',
-    images: '/placeholder-product.svg',
-    is_featured: true,
-    views_count: 230,
-  },
-  {
-    id: 4,
-    title: 'Corona de espinas en plata cincelada',
-    price: 1200.00,
-    category_id: 3,
-    condition: 'nuevo',
-    location_province: 'Córdoba',
-    location_city: 'Lucena',
-    images: '/placeholder-product.svg',
-    is_featured: true,
-    views_count: 156,
-  },
-  {
-    id: 5,
-    title: 'Imagen del Cristo de la Buena Muerte - 40cm',
-    price: 680.00,
-    category_id: 5,
-    condition: 'nuevo',
-    location_province: 'Málaga',
-    location_city: 'Antequera',
-    images: '/placeholder-product.svg',
-    is_featured: true,
-    views_count: 89,
-  },
-  {
-    id: 6,
-    title: 'Fajín de terciopelo con bordado en oro',
-    price: 280.00,
-    category_id: 8,
-    condition: 'nuevo',
-    location_province: 'Sevilla',
-    location_city: 'Sevilla',
-    images: '/placeholder-product.svg',
-    is_featured: true,
-    views_count: 42,
-  },
-];
