@@ -183,7 +183,7 @@ export default function ExplorarPage() {
           </div>
         </div>
 
-        <AdSlot label="Publicidad" />
+        <AdSlot slot="explorar_top" />
 
         {/* Category Tabs */}
         <div className="flex flex-wrap gap-2 mb-8">

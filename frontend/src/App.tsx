@@ -5,6 +5,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Index from './pages/Index';
 import Explorar from './pages/Explorar';
 import Producto from './pages/Producto';
+import VendedorPage from './pages/Vendedor';
 import Vender from './pages/Vender';
 import Publicar from './pages/Publicar';
 import Documentacion from './pages/Documentacion';
@@ -18,6 +19,7 @@ import ConversacionPage from './pages/cuenta/Conversacion';
 import FavoritosPage from './pages/cuenta/Favoritos';
 import SuscripcionPage from './pages/cuenta/Suscripcion';
 import AdminVendedoresPage from './pages/admin/Vendedores';
+import AdminPublicidadPage from './pages/admin/Publicidad';
 import AdminEquipoPage from './pages/admin/Equipo';
 import AdminResumenPage from './pages/admin/Resumen';
 import AdminUsuariosPage from './pages/admin/Usuarios';
@@ -41,6 +43,7 @@ const AppRoutes = () => (
     <Route path="/" element={<Index />} />
     <Route path="/explorar" element={<Explorar />} />
     <Route path="/producto/:id" element={<Producto />} />
+    <Route path="/vendedor/:id" element={<VendedorPage />} />
     <Route path="/vender" element={<Vender />} />
     <Route path="/publicar" element={<Publicar />} />
     <Route path="/documentacion" element={<Documentacion />} />
@@ -94,6 +97,14 @@ const AppRoutes = () => (
       element={
         <ProtectedAdminRoute allowedRoles={['marketing']}>
           <AdminVendedoresPage />
+        </ProtectedAdminRoute>
+      }
+    />
+    <Route
+      path="/admin/publicidad"
+      element={
+        <ProtectedAdminRoute allowedRoles={['marketing']}>
+          <AdminPublicidadPage />
         </ProtectedAdminRoute>
       }
     />

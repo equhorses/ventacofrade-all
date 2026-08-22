@@ -131,7 +131,7 @@ export const client = {
      * short-lived presigned URL obtained from our backend, and returns the
      * public URL where the image will be accessible.
      */
-    async uploadImage(file: File, folder: 'products' | 'avatars'): Promise<string> {
+    async uploadImage(file: File, folder: 'products' | 'avatars' | 'ads'): Promise<string> {
       const presignResponse = await http.post(`${baseUrl()}/api/v1/storage/presigned-upload`, {
         filename: file.name,
         content_type: file.type,
@@ -195,6 +195,28 @@ export const client = {
     async changePlan(plan: 'basico' | 'profesional') {
       const response = await http.post(`${baseUrl()}/api/v1/payments/subscription/change-plan`, { plan });
       return { data: response.data as SubscriptionActionResult };
+    },
+  },
+  houseAds: {
+    async getForSlot(slot: string) {
+      const response = await http.get(`${baseUrl()}/api/v1/house-ads/${slot}`);
+      return { data: response.data as { slot: string; title: string; image_url: string; link_url: string } | null };
+    },
+  },
+  reviews: {
+    async list(sellerProfileId: number) {
+      const response = await http.get(`${baseUrl()}/api/v1/entities/reviews`, {
+        params: { seller_profile_id: sellerProfileId },
+      });
+      return { data: response.data as { items: Review[]; total: number; average_rating: number } };
+    },
+    async submit(sellerProfileId: number, rating: number, comment?: string) {
+      const response = await http.post(`${baseUrl()}/api/v1/entities/reviews`, {
+        seller_profile_id: sellerProfileId,
+        rating,
+        comment,
+      });
+      return { data: response.data as Review };
     },
   },
   waitlist: {
@@ -281,6 +303,18 @@ export const client = {
     async getSecurityOverview() {
       const response = await http.get(`${baseUrl()}/api/v1/admin/security`);
       return { data: response.data as SecurityOverview };
+    },
+    async listHouseAds() {
+      const response = await http.get(`${baseUrl()}/api/v1/admin/house-ads`);
+      return { data: response.data as HouseAdAdmin[] };
+    },
+    async upsertHouseAd(slot: string, payload: { title: string; image_url: string; link_url: string; active: boolean }) {
+      const response = await http.put(`${baseUrl()}/api/v1/admin/house-ads/${slot}`, payload);
+      return { data: response.data as HouseAdAdmin };
+    },
+    async deleteHouseAd(slot: string) {
+      const response = await http.delete(`${baseUrl()}/api/v1/admin/house-ads/${slot}`);
+      return { data: response.data as { message: string; slot: string } };
     },
     async assignRole(email: string, role: string) {
       const response = await http.post(`${baseUrl()}/api/v1/admin/staff/assign-role`, { email, role });
@@ -404,4 +438,23 @@ export interface SubscriptionActionResult {
   plan?: string | null;
   cancel_at_period_end?: boolean | null;
   subscription_end_date?: string | null;
+}
+
+export interface Review {
+  id: number;
+  seller_profile_id: number;
+  reviewer_user_id: string;
+  reviewer_name?: string | null;
+  rating: number;
+  comment?: string | null;
+  created_at?: string | null;
+}
+
+export interface HouseAdAdmin {
+  id?: number | null;
+  slot: string;
+  title?: string | null;
+  image_url?: string | null;
+  link_url?: string | null;
+  active: boolean;
 }

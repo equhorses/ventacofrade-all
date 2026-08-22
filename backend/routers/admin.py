@@ -18,6 +18,8 @@ from models.products import Products
 from models.waitlist import Waitlist
 from models.messages import Messages
 from models.audit import AuditLog, LoginAttempt
+from models.house_ads import HouseAds
+from routers.house_ads import KNOWN_SLOTS
 from services.email import send_invitation_email
 from services.audit import log_admin_action
 
@@ -909,3 +911,104 @@ async def assign_role(
         role=user.role,
         role_label=ROLE_LABELS.get(user.role, user.role),
     )
+
+
+class HouseAdAdminResponse(BaseModel):
+    id: Optional[int] = None
+    slot: str
+    title: Optional[str] = None
+    image_url: Optional[str] = None
+    link_url: Optional[str] = None
+    active: bool = False
+
+    class Config:
+        from_attributes = True
+
+
+class UpsertHouseAdRequest(BaseModel):
+    slot: str
+    title: str
+    image_url: str
+    link_url: str
+    active: bool = True
+
+
+@router.get("/house-ads", response_model=List[HouseAdAdminResponse])
+async def list_house_ads(
+    current_user: UserResponse = Depends(require_roles("admin", "marketing")),
+    db: AsyncSession = Depends(get_db),
+):
+    """List every reserved slot, with its configured ad (if any)."""
+    result = await db.execute(select(HouseAds))
+    ads_by_slot = {ad.slot: ad for ad in result.scalars().all()}
+
+    return [
+        HouseAdAdminResponse(
+            id=ads_by_slot[slot].id if slot in ads_by_slot else None,
+            slot=slot,
+            title=ads_by_slot[slot].title if slot in ads_by_slot else None,
+            image_url=ads_by_slot[slot].image_url if slot in ads_by_slot else None,
+            link_url=ads_by_slot[slot].link_url if slot in ads_by_slot else None,
+            active=bool(ads_by_slot[slot].active) if slot in ads_by_slot else False,
+        )
+        for slot in KNOWN_SLOTS
+    ]
+
+
+@router.put("/house-ads/{slot}", response_model=HouseAdAdminResponse)
+async def upsert_house_ad(
+    slot: str,
+    payload: UpsertHouseAdRequest,
+    current_user: UserResponse = Depends(require_roles("admin", "marketing")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Create or update the ad configured for a slot."""
+    if slot not in KNOWN_SLOTS:
+        raise HTTPException(status_code=400, detail=f"Hueco desconocido. Usa uno de: {', '.join(KNOWN_SLOTS)}")
+
+    result = await db.execute(select(HouseAds).where(HouseAds.slot == slot))
+    ad = result.scalar_one_or_none()
+
+    if ad:
+        ad.title = payload.title
+        ad.image_url = payload.image_url
+        ad.link_url = payload.link_url
+        ad.active = payload.active
+    else:
+        ad = HouseAds(
+            slot=slot,
+            title=payload.title,
+            image_url=payload.image_url,
+            link_url=payload.link_url,
+            active=payload.active,
+        )
+        db.add(ad)
+
+    await db.commit()
+    await db.refresh(ad)
+
+    await log_admin_action(
+        db, current_user.id, current_user.email, "upsert_house_ad", target=slot, details=payload.title
+    )
+
+    return ad
+
+
+@router.delete("/house-ads/{slot}")
+async def delete_house_ad(
+    slot: str,
+    current_user: UserResponse = Depends(require_roles("admin", "marketing")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Remove the ad configured for a slot (the slot goes back to empty)."""
+    result = await db.execute(select(HouseAds).where(HouseAds.slot == slot))
+    ad = result.scalar_one_or_none()
+    if not ad:
+        raise HTTPException(status_code=404, detail="No hay ningún anuncio configurado en ese hueco")
+
+    await db.delete(ad)
+    await db.commit()
+
+    await log_admin_action(db, current_user.id, current_user.email, "delete_house_ad", target=slot)
+
+    return {"message": "Anuncio eliminado", "slot": slot}

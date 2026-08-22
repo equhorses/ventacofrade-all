@@ -7,8 +7,16 @@ import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import Layout from '@/components/Layout';
 import { client } from '@/lib/api';
-import { MapPin, Heart, Share2, MessageCircle, Eye, ArrowLeft, Church, User } from 'lucide-react';
+import { MapPin, Heart, Share2, MessageCircle, Eye, ArrowLeft, Church, User, Star } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
+import type { Review } from '@/lib/api';
+
+interface SellerProfile {
+  id: number;
+  shop_name: string;
+  rating?: number;
+}
 
 interface Product {
   id: number;
@@ -41,15 +49,69 @@ const QUICK_MESSAGES = [
 
 export default function ProductoPage() {
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [seller, setSeller] = useState<SellerProfile | null>(null);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [avgRating, setAvgRating] = useState(0);
+  const [myRating, setMyRating] = useState(0);
+  const [myComment, setMyComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   useEffect(() => {
     if (id) loadProduct();
   }, [id]);
+
+  useEffect(() => {
+    if (!product) return;
+    const loadSellerAndReviews = async () => {
+      try {
+        const sellerRes = await client.entities.seller_profiles.query({
+          query: { user_id: product.user_id },
+          limit: 1,
+        });
+        const sellerProfile = sellerRes?.data?.items?.[0];
+        if (!sellerProfile) return;
+        setSeller(sellerProfile);
+
+        const reviewsRes = await client.reviews.list(sellerProfile.id);
+        setReviews(reviewsRes.data.items);
+        setAvgRating(reviewsRes.data.average_rating);
+        const mine = reviewsRes.data.items.find((r) => r.reviewer_user_id === user?.id);
+        if (mine) {
+          setMyRating(mine.rating);
+          setMyComment(mine.comment || '');
+        }
+      } catch (err) {
+        console.error('Error loading seller/reviews:', err);
+      }
+    };
+    loadSellerAndReviews();
+  }, [product, user?.id]);
+
+  const handleSubmitReview = async () => {
+    if (!seller || myRating === 0) return;
+    setSubmittingReview(true);
+    try {
+      await client.reviews.submit(seller.id, myRating, myComment.trim() || undefined);
+      const reviewsRes = await client.reviews.list(seller.id);
+      setReviews(reviewsRes.data.items);
+      setAvgRating(reviewsRes.data.average_rating);
+      toast.success('¡Gracias por tu valoración!');
+    } catch (err: unknown) {
+      console.error('Error submitting review:', err);
+      const msg =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+        'No se pudo enviar la valoración.';
+      toast.error(msg);
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
 
   const loadProduct = async () => {
     try {
@@ -258,6 +320,94 @@ export default function ProductoPage() {
                 </Button>
               </CardContent>
             </Card>
+
+            {/* Seller rating + reviews */}
+            {seller && (
+              <Card>
+                <CardContent className="p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Link to={`/vendedor/${seller.id}`} className="font-medium text-sm hover:text-primary cursor-pointer">
+                      {seller.shop_name}
+                    </Link>
+                    <div className="flex items-center gap-1">
+                      <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                      <span className="text-sm font-medium">
+                        {avgRating > 0 ? avgRating.toFixed(1) : 'Sin valoraciones'}
+                      </span>
+                      {reviews.length > 0 && (
+                        <span className="text-xs text-muted-foreground">({reviews.length})</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {reviews.length > 0 && (
+                    <div className="space-y-3 max-h-52 overflow-y-auto">
+                      {reviews.map((r) => (
+                        <div key={r.id} className="border-t border-border pt-3 first:border-t-0 first:pt-0">
+                          <div className="flex items-center gap-1 mb-1">
+                            {[1, 2, 3, 4, 5].map((n) => (
+                              <Star
+                                key={n}
+                                className={`h-3.5 w-3.5 ${
+                                  n <= r.rating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30'
+                                }`}
+                              />
+                            ))}
+                            <span className="text-xs text-muted-foreground ml-1">{r.reviewer_name || 'Usuario'}</span>
+                          </div>
+                          {r.comment && <p className="text-sm text-muted-foreground">{r.comment}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {user && product && user.id !== product.user_id && (
+                    <div className="border-t border-border pt-3 space-y-2">
+                      <p className="text-xs text-muted-foreground">
+                        {myRating > 0 ? 'Tu valoración' : 'Deja tu valoración'}
+                      </p>
+                      <div className="flex items-center gap-1">
+                        {[1, 2, 3, 4, 5].map((n) => (
+                          <button
+                            key={n}
+                            type="button"
+                            onClick={() => setMyRating(n)}
+                            className="cursor-pointer"
+                            aria-label={`${n} estrellas`}
+                          >
+                            <Star
+                              className={`h-5 w-5 ${
+                                n <= myRating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30'
+                              }`}
+                            />
+                          </button>
+                        ))}
+                      </div>
+                      {myRating > 0 && (
+                        <>
+                          <Textarea
+                            value={myComment}
+                            onChange={(e) => setMyComment(e.target.value)}
+                            placeholder="Comparte tu experiencia (opcional)"
+                            rows={2}
+                            className="resize-none text-sm"
+                          />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="cursor-pointer"
+                            disabled={submittingReview}
+                            onClick={handleSubmitReview}
+                          >
+                            Guardar valoración
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </div>
