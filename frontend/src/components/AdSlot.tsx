@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { client } from '@/lib/api';
+import { Megaphone } from 'lucide-react';
 
 interface HouseAd {
   slot: string;
@@ -8,11 +9,14 @@ interface HouseAd {
   link_url: string;
 }
 
+const ADVERTISE_CONTACT_EMAIL = 'contacto@ventacofrade.com';
+
 /**
  * Reserved ad slot. Priority order:
  *   1. A house ad configured for this slot from /admin/publicidad (our own banners)
- *   2. Google AdSense, if VITE_ADSENSE_CLIENT_ID is set
- *   3. Nothing — renders null, taking up no space
+ *   2. Google AdSense, if VITE_ADSENSE_CLIENT_ID is set AND Google actually fills the slot
+ *   3. A "¿Quieres anunciarte aquí?" self-promo placeholder — shown whenever nothing
+ *      else is filling the space, so visitors know the spot is for sale.
  *
  * `slot` must be one of the known slot ids (see backend KNOWN_SLOTS):
  * "home_top" | "explorar_top"
@@ -20,6 +24,7 @@ interface HouseAd {
 export default function AdSlot({ slot, label = 'Publicidad' }: { slot: string; label?: string }) {
   const clientId = import.meta.env.VITE_ADSENSE_CLIENT_ID as string | undefined;
   const [houseAd, setHouseAd] = useState<HouseAd | null | undefined>(undefined); // undefined = loading
+  const [adSenseFilled, setAdSenseFilled] = useState<boolean | null>(null); // null = unknown/pending
   const adsenseRef = useRef<HTMLModElement>(null);
 
   useEffect(() => {
@@ -38,13 +43,50 @@ export default function AdSlot({ slot, label = 'Publicidad' }: { slot: string; l
   }, [slot]);
 
   useEffect(() => {
-    if (houseAd || !clientId) return;
+    if (houseAd) return;
+
+    if (!clientId) {
+      // No AdSense configured at all — go straight to the "advertise with us" placeholder.
+      setAdSenseFilled(false);
+      return;
+    }
+
     try {
       // @ts-expect-error adsbygoogle is injected globally by the AdSense loader script
       (window.adsbygoogle = window.adsbygoogle || []).push({});
     } catch (err) {
       console.error('AdSense error:', err);
+      setAdSenseFilled(false);
+      return;
     }
+
+    // Google marks the <ins> with data-ad-status="filled" | "unfilled" once it
+    // resolves. Watch for that, with a timeout fallback in case it never sets it
+    // (e.g. account not approved yet, ad blocker, etc.) — treat that as unfilled
+    // so we can show the "advertise with us" placeholder instead of blank space.
+    const el = adsenseRef.current;
+    if (!el) return;
+
+    let settled = false;
+    const resolve = (filled: boolean) => {
+      if (settled) return;
+      settled = true;
+      setAdSenseFilled(filled);
+    };
+
+    const observer = new MutationObserver(() => {
+      const status = el.getAttribute('data-ad-status');
+      if (status === 'filled') resolve(true);
+      else if (status === 'unfilled') resolve(false);
+    });
+    observer.observe(el, { attributes: true, attributeFilter: ['data-ad-status'] });
+
+    const timeout = setTimeout(() => resolve(false), 2500);
+
+    return () => {
+      observer.disconnect();
+      clearTimeout(timeout);
+    };
   }, [clientId, houseAd]);
 
   if (houseAd === undefined) {
@@ -69,22 +111,33 @@ export default function AdSlot({ slot, label = 'Publicidad' }: { slot: string; l
     );
   }
 
-  if (!clientId) {
-    return null;
-  }
+  const showAdSensePlaceholder = !!clientId && adSenseFilled !== false;
 
   return (
     <div className="w-full flex flex-col items-center gap-1 my-4">
       <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</span>
-      <ins
-        ref={adsenseRef}
-        className="adsbygoogle"
-        style={{ display: 'block', width: '100%' }}
-        data-ad-client={clientId}
-        data-ad-slot={slot}
-        data-ad-format="auto"
-        data-full-width-responsive="true"
-      />
+
+      {showAdSensePlaceholder && (
+        <ins
+          ref={adsenseRef}
+          className="adsbygoogle"
+          style={{ display: 'block', width: '100%' }}
+          data-ad-client={clientId}
+          data-ad-slot={slot}
+          data-ad-format="auto"
+          data-full-width-responsive="true"
+        />
+      )}
+
+      {adSenseFilled === false && (
+        <a
+          href={`mailto:${ADVERTISE_CONTACT_EMAIL}?subject=Quiero anunciarme en VentaCofrade`}
+          className="w-full flex items-center justify-center gap-2 rounded-md border border-dashed border-primary/40 bg-primary/5 py-6 text-primary hover:bg-primary/10 transition-colors cursor-pointer"
+        >
+          <Megaphone className="h-4 w-4" />
+          <span className="text-sm font-medium">¿Quieres anunciarte aquí? Escríbenos</span>
+        </a>
+      )}
     </div>
   );
 }
