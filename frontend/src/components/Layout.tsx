@@ -76,6 +76,7 @@ export default function Layout({ children }: LayoutProps) {
     { href: '/explorar', label: 'Explorar' },
     { href: '/explorar?categoria=orfebreria', label: 'Orfebrería' },
     { href: '/explorar?categoria=bordados', label: 'Bordados' },
+    { href: '/red-profesional', label: 'Red Profesional' },
     { href: '/vender', label: 'Vender' },
   ];
 
@@ -286,6 +287,7 @@ export default function Layout({ children }: LayoutProps) {
               <ul className="space-y-2 text-sm text-primary-foreground/70">
                 <li><Link to="/vender" className="hover:text-primary-foreground transition-colors cursor-pointer">Cómo vender</Link></li>
                 <li><Link to="/publicar" className="hover:text-primary-foreground transition-colors cursor-pointer">Publicar anuncio</Link></li>
+                <li><Link to="/red-profesional" className="hover:text-primary-foreground transition-colors cursor-pointer">Red Profesional</Link></li>
                 <li><Link to="/documentacion" className="hover:text-primary-foreground transition-colors cursor-pointer">Documentación</Link></li>
               </ul>
             </div>

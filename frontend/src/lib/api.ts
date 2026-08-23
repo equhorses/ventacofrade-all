@@ -107,6 +107,36 @@ export const client = {
     messages: makeEntity('messages'),
     seller_profiles: makeEntity('seller_profiles'),
   },
+  professionalProfiles: {
+    async getSpecialties() {
+      const response = await http.get(`${baseUrl()}/api/v1/entities/professional_profiles/specialties`);
+      return { data: response.data as string[] };
+    },
+    async list(params: { specialty?: string; province?: string; search?: string; skip?: number; limit?: number } = {}) {
+      const response = await http.get(`${baseUrl()}/api/v1/entities/professional_profiles`, { params });
+      return { data: response.data as { items: ProfessionalProfile[]; total: number } };
+    },
+    async get(id: number) {
+      const response = await http.get(`${baseUrl()}/api/v1/entities/professional_profiles/${id}`);
+      return { data: response.data as ProfessionalProfile };
+    },
+    async getMine() {
+      const response = await http.get(`${baseUrl()}/api/v1/entities/professional_profiles/mine`);
+      return { data: response.data as ProfessionalProfile | null };
+    },
+    async create(payload: Partial<ProfessionalProfile>) {
+      const response = await http.post(`${baseUrl()}/api/v1/entities/professional_profiles`, payload);
+      return { data: response.data as ProfessionalProfile };
+    },
+    async update(id: number, payload: Partial<ProfessionalProfile>) {
+      const response = await http.put(`${baseUrl()}/api/v1/entities/professional_profiles/${id}`, payload);
+      return { data: response.data as ProfessionalProfile };
+    },
+    async remove(id: number) {
+      const response = await http.delete(`${baseUrl()}/api/v1/entities/professional_profiles/${id}`);
+      return { data: response.data as { message: string; id: number } };
+    },
+  },
   users: {
     async getProfile() {
       const response = await http.get(`${baseUrl()}/api/v1/users/profile`);
@@ -457,4 +487,19 @@ export interface HouseAdAdmin {
   image_url?: string | null;
   link_url?: string | null;
   active: boolean;
+}
+
+export interface ProfessionalProfile {
+  id: number;
+  user_id: string;
+  business_name: string;
+  specialty: string;
+  description?: string | null;
+  province: string;
+  city?: string | null;
+  phone?: string | null;
+  whatsapp?: string | null;
+  portfolio_images?: string | null;
+  is_active?: boolean | null;
+  created_at?: string | null;
 }
