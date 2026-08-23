@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Layout from '@/components/Layout';
 import { client, type ProfessionalProfile } from '@/lib/api';
-import { MapPin, Phone, MessageCircle, ArrowLeft } from 'lucide-react';
+import { MapPin, Phone, MessageCircle, ArrowLeft, Briefcase } from 'lucide-react';
 
 export default function ProfesionalDetallePage() {
   const { id } = useParams<{ id: string }>();
@@ -47,8 +47,19 @@ export default function ProfesionalDetallePage() {
           <ArrowLeft className="h-4 w-4" /> Volver a Red Profesional
         </Link>
 
-        <Badge className="mb-3 bg-primary/10 text-primary">{profile.specialty}</Badge>
-        <h1 className="text-3xl font-bold text-foreground mb-2">{profile.business_name}</h1>
+        <div className="flex items-center gap-4 mb-3">
+          {images[0] ? (
+            <img src={images[0]} alt="" className="w-16 h-16 rounded-full object-cover shrink-0" />
+          ) : (
+            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+              <Briefcase className="h-7 w-7 text-primary" />
+            </div>
+          )}
+          <div>
+            <Badge className="bg-primary/10 text-primary mb-1">{profile.specialty}</Badge>
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">{profile.business_name}</h1>
+          </div>
+        </div>
         <p className="text-muted-foreground flex items-center gap-1 mb-6">
           <MapPin className="h-4 w-4" /> {profile.city ? `${profile.city}, ` : ''}{profile.province}
         </p>

@@ -9,6 +9,12 @@ import { client, type ProfessionalProfile } from '@/lib/api';
 import { Search, MapPin, Briefcase, Plus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
+function firstImage(images?: string | null): string | null {
+  if (!images) return null;
+  const first = images.split(',').map((s) => s.trim()).filter(Boolean)[0];
+  return first || null;
+}
+
 export default function RedProfesionalPage() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -123,8 +129,23 @@ export default function RedProfesionalPage() {
               <Link key={p.id} to={`/profesional/${p.id}`}>
                 <Card className="h-full hover:shadow-md transition-shadow cursor-pointer">
                   <CardContent className="p-5">
-                    <Badge className="mb-2 bg-primary/10 text-primary">{p.specialty}</Badge>
-                    <h3 className="font-semibold text-foreground">{p.business_name}</h3>
+                    <div className="flex items-center gap-3 mb-3">
+                      {firstImage(p.portfolio_images) ? (
+                        <img
+                          src={firstImage(p.portfolio_images)!}
+                          alt=""
+                          className="w-11 h-11 rounded-full object-cover shrink-0"
+                        />
+                      ) : (
+                        <div className="w-11 h-11 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                          <Briefcase className="h-5 w-5 text-primary" />
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-foreground truncate">{p.business_name}</h3>
+                        <Badge className="bg-primary/10 text-primary">{p.specialty}</Badge>
+                      </div>
+                    </div>
                     <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
                       <MapPin className="h-3.5 w-3.5" /> {p.city ? `${p.city}, ` : ''}{p.province}
                     </p>
