@@ -15,7 +15,7 @@ from schemas.auth import (
     UserResponse,
 )
 from services.auth import AuthService
-from services.audit import log_login_attempt
+from services.audit import log_login_attempt, is_locked_out
 from services.hcaptcha import verify_hcaptcha_token
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -50,6 +50,21 @@ async def login_with_password(payload: LoginRequest, request: Request, db: Async
     """Log in with email + password and return a session token."""
     client_ip = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent", "")[:255]
+
+    minutes_locked = await is_locked_out(db, payload.email)
+    if minutes_locked is not None:
+        await log_login_attempt(
+            db, email=payload.email, method="password", success=False,
+            reason="Cuenta bloqueada temporalmente por demasiados intentos fallidos",
+            ip_address=client_ip, user_agent=user_agent,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                "Demasiados intentos fallidos. Por seguridad, espera "
+                f"{minutes_locked} minutos antes de volver a intentarlo."
+            ),
+        )
 
     auth_service = AuthService(db)
     try:
