@@ -1,4 +1,5 @@
 import { useEffect, useState, ReactNode } from 'react';
+import { useLocation } from 'react-router-dom';
 import ComingSoon from '@/components/ComingSoon';
 import { getAPIBaseURL } from '@/lib/config';
 
@@ -57,15 +58,8 @@ async function checkInviteToken(): Promise<boolean> {
   return false;
 }
 
-/** Legal pages (terms, privacy, cookies, giveaway rules) must stay reachable
- * even before launch — for compliance, and so links shared externally
- * (e.g. a raffle's legal bases on Instagram) always work. */
-function isExemptRoute(): boolean {
-  if (typeof window === 'undefined') return false;
-  return window.location.pathname.startsWith('/legal/');
-}
-
 export default function ComingSoonGate({ children }: { children: ReactNode }) {
+  const location = useLocation();
   const [bypassed, setBypassed] = useState(false);
   const [checked, setChecked] = useState(false);
 
@@ -86,7 +80,11 @@ export default function ComingSoonGate({ children }: { children: ReactNode }) {
     return <>{children}</>;
   }
 
-  if (isExemptRoute()) {
+  // Re-evaluated on every navigation (location changes), unlike a plain
+  // window.location.pathname check — legal pages stay open, but navigating
+  // away from them correctly re-applies the gate.
+  const isLegalPage = location.pathname.startsWith('/legal/');
+  if (isLegalPage) {
     return <>{children}</>;
   }
 
