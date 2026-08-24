@@ -388,7 +388,11 @@ export interface DashboardStats {
   active_subscriptions: number;
   basico_count: number;
   profesional_count: number;
-  estimated_mrr: number;
+  // Solo llegan con valor real si eres super admin; el resto del equipo recibe null.
+  estimated_mrr: number | null;
+  featured_revenue_total: number | null;
+  featured_revenue_this_month: number | null;
+  active_featured_count: number;
   total_products: number;
   active_products: number;
   waitlist_count: number;
@@ -416,6 +420,7 @@ export interface AdminProduct {
   price: number;
   status?: string | null;
   images?: string | null;
+  featured_until?: string | null;
   created_at?: string | null;
 }
 

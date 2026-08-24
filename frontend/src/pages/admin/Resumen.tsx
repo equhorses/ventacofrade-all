@@ -7,6 +7,7 @@ import {
   Users,
   Store,
   CreditCard,
+  Sparkles,
   Package,
   Mail,
   Send,
@@ -96,8 +97,16 @@ export default function AdminResumenPage() {
                 icon={CreditCard}
                 label="Suscripciones activas"
                 value={stats.active_subscriptions}
-                hint={`~${stats.estimated_mrr.toFixed(2)}€ / mes estimados`}
+                hint={stats.estimated_mrr !== null ? `~${stats.estimated_mrr.toFixed(2)}€ / mes estimados` : undefined}
               />
+              {stats.featured_revenue_total !== null && (
+                <StatCard
+                  icon={Sparkles}
+                  label="Ingresos por destacados"
+                  value={`${stats.featured_revenue_total.toFixed(2)}€`}
+                  hint={`${(stats.featured_revenue_this_month ?? 0).toFixed(2)}€ este mes · ${stats.active_featured_count} activos ahora`}
+                />
+              )}
               <StatCard
                 icon={Package}
                 label="Anuncios activos"

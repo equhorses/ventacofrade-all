@@ -19,6 +19,7 @@ from models.waitlist import Waitlist
 from models.messages import Messages
 from models.audit import AuditLog, LoginAttempt
 from models.house_ads import HouseAds
+from models.feature_purchases import FeaturePurchases
 from routers.house_ads import KNOWN_SLOTS
 from services.email import send_invitation_email
 from services.audit import log_admin_action
@@ -195,6 +196,7 @@ class AdminProductResponse(BaseModel):
     price: float
     status: Optional[str] = None
     images: Optional[str] = None
+    featured_until: Optional[datetime] = None
     created_at: Optional[datetime] = None
 
     class Config:
@@ -249,6 +251,7 @@ async def list_products_admin(
                 price=p.price,
                 status=p.status,
                 images=p.images,
+                featured_until=p.featured_until,
                 created_at=p.created_at,
             )
             for p, email in rows
@@ -631,7 +634,12 @@ class DashboardStats(BaseModel):
     active_subscriptions: int
     basico_count: int
     profesional_count: int
-    estimated_mrr: float
+    # Money figures — only populated for the super admin (role == "admin").
+    # Other staff roles get null here, not the real numbers.
+    estimated_mrr: Optional[float] = None
+    featured_revenue_total: Optional[float] = None
+    featured_revenue_this_month: Optional[float] = None
+    active_featured_count: int
     total_products: int
     active_products: int
     waitlist_count: int
@@ -675,7 +683,35 @@ async def get_dashboard_stats(
             )
         )
     ).scalar_one()
-    estimated_mrr = round(basico_count * 4.99 + profesional_count * 9.99, 2)
+    now_utc = datetime.now(timezone.utc)
+    start_of_month = now_utc.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    is_super_admin = current_user.role == "admin"
+
+    estimated_mrr = None
+    featured_revenue_total_cents = 0
+    featured_revenue_this_month_cents = 0
+
+    if is_super_admin:
+        estimated_mrr = round(basico_count * 4.99 + profesional_count * 9.99, 2)
+        featured_revenue_total_cents = (
+            await db.execute(select(func.coalesce(func.sum(FeaturePurchases.amount_cents), 0)))
+        ).scalar_one()
+        featured_revenue_this_month_cents = (
+            await db.execute(
+                select(func.coalesce(func.sum(FeaturePurchases.amount_cents), 0)).where(
+                    FeaturePurchases.created_at >= start_of_month
+                )
+            )
+        ).scalar_one()
+
+    active_featured_count = (
+        await db.execute(
+            select(func.count()).select_from(Products).where(
+                Products.featured_until.isnot(None), Products.featured_until > now_utc
+            )
+        )
+    ).scalar_one()
 
     total_products = (await db.execute(select(func.count()).select_from(Products))).scalar_one()
     active_products = (
@@ -702,6 +738,9 @@ async def get_dashboard_stats(
         basico_count=basico_count,
         profesional_count=profesional_count,
         estimated_mrr=estimated_mrr,
+        featured_revenue_total=round(featured_revenue_total_cents / 100, 2) if is_super_admin else None,
+        featured_revenue_this_month=round(featured_revenue_this_month_cents / 100, 2) if is_super_admin else None,
+        active_featured_count=active_featured_count,
         total_products=total_products,
         active_products=active_products,
         waitlist_count=waitlist_count,

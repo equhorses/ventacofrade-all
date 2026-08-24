@@ -14,6 +14,7 @@ from typing import Optional
 import stripe
 from core.config import settings
 from models.products import Products
+from models.feature_purchases import FeaturePurchases
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -111,6 +112,18 @@ class FeaturedListingsService:
         base = current_until if (current_until and current_until > now) else now
         product.featured_until = base + timedelta(days=int(days))
         product.is_featured = True
+
+        # Keep a permanent revenue record — featured_until only tracks the
+        # current expiry and gets overwritten on renewal, so this is the
+        # only place the admin can see real earnings history from this.
+        self.db.add(
+            FeaturePurchases(
+                product_id=product.id,
+                seller_user_id=product.user_id,
+                days=int(days),
+                amount_cents=FEATURE_PRICES_CENTS.get(int(days), 0),
+            )
+        )
 
         await self.db.commit()
         logger.info(f"Product {product_id} featured until {product.featured_until}")
