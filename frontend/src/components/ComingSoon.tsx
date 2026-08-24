@@ -93,6 +93,10 @@ export default function ComingSoon() {
           <a href="mailto:contacto@ventacofrade.com" className="underline hover:text-primary-foreground">
             contacto@ventacofrade.com
           </a>
+          {' · '}
+          <a href="/legal/bases-sorteo" className="underline hover:text-primary-foreground">
+            Bases del sorteo
+          </a>
         </p>
       </div>
     </div>
