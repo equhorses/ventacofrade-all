@@ -57,6 +57,14 @@ async function checkInviteToken(): Promise<boolean> {
   return false;
 }
 
+/** Legal pages (terms, privacy, cookies, giveaway rules) must stay reachable
+ * even before launch — for compliance, and so links shared externally
+ * (e.g. a raffle's legal bases on Instagram) always work. */
+function isExemptRoute(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.location.pathname.startsWith('/legal/');
+}
+
 export default function ComingSoonGate({ children }: { children: ReactNode }) {
   const [bypassed, setBypassed] = useState(false);
   const [checked, setChecked] = useState(false);
@@ -75,6 +83,10 @@ export default function ComingSoonGate({ children }: { children: ReactNode }) {
   }, []);
 
   if (!COMING_SOON_ENABLED) {
+    return <>{children}</>;
+  }
+
+  if (isExemptRoute()) {
     return <>{children}</>;
   }
 
