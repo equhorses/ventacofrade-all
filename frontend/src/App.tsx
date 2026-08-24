@@ -38,6 +38,7 @@ import AvisoLegal from './pages/legal/AvisoLegal';
 import Privacidad from './pages/legal/Privacidad';
 import Terminos from './pages/legal/Terminos';
 import Cookies from './pages/legal/Cookies';
+import BasesSorteo from './pages/legal/BasesSorteo';
 
 const queryClient = new QueryClient();
 
@@ -56,6 +57,7 @@ const AppRoutes = () => (
     <Route path="/legal/privacidad" element={<Privacidad />} />
     <Route path="/legal/terminos" element={<Terminos />} />
     <Route path="/cookies" element={<Cookies />} />
+    <Route path="/legal/bases-sorteo" element={<BasesSorteo />} />
     <Route path="/favoritos" element={<Explorar />} />
     <Route path="/login" element={<Login />} />
     <Route path="/cuenta" element={<Navigate to="/cuenta/perfil" replace />} />
