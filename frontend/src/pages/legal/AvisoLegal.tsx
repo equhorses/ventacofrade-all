@@ -27,11 +27,15 @@ export default function AvisoLegal() {
           Este Aviso Legal regula el acceso y uso del sitio web ventacofrade.com. VentaCofrade es
           un marketplace que actúa exclusivamente como intermediario tecnológico, poniendo en
           contacto a personas usuarias que desean comprar y vender artículos relacionados con el
-          mundo cofrade (orfebrería, bordados, túnicas, cirios, imágenes y similares).
-          VentaCofrade no es parte en las compraventas realizadas entre usuarios, no interviene
-          en la entrega física de los artículos, no fija los precios de los anuncios (salvo las
-          tarifas propias de suscripción de vendedor) y no garantiza la calidad, legalidad,
-          autenticidad o estado de conservación de los artículos publicados por terceros.
+          mundo cofrade (orfebrería, bordados, túnicas, cirios, imágenes y similares), y que
+          además aloja un directorio de profesionales del sector ("Red Profesional") donde
+          talleres y personas profesionales pueden publicar un perfil informativo con sus
+          servicios y datos de contacto. VentaCofrade no es parte en las compraventas realizadas
+          entre usuarios ni en los servicios contratados a través de un perfil profesional, no
+          interviene en la entrega física de los artículos, no fija los precios de los anuncios
+          ni de los servicios (salvo las tarifas propias de suscripción de vendedor) y no
+          garantiza la calidad, legalidad, autenticidad o estado de conservación de los artículos
+          ni la cualificación de los servicios publicados por terceros.
         </p>
 
         <h2 className="text-xl font-semibold mt-6 mb-2">3. Condiciones de acceso y uso</h2>
