@@ -29,7 +29,7 @@ greenlet
 python-jose[cryptography]>=3.3.0
 
 # aihub module dependencies
-openai==2.16.0
+openai==3.3.1
 sse-starlette>=1.6.0
 PyMuPDF
 
