@@ -166,7 +166,7 @@ async def send_invitation_email(to_email: str, months: int, token: str) -> bool:
         return False
 
     site_url = "https://ventacofrade.com"
-    access_url = f"{site_url}/?invite={token}"
+    access_url = f"{site_url}/login?invite={token}"
 
     duration_text = "1 mes" if months == 1 else f"{months} meses"
 
