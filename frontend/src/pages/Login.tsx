@@ -8,6 +8,8 @@ import Layout from '@/components/Layout';
 import { toast } from 'sonner';
 import { authApi } from '@/lib/auth';
 import { getAPIBaseURL } from '@/lib/config';
+import { Gift } from 'lucide-react';
+import { INVITE_TOKEN_STORAGE_KEY } from '@/components/ComingSoonGate';
 
 const HCAPTCHA_SITE_KEY = import.meta.env.VITE_HCAPTCHA_SITE_KEY as string | undefined;
 const HCAPTCHA_SCRIPT_ID = 'hcaptcha-script';
@@ -89,10 +91,37 @@ export default function LoginPage() {
   const captchaContainerRef = useRef<HTMLDivElement>(null);
   const captchaWidgetId = useRef<string | null>(null);
 
+  const [pendingInvite, setPendingInvite] = useState<{ email: string; months: number } | null>(null);
+  const [inviteAlreadyRedeemed, setInviteAlreadyRedeemed] = useState(false);
+
   useEffect(() => {
     const error = searchParams.get('error');
     if (error) toast.error(error);
   }, [searchParams]);
+
+  // If the person arrived earlier via a personal ?invite= link (the
+  // "Coming Soon" gate already consumed it from the URL, but kept the token
+  // in localStorage — see ComingSoonGate.tsx), show them what's waiting and
+  // pre-fill the signup form with the right email so they don't accidentally
+  // register with a different Google account and miss out on the free access.
+  useEffect(() => {
+    const token = localStorage.getItem(INVITE_TOKEN_STORAGE_KEY);
+    if (!token) return;
+
+    fetch(`${getAPIBaseURL()}/api/v1/invitations/verify?token=${encodeURIComponent(token)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data || !data.valid || !data.email) return;
+        if (data.already_redeemed) {
+          setInviteAlreadyRedeemed(true);
+          return;
+        }
+        setPendingInvite({ email: data.email, months: data.months || 1 });
+        setMode('register');
+        setEmail((current) => current || data.email);
+      })
+      .catch((err) => console.error('Error checking pending invitation:', err));
+  }, []);
 
   // Render the hCaptcha widget only while in "register" mode.
   useEffect(() => {
@@ -118,6 +147,7 @@ export default function LoginPage() {
   }, [mode]);
 
   const handleGoogleLogin = () => {
+    localStorage.removeItem(INVITE_TOKEN_STORAGE_KEY);
     window.location.href = `${getAPIBaseURL()}/api/v1/auth/google/login`;
   };
 
@@ -138,6 +168,7 @@ export default function LoginPage() {
         await authApi.login(email, password);
         toast.success('Sesión iniciada');
       }
+      localStorage.removeItem(INVITE_TOKEN_STORAGE_KEY);
       window.location.href = mode === 'register' ? '/?welcome=1' : '/';
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Algo salió mal');
@@ -159,6 +190,21 @@ export default function LoginPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {pendingInvite && (
+              <div className="mb-5 rounded-lg border border-purple-200 bg-purple-50 px-4 py-3 text-sm text-purple-900 flex gap-2">
+                <Gift className="h-4 w-4 shrink-0 mt-0.5 text-purple-600" />
+                <span>
+                  Tienes <strong>{pendingInvite.months} {pendingInvite.months === 1 ? 'mes' : 'meses'} de acceso
+                  gratis</strong> reservados para <strong>{pendingInvite.email}</strong>. Regístrate con ese
+                  mismo correo (o con Google usando esa cuenta) para activarlo automáticamente.
+                </span>
+              </div>
+            )}
+            {inviteAlreadyRedeemed && (
+              <div className="mb-5 rounded-lg border border-muted bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
+                Ya activaste tu acceso gratis con esta invitación — inicia sesión normalmente con esa cuenta.
+              </div>
+            )}
             <Button
               type="button"
               variant="outline"

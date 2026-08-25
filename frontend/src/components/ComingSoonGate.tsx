@@ -8,6 +8,9 @@ const BYPASS_KEY = import.meta.env.VITE_COMING_SOON_BYPASS_KEY as string | undef
 const BYPASS_STORAGE_KEY = 'vc_bypass_coming_soon';
 const BYPASS_QUERY_PARAM = 'acceso';
 const INVITE_QUERY_PARAM = 'invite';
+// Kept around after the gate opens so the signup page can later show a
+// "your free access is waiting" banner — see Login.tsx.
+export const INVITE_TOKEN_STORAGE_KEY = 'vc_invite_token';
 
 function stripQueryParam(param: string) {
   const params = new URLSearchParams(window.location.search);
@@ -49,6 +52,7 @@ async function checkInviteToken(): Promise<boolean> {
     const data = await response.json();
     if (data.valid) {
       localStorage.setItem(BYPASS_STORAGE_KEY, 'true');
+      localStorage.setItem(INVITE_TOKEN_STORAGE_KEY, token);
       stripQueryParam(INVITE_QUERY_PARAM);
       return true;
     }

@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
@@ -17,6 +18,9 @@ router = APIRouter(prefix="/api/v1/invitations", tags=["invitations"])
 
 class VerifyTokenResponse(BaseModel):
     valid: bool
+    email: Optional[str] = None
+    months: Optional[int] = None
+    already_redeemed: Optional[bool] = None
 
 
 @router.get("/verify", response_model=VerifyTokenResponse)
@@ -24,6 +28,20 @@ async def verify_invitation_token(
     token: str = Query(..., min_length=1),
     db: AsyncSession = Depends(get_db),
 ):
-    """Check whether an invitation token exists (doesn't reveal the email)."""
-    result = await db.execute(select(Invitation.id).where(Invitation.token == token))
-    return VerifyTokenResponse(valid=result.scalar_one_or_none() is not None)
+    """Check whether an invitation token exists, and if so return the email
+    and months it grants — safe to reveal here because holding the token
+    (an unguessable random string sent only to that person's inbox) already
+    proves ownership of that invitation; this lets the frontend show a
+    personalized "your free access is waiting" banner and pre-fill the
+    signup form with the right email."""
+    result = await db.execute(select(Invitation).where(Invitation.token == token))
+    invitation = result.scalar_one_or_none()
+    if not invitation:
+        return VerifyTokenResponse(valid=False)
+
+    return VerifyTokenResponse(
+        valid=True,
+        email=invitation.email,
+        months=invitation.months,
+        already_redeemed=invitation.status == "redeemed",
+    )
