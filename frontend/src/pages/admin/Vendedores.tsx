@@ -205,6 +205,16 @@ export default function AdminVendedoresPage() {
           <CardTitle className="text-base flex items-center gap-2">
             <Mail className="h-4 w-4" /> Invitar por email
           </CardTitle>
+          {(() => {
+            const raffleCount = invitations.filter((inv) => inv.source === 'sorteo_instagram').length;
+            const overLimit = raffleCount >= 25;
+            return (
+              <p className={`text-xs mt-1 ${overLimit ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
+                {raffleCount} / 25 ganadores del sorteo invitados hasta ahora
+                {overLimit && ' — las bases prometen "hasta 25 premios", revisa antes de invitar a más'}
+              </p>
+            );
+          })()}
         </CardHeader>
         <CardContent>
           <form onSubmit={handleInvite} className="flex flex-wrap gap-2 items-center mb-6">

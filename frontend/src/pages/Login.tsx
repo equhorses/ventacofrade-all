@@ -93,6 +93,7 @@ export default function LoginPage() {
 
   const [pendingInvite, setPendingInvite] = useState<{ email: string; months: number } | null>(null);
   const [inviteAlreadyRedeemed, setInviteAlreadyRedeemed] = useState(false);
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
 
   useEffect(() => {
     const error = searchParams.get('error');
@@ -147,6 +148,10 @@ export default function LoginPage() {
   }, [mode]);
 
   const handleGoogleLogin = () => {
+    if (pendingInvite && !ageConfirmed) {
+      toast.error('Confirma que eres mayor de 18 años para activar el premio del sorteo');
+      return;
+    }
     localStorage.removeItem(INVITE_TOKEN_STORAGE_KEY);
     window.location.href = `${getAPIBaseURL()}/api/v1/auth/google/login`;
   };
@@ -156,6 +161,11 @@ export default function LoginPage() {
 
     if (mode === 'register' && HCAPTCHA_SITE_KEY && !captchaToken) {
       toast.error('Confirma que no eres un robot antes de continuar');
+      return;
+    }
+
+    if (mode === 'register' && pendingInvite && !ageConfirmed) {
+      toast.error('Confirma que eres mayor de 18 años para activar el premio del sorteo');
       return;
     }
 
@@ -191,13 +201,24 @@ export default function LoginPage() {
           </CardHeader>
           <CardContent>
             {pendingInvite && (
-              <div className="mb-5 rounded-lg border border-purple-200 bg-purple-50 px-4 py-3 text-sm text-purple-900 flex gap-2">
-                <Gift className="h-4 w-4 shrink-0 mt-0.5 text-purple-600" />
-                <span>
-                  Tienes <strong>{pendingInvite.months} {pendingInvite.months === 1 ? 'mes' : 'meses'} de acceso
-                  gratis</strong> reservados para <strong>{pendingInvite.email}</strong>. Regístrate con ese
-                  mismo correo (o con Google usando esa cuenta) para activarlo automáticamente.
-                </span>
+              <div className="mb-5 rounded-lg border border-purple-200 bg-purple-50 px-4 py-3 text-sm text-purple-900">
+                <div className="flex gap-2">
+                  <Gift className="h-4 w-4 shrink-0 mt-0.5 text-purple-600" />
+                  <span>
+                    Tienes <strong>{pendingInvite.months} {pendingInvite.months === 1 ? 'mes' : 'meses'} de
+                    acceso gratis</strong> reservados para <strong>{pendingInvite.email}</strong>. Regístrate
+                    con ese mismo correo (o con Google usando esa cuenta) para activarlo automáticamente.
+                  </span>
+                </div>
+                <label className="mt-3 flex items-start gap-2 text-sm text-purple-900 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={ageConfirmed}
+                    onChange={(e) => setAgeConfirmed(e.target.checked)}
+                    className="mt-0.5 cursor-pointer"
+                  />
+                  Confirmo que soy mayor de 18 años.
+                </label>
               </div>
             )}
             {inviteAlreadyRedeemed && (
