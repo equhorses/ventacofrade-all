@@ -56,6 +56,9 @@ class InvitationResponse(BaseModel):
     status: str
     created_at: Optional[datetime] = None
     redeemed_at: Optional[datetime] = None
+    source: Optional[str] = None
+    activated_at: Optional[datetime] = None
+    revoked_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -64,6 +67,10 @@ class InvitationResponse(BaseModel):
 class CreateInvitationRequest(BaseModel):
     email: EmailStr
     months: int = 1
+    # Set to "sorteo_instagram" when this invitation is a raffle prize, so its
+    # free-access clock only starts once the platform actually launches
+    # publicly (see services/platform_settings.py).
+    source: Optional[str] = None
 
 
 class StaffMemberResponse(BaseModel):
@@ -864,6 +871,7 @@ async def create_invitation(
         months=max(1, payload.months),
         status="pending",
         invited_by=current_user.id,
+        source=payload.source,
     )
     db.add(invitation)
     await db.commit()

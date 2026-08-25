@@ -13,7 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { client, type AdminSeller, type AdminInvitation } from '@/lib/api';
-import { Gift, Search, XCircle, Mail, Send } from 'lucide-react';
+import { Gift, Search, XCircle, Mail, Send, Rocket, Sparkles } from 'lucide-react';
 import AdminNav from '@/components/admin/AdminNav';
 
 const MONTH_OPTIONS = [1, 3, 6, 12];
@@ -28,7 +28,45 @@ export default function AdminVendedoresPage() {
   const [loadingInvitations, setLoadingInvitations] = useState(true);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteMonths, setInviteMonths] = useState(3);
+  const [isRaffleWinner, setIsRaffleWinner] = useState(false);
   const [sendingInvite, setSendingInvite] = useState(false);
+
+  const [launchAt, setLaunchAt] = useState<string | null>(null);
+  const [launchAtInput, setLaunchAtInput] = useState('');
+  const [loadingLaunch, setLoadingLaunch] = useState(true);
+  const [savingLaunch, setSavingLaunch] = useState(false);
+
+  const loadLaunchSettings = async () => {
+    setLoadingLaunch(true);
+    try {
+      const { data } = await client.admin.getPlatformSettings();
+      setLaunchAt(data.launch_at);
+      setLaunchAtInput(data.launch_at ? data.launch_at.slice(0, 16) : '');
+    } catch (err) {
+      console.error('Error loading platform settings:', err);
+    } finally {
+      setLoadingLaunch(false);
+    }
+  };
+
+  const handleSaveLaunch = async () => {
+    setSavingLaunch(true);
+    try {
+      const isoValue = launchAtInput ? new Date(launchAtInput).toISOString() : null;
+      const { data } = await client.admin.setPlatformLaunchAt(isoValue);
+      setLaunchAt(data.launch_at);
+      toast.success(
+        data.launch_at
+          ? 'Fecha de lanzamiento guardada. Los ganadores del sorteo pendientes ya han sido activados.'
+          : 'Fecha de lanzamiento borrada.'
+      );
+    } catch (err) {
+      console.error('Error saving launch date:', err);
+      toast.error('No se pudo guardar la fecha de lanzamiento');
+    } finally {
+      setSavingLaunch(false);
+    }
+  };
 
   const loadSellers = async (query?: string) => {
     setLoadingSellers(true);
@@ -59,6 +97,7 @@ export default function AdminVendedoresPage() {
   useEffect(() => {
     loadSellers();
     loadInvitations();
+    loadLaunchSettings();
   }, []);
 
   const handleSearch = (e: React.FormEvent) => {
@@ -89,9 +128,14 @@ export default function AdminVendedoresPage() {
     if (!inviteEmail.trim()) return;
     setSendingInvite(true);
     try {
-      const { data } = await client.admin.createInvitation(inviteEmail.trim(), inviteMonths);
+      const { data } = await client.admin.createInvitation(
+        inviteEmail.trim(),
+        inviteMonths,
+        isRaffleWinner ? 'sorteo_instagram' : undefined
+      );
       setInvitations((prev) => [data, ...prev]);
       setInviteEmail('');
+      setIsRaffleWinner(false);
       toast.success(`Invitación enviada a ${data.email}`);
     } catch (err) {
       console.error('Error sending invitation:', err);
@@ -114,6 +158,46 @@ export default function AdminVendedoresPage() {
           Invita a vendedores antes del lanzamiento y concede acceso gratuito para publicar sin suscripción.
         </p>
       </div>
+
+      {/* Fecha real de lanzamiento (afecta a cuándo empiezan a contar los 3 meses de los ganadores del sorteo) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Rocket className="h-4 w-4" /> Fecha de lanzamiento de la plataforma
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground mb-3">
+            Ponla el día real en que VentaCofrade abra al público. Hasta entonces, los ganadores del
+            sorteo pueden registrarse pero su acceso gratis no empieza a contar. En cuanto guardes esta
+            fecha por primera vez, se activan automáticamente todos los ganadores pendientes y reciben
+            su email de "premio activado" con el plazo de 15 días para publicar.
+          </p>
+          {loadingLaunch ? (
+            <p className="text-sm text-muted-foreground">Cargando...</p>
+          ) : (
+            <div className="flex flex-wrap gap-2 items-center">
+              <Input
+                type="datetime-local"
+                value={launchAtInput}
+                onChange={(e) => setLaunchAtInput(e.target.value)}
+                className="max-w-xs"
+              />
+              <Button onClick={handleSaveLaunch} disabled={savingLaunch}>
+                Guardar fecha
+              </Button>
+              {launchAt && (
+                <Badge className="bg-green-100 text-green-700">
+                  Lanzada el {new Date(launchAt).toLocaleString('es-ES')}
+                </Badge>
+              )}
+              {!launchAt && (
+                <Badge className="bg-amber-100 text-amber-700">Todavía sin fecha de lanzamiento</Badge>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Invitaciones */}
       <Card>
@@ -146,6 +230,16 @@ export default function AdminVendedoresPage() {
             <Button type="submit" disabled={sendingInvite}>
               <Send className="h-4 w-4 mr-1" /> Enviar invitación
             </Button>
+            <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={isRaffleWinner}
+                onChange={(e) => setIsRaffleWinner(e.target.checked)}
+                className="cursor-pointer"
+              />
+              <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+              Es ganador del sorteo de Instagram
+            </label>
           </form>
 
           <Table>
@@ -153,6 +247,7 @@ export default function AdminVendedoresPage() {
               <TableRow>
                 <TableHead>Email</TableHead>
                 <TableHead>Meses</TableHead>
+                <TableHead>Origen</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Enviada</TableHead>
               </TableRow>
@@ -163,14 +258,33 @@ export default function AdminVendedoresPage() {
                   <TableCell>{inv.email}</TableCell>
                   <TableCell>{inv.months}</TableCell>
                   <TableCell>
+                    {inv.source === 'sorteo_instagram' ? (
+                      <Badge className="bg-purple-100 text-purple-700 flex items-center gap-1 w-fit">
+                        <Sparkles className="h-3 w-3" /> Sorteo
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Manual</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
                     <Badge
                       className={
-                        inv.status === 'redeemed'
-                          ? 'bg-green-100 text-green-700'
+                        inv.revoked_at
+                          ? 'bg-red-100 text-red-700'
+                          : inv.status === 'redeemed'
+                          ? inv.source === 'sorteo_instagram' && !inv.activated_at
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-green-100 text-green-700'
                           : 'bg-amber-100 text-amber-700'
                       }
                     >
-                      {inv.status === 'redeemed' ? 'Canjeada' : 'Pendiente'}
+                      {inv.revoked_at
+                        ? 'Revocada'
+                        : inv.status === 'redeemed'
+                        ? inv.source === 'sorteo_instagram' && !inv.activated_at
+                          ? 'Canjeada (esperando lanzamiento)'
+                          : 'Canjeada y activa'
+                        : 'Pendiente'}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
@@ -180,7 +294,7 @@ export default function AdminVendedoresPage() {
               ))}
               {!loadingInvitations && invitations.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center text-muted-foreground py-6">
+                  <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
                     Todavía no has enviado ninguna invitación.
                   </TableCell>
                 </TableRow>

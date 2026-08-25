@@ -14,6 +14,8 @@ from services.seller_profiles import Seller_profilesService
 from dependencies.auth import get_current_user
 from schemas.auth import UserResponse
 from models.invitations import Invitation
+from services.platform_settings import get_launch_at, RAFFLE_SOURCE
+from services.email import send_raffle_prize_activated_email
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -233,10 +235,32 @@ async def create_seller_profiles(
             )
             invitation = invite_result.scalar_one_or_none()
             if invitation:
-                result.free_access_until = datetime.now(timezone.utc) + timedelta(days=30 * invitation.months)
+                now = datetime.now(timezone.utc)
                 invitation.status = "redeemed"
                 invitation.redeemed_by_user_id = str(current_user.id)
-                invitation.redeemed_at = datetime.now(timezone.utc)
+                invitation.redeemed_at = now
+
+                is_raffle_winner = invitation.source == RAFFLE_SOURCE
+                if is_raffle_winner:
+                    launch_at = await get_launch_at(db)
+                    if launch_at is None:
+                        # Platform isn't public yet: don't start the clock. Once an
+                        # admin sets the launch date, services/platform_settings.py
+                        # activates every pending raffle winner in one pass.
+                        invitation.activated_at = None
+                    else:
+                        start = max(now, launch_at)
+                        invitation.activated_at = start
+                        result.free_access_until = start + timedelta(days=30 * invitation.months)
+                        sent = await send_raffle_prize_activated_email(
+                            to_email=normalized_email, deadline=start + timedelta(days=15)
+                        )
+                        if not sent:
+                            logger.warning("No se pudo enviar email de premio activado a %s", normalized_email)
+                else:
+                    invitation.activated_at = now
+                    result.free_access_until = now + timedelta(days=30 * invitation.months)
+
                 await db.commit()
                 await db.refresh(result)
                 logger.info(f"Invitacion redimida automaticamente para {normalized_email}")

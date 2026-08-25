@@ -211,3 +211,125 @@ async def send_invitation_email(to_email: str, months: int, token: str) -> bool:
     except httpx.HTTPError as exc:
         logger.error(f"Fallo al enviar email de invitacion a {to_email}: {exc}")
         return False
+
+
+async def _send_via_resend(to_email: str, subject: str, html_content: str, log_label: str) -> bool:
+    """Shared sender for the emails below — keeps the Resend call in one place."""
+    api_key = getattr(settings, "resend_api_key", None)
+    from_email = getattr(settings, "resend_from_email", None)
+
+    if not api_key or not from_email:
+        logger.warning(f"Resend no configurado; email de {log_label} omitido")
+        return False
+
+    payload = {"from": from_email, "to": [to_email], "subject": subject, "html": html_content}
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                RESEND_API_URL,
+                headers={"Authorization": f"Bearer {api_key}"},
+                json=payload,
+            )
+            response.raise_for_status()
+        logger.info(f"Email de {log_label} enviado a {to_email}")
+        return True
+    except httpx.HTTPError as exc:
+        logger.error(f"Fallo al enviar email de {log_label} a {to_email}: {exc}")
+        return False
+
+
+async def send_raffle_prize_activated_email(to_email: str, deadline) -> bool:
+    """Sent to a raffle winner the moment their 3 free months actually start
+    counting (i.e. when the platform is publicly live), telling them they have
+    15 days to publish a real listing or the prize can be revoked."""
+    deadline_str = deadline.strftime("%d/%m/%Y")
+    html_content = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+      <h2 style="color: #6d28d9;">¡Tu premio ya está activo! 🎉</h2>
+      <p>VentaCofrade ya está abierta al público y tus <strong>3 meses de acceso gratuito</strong>
+      para publicar como vendedor han empezado a contar hoy.</p>
+      <p style="background:#fef3c7; padding:12px 16px; border-radius:8px; color:#92400e;">
+        <strong>Importante:</strong> para conservar el premio, completa tu perfil de vendedor
+        y publica al menos un anuncio real antes del <strong>{deadline_str}</strong> (15 días).
+        Si no lo haces en ese plazo, el premio podrá ofrecerse a otra persona.
+      </p>
+      <p style="margin-top: 24px;">
+        <a href="https://www.ventacofrade.com/cuenta/publicar" style="background-color:#6d28d9;
+        color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;">Publicar mi primer anuncio</a>
+      </p>
+      <p style="margin-top: 24px; color: #666; font-size: 13px;">
+        ¿Dudas? Escríbenos a <a href="mailto:contacto@ventacofrade.com">contacto@ventacofrade.com</a>.
+      </p>
+    </div>
+    """
+    return await _send_via_resend(
+        to_email, "¡Tu premio del sorteo ya está activo! Tienes 15 días para publicar", html_content,
+        "premio de sorteo activado",
+    )
+
+
+async def send_raffle_deadline_reminder_email(to_email: str, deadline) -> bool:
+    """Sent a few days before the 15-day publish deadline if the winner still
+    hasn't published a real listing."""
+    deadline_str = deadline.strftime("%d/%m/%Y")
+    html_content = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+      <h2 style="color: #b45309;">Tu premio del sorteo caduca pronto</h2>
+      <p>Todavía no has publicado ningún anuncio en VentaCofrade con tu acceso gratuito del sorteo.</p>
+      <p>Tienes hasta el <strong>{deadline_str}</strong> para publicar al menos un anuncio real,
+      o el premio podrá revocarse y ofrecerse a otra persona participante.</p>
+      <p style="margin-top: 24px;">
+        <a href="https://www.ventacofrade.com/cuenta/publicar" style="background-color:#6d28d9;
+        color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;">Publicar ahora</a>
+      </p>
+    </div>
+    """
+    return await _send_via_resend(
+        to_email, "Quedan pocos días para usar tu premio del sorteo", html_content,
+        "recordatorio de plazo de sorteo",
+    )
+
+
+async def send_raffle_prize_revoked_email(to_email: str) -> bool:
+    """Sent when the 15-day window closed without a real listing published."""
+    html_content = """
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+      <h2 style="color: #b91c1c;">Tu premio del sorteo ha sido revocado</h2>
+      <p>El plazo de 15 días para publicar tu primer anuncio con el acceso gratuito del sorteo
+      ha finalizado sin que se haya publicado ningún anuncio, así que el premio ha sido revocado
+      conforme a las bases del sorteo.</p>
+      <p>Si aún quieres vender en VentaCofrade, puedes hacerlo en cualquier momento activando
+      uno de nuestros planes de suscripción.</p>
+      <p style="margin-top: 24px; color: #666; font-size: 13px;">
+        Si crees que esto es un error, escríbenos a
+        <a href="mailto:contacto@ventacofrade.com">contacto@ventacofrade.com</a>.
+      </p>
+    </div>
+    """
+    return await _send_via_resend(
+        to_email, "Tu premio del sorteo ha sido revocado", html_content, "revocación de premio de sorteo",
+    )
+
+
+async def send_subscription_renewal_reminder_email(to_email: str, plan: str, renewal_date) -> bool:
+    """Sent 7 days before a subscription auto-renews (charges the card again)."""
+    renewal_str = renewal_date.strftime("%d/%m/%Y")
+    plan_label = "Profesional" if plan == "profesional" else "Básico"
+    html_content = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+      <h2 style="color: #6d28d9;">Tu suscripción se renueva en 7 días</h2>
+      <p>Tu plan <strong>{plan_label}</strong> de VentaCofrade se renovará automáticamente
+      el <strong>{renewal_str}</strong>.</p>
+      <p>Si quieres hacer algún cambio antes, puedes gestionar tu suscripción (cambiar de plan
+      o cancelarla) desde tu cuenta.</p>
+      <p style="margin-top: 24px;">
+        <a href="https://www.ventacofrade.com/cuenta/suscripcion" style="background-color:#6d28d9;
+        color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;">Gestionar mi suscripción</a>
+      </p>
+    </div>
+    """
+    return await _send_via_resend(
+        to_email, "Tu suscripción a VentaCofrade se renueva en 7 días", html_content,
+        "recordatorio de renovacion",
+    )

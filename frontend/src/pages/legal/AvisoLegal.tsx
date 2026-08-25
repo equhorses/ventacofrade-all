@@ -14,9 +14,9 @@ export default function AvisoLegal() {
           ventacofrade.com (en adelante, "VentaCofrade" o "la Plataforma"):
         </p>
         <ul>
-          <li><strong>Titular:</strong> [PENDIENTE: nombre completo o razón social]</li>
-          <li><strong>NIF/CIF:</strong> [PENDIENTE: número de NIF o CIF]</li>
-          <li><strong>Domicilio:</strong> [PENDIENTE: dirección fiscal completa]</li>
+          <li><strong>Titular:</strong> Daniel Ariza Otero</li>
+          <li><strong>NIF/CIF:</strong> 44966216C</li>
+          <li><strong>Domicilio:</strong> C/ Zarza 20B, El Puerto de Santa María, Cádiz</li>
           <li><strong>Email de contacto:</strong> contacto@ventacofrade.com</li>
           <li><strong>Dominio:</strong> ventacofrade.com</li>
           <li><strong>Actividad:</strong> intermediación en la compraventa entre particulares de artículos relacionados con el mundo cofrade</li>

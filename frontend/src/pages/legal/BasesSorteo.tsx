@@ -8,8 +8,9 @@ export default function BasesSorteo() {
 
         <h2 className="text-xl font-semibold mt-6 mb-2">1. Empresa organizadora</h2>
         <ul>
-          <li><strong>Organiza:</strong> [PENDIENTE: nombre completo o razón social]</li>
-          <li><strong>NIF/CIF:</strong> [PENDIENTE: número de NIF o CIF]</li>
+          <li><strong>Organiza:</strong> Daniel Ariza Otero</li>
+          <li><strong>NIF/CIF:</strong> 44966216C</li>
+          <li><strong>Domicilio:</strong> C/ Zarza 20B, El Puerto de Santa María, Cádiz</li>
           <li><strong>Web:</strong> ventacofrade.com</li>
           <li><strong>Perfil de Instagram:</strong> @ventacofrade_vendelo</li>
         </ul>

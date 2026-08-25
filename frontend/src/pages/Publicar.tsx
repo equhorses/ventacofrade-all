@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Layout from '@/components/Layout';
 import { client } from '@/lib/api';
-import { Upload, ImagePlus, X, Loader2 } from 'lucide-react';
+import { Upload, ImagePlus, X, Loader2, Sparkles, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Category {
@@ -34,6 +34,10 @@ export default function PublicarPage() {
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [uploadingCount, setUploadingCount] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [publishedProductId, setPublishedProductId] = useState<number | null>(null);
+  const [featurePrices, setFeaturePrices] = useState<Record<string, number>>({});
+  const [featuringDays, setFeaturingDays] = useState<number | null>(null);
 
   const [form, setForm] = useState({
     title: '',
@@ -135,7 +139,7 @@ export default function PublicarPage() {
 
     setLoading(true);
     try {
-      await client.entities.products.create({
+      const { data: created } = await client.entities.products.create({
         data: {
           title: form.title,
           description: form.description,
@@ -151,7 +155,16 @@ export default function PublicarPage() {
         },
       });
       toast.success('¡Anuncio publicado con éxito!');
-      navigate('/explorar');
+      const newId = (created as { id?: number })?.id;
+      if (newId) {
+        setPublishedProductId(newId);
+        client.payments
+          .getFeaturePrices()
+          .then(({ data }) => setFeaturePrices(data))
+          .catch((err) => console.error('Error loading feature prices:', err));
+      } else {
+        navigate('/explorar');
+      }
     } catch (err) {
       console.error('Error creating product:', err);
       const backendMessage = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
@@ -184,6 +197,67 @@ export default function PublicarPage() {
           <Button onClick={() => client.auth.toLogin()} className="bg-primary hover:bg-primary/90 cursor-pointer">
             Iniciar sesión
           </Button>
+        </div>
+      </Layout>
+    );
+  }
+
+  const handleFeatureAfterPublish = async (days: 3 | 7 | 30) => {
+    if (!publishedProductId) return;
+    setFeaturingDays(days);
+    try {
+      const { data } = await client.payments.featureListing(publishedProductId, days);
+      window.location.href = data.url;
+    } catch (err) {
+      console.error('Error starting feature checkout:', err);
+      toast.error('No se pudo iniciar el pago para destacar el anuncio.');
+      setFeaturingDays(null);
+    }
+  };
+
+  if (publishedProductId) {
+    return (
+      <Layout>
+        <div className="max-w-lg mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <Card>
+            <CardContent className="pt-6 text-center">
+              <CheckCircle2 className="h-14 w-14 mx-auto text-green-600 mb-4" />
+              <h2 className="text-2xl font-bold mb-2">¡Anuncio publicado!</h2>
+              <p className="text-muted-foreground mb-6">
+                Ya está visible en VentaCofrade. Si quieres que se vea antes que los demás, puedes
+                destacarlo ahora:
+              </p>
+
+              <div className="grid grid-cols-3 gap-2 mb-6">
+                {[3, 7, 30].map((days) => (
+                  <Button
+                    key={days}
+                    variant="outline"
+                    disabled={featuringDays !== null}
+                    onClick={() => handleFeatureAfterPublish(days as 3 | 7 | 30)}
+                    className="flex flex-col h-auto py-3 cursor-pointer"
+                  >
+                    <Sparkles className="h-4 w-4 mb-1 text-amber-500" />
+                    <span className="text-sm font-medium">{days} días</span>
+                    <span className="text-xs text-muted-foreground">
+                      {featurePrices[String(days)] !== undefined
+                        ? `${featurePrices[String(days)].toFixed(2)} €`
+                        : '…'}
+                    </span>
+                  </Button>
+                ))}
+              </div>
+
+              <Button
+                variant="ghost"
+                className="cursor-pointer"
+                disabled={featuringDays !== null}
+                onClick={() => navigate('/explorar')}
+              >
+                No, gracias — ver mi anuncio
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </Layout>
     );

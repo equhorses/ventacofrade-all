@@ -36,5 +36,8 @@ PyMuPDF
 # payment module dependencies
 stripe>=12.0.0
 
+# scheduled jobs (sorteo deadlines, subscription renewal reminders)
+apscheduler>=3.10.0,<4.0.0
+
 # storage module dependencies (Cloudflare R2, S3-compatible)
 boto3>=1.34.0

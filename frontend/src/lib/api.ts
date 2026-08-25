@@ -272,9 +272,17 @@ export const client = {
       const response = await http.get(`${baseUrl()}/api/v1/admin/invitations`);
       return { data: response.data as AdminInvitation[] };
     },
-    async createInvitation(email: string, months: number) {
-      const response = await http.post(`${baseUrl()}/api/v1/admin/invitations`, { email, months });
+    async createInvitation(email: string, months: number, source?: string) {
+      const response = await http.post(`${baseUrl()}/api/v1/admin/invitations`, { email, months, source });
       return { data: response.data as AdminInvitation };
+    },
+    async getPlatformSettings() {
+      const response = await http.get(`${baseUrl()}/api/v1/admin/platform-settings`);
+      return { data: response.data as { launch_at: string | null } };
+    },
+    async setPlatformLaunchAt(launchAt: string | null) {
+      const response = await http.put(`${baseUrl()}/api/v1/admin/platform-settings`, { launch_at: launchAt });
+      return { data: response.data as { launch_at: string | null } };
     },
     async listStaff() {
       const response = await http.get(`${baseUrl()}/api/v1/admin/staff`);
@@ -371,6 +379,9 @@ export interface AdminInvitation {
   status: string;
   created_at?: string | null;
   redeemed_at?: string | null;
+  source?: string | null;
+  activated_at?: string | null;
+  revoked_at?: string | null;
 }
 
 export interface StaffMember {

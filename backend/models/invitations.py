@@ -16,3 +16,15 @@ class Invitation(Base):
     redeemed_by_user_id = Column(String, nullable=True)
     redeemed_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=datetime.now)
+
+    # 'sorteo_instagram' marks invitations created for raffle winners (as opposed
+    # to regular admin-granted free access). Everything below only applies to those.
+    source = Column(String(30), nullable=True)
+    # When the free-access clock actually started counting. For raffle winners this
+    # is max(redeemed_at, platform launch date) — not necessarily redeemed_at itself,
+    # since the platform may not be public yet when they redeem their prize.
+    activated_at = Column(DateTime(timezone=True), nullable=True)
+    # When we sent the "faltan pocos días para publicar tu anuncio" reminder.
+    deadline_reminder_sent_at = Column(DateTime(timezone=True), nullable=True)
+    # When we revoked the prize because the 15-day publish deadline passed unused.
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
