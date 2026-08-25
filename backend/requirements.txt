@@ -34,7 +34,7 @@ sse-starlette>=1.6.0
 PyMuPDF
 
 # payment module dependencies
-stripe>=12.0.0
+stripe>=15.5.1
 
 # scheduled jobs (sorteo deadlines, subscription renewal reminders)
 apscheduler>=3.10.0,<4.0.0
