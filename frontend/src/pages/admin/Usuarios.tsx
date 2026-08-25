@@ -13,7 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { client, type AdminUser, type AdminChatMessage } from '@/lib/api';
-import { Search, Ban, RotateCcw, MessageCircle, Send } from 'lucide-react';
+import { Search, Ban, RotateCcw, MessageCircle, Send, Trash2 } from 'lucide-react';
 import AdminNav from '@/components/admin/AdminNav';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -107,6 +107,30 @@ export default function AdminUsuariosPage() {
     } catch (err: unknown) {
       console.error('Error unbanning user:', err);
       toast.error('No se pudo quitar el baneo.');
+    } finally {
+      setActingId(null);
+    }
+  };
+
+  const handleDelete = async (user: AdminUser) => {
+    if (
+      !confirm(
+        `¿Borrar PERMANENTEMENTE la cuenta ${user.email}?\n\nEsto elimina su perfil, anuncios, mensajes, valoraciones y favoritos. No se puede deshacer.`
+      )
+    ) {
+      return;
+    }
+    setActingId(user.id);
+    try {
+      await client.admin.deleteUser(user.id);
+      setUsers((prev) => prev.filter((u) => u.id !== user.id));
+      setTotal((t) => t - 1);
+      toast.success(`${user.email} ha sido borrado permanentemente`);
+    } catch (err: unknown) {
+      console.error('Error deleting user:', err);
+      const message =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'No se pudo borrar.';
+      toast.error(message);
     } finally {
       setActingId(null);
     }
@@ -223,6 +247,18 @@ export default function AdminUsuariosPage() {
                             onClick={() => handleBan(u)}
                           >
                             <Ban className="h-3 w-3 mr-1" /> Banear
+                          </Button>
+                        )}
+                        {isSuperAdmin && u.role === 'user' && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive hover:text-destructive"
+                            disabled={actingId === u.id}
+                            onClick={() => handleDelete(u)}
+                            title="Borrar permanentemente (no se puede deshacer)"
+                          >
+                            <Trash2 className="h-3 w-3" />
                           </Button>
                         )}
                       </div>

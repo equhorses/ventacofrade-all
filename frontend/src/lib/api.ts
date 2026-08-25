@@ -304,6 +304,10 @@ export const client = {
       const response = await http.post(`${baseUrl()}/api/v1/admin/users/${userId}/unban`, {});
       return { data: response.data as AdminUser };
     },
+    async deleteUser(userId: string) {
+      const response = await http.delete(`${baseUrl()}/api/v1/admin/users/${userId}`);
+      return { data: response.data as { deleted_email: string } };
+    },
     async listProducts(params: { search?: string; status?: string; skip?: number; limit?: number } = {}) {
       const response = await http.get(`${baseUrl()}/api/v1/admin/products`, { params });
       return { data: response.data as { items: AdminProduct[]; total: number } };

@@ -20,6 +20,9 @@ from models.messages import Messages
 from models.audit import AuditLog, LoginAttempt
 from models.house_ads import HouseAds
 from models.feature_purchases import FeaturePurchases
+from models.favorites import Favorites
+from models.reviews import Reviews
+from models.professional_profiles import ProfessionalProfiles
 from routers.house_ads import KNOWN_SLOTS
 from services.email import send_invitation_email
 from services.audit import log_admin_action
@@ -193,6 +196,63 @@ async def unban_user(
     logger.info("Admin %s unbanned user %s", current_user.email, user.email)
     await log_admin_action(db, current_user.id, current_user.email, "unban_user", target=user.email)
     return user
+
+
+class DeleteUserResponse(BaseModel):
+    deleted_email: str
+
+
+@router.delete("/users/{user_id}", response_model=DeleteUserResponse)
+async def delete_user_admin(
+    user_id: str,
+    current_user: UserResponse = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Permanently delete a user account and everything tied to it: seller
+    profile, listings, professional profile, reviews, favorites, and any
+    pending/redeemed invitation. Intended for cleaning up test accounts —
+    super admin only, and refuses to touch staff/team accounts to avoid an
+    accidental self-lockout or deleting a colleague.
+
+    Unlike 'ban', this cannot be undone.
+    """
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    if user.role != "user":
+        raise HTTPException(
+            status_code=400,
+            detail="No se pueden borrar cuentas de equipo desde aquí. Quita antes su rol en la pestaña Equipo.",
+        )
+
+    deleted_email = user.email
+
+    seller_result = await db.execute(select(Seller_profiles).where(Seller_profiles.user_id == user_id))
+    seller_profile = seller_result.scalar_one_or_none()
+    if seller_profile:
+        await db.execute(Products.__table__.delete().where(Products.user_id == user_id))
+        await db.execute(FeaturePurchases.__table__.delete().where(FeaturePurchases.seller_user_id == user_id))
+        await db.execute(Reviews.__table__.delete().where(Reviews.seller_profile_id == seller_profile.id))
+        await db.delete(seller_profile)
+
+    await db.execute(ProfessionalProfiles.__table__.delete().where(ProfessionalProfiles.user_id == user_id))
+    await db.execute(Favorites.__table__.delete().where(Favorites.user_id == user_id))
+    await db.execute(Messages.__table__.delete().where(Messages.user_id == user_id))
+    await db.execute(Messages.__table__.delete().where(Messages.receiver_id == user_id))
+    await db.execute(Reviews.__table__.delete().where(Reviews.reviewer_user_id == user_id))
+    await db.execute(Invitation.__table__.delete().where(Invitation.redeemed_by_user_id == user_id))
+
+    await db.delete(user)
+    await db.commit()
+
+    logger.info("Admin %s permanently deleted user %s", current_user.email, deleted_email)
+    await log_admin_action(
+        db, current_user.id, current_user.email, "delete_user",
+        target=deleted_email, details="Borrado permanente: perfil, anuncios, mensajes, valoraciones, favoritos",
+    )
+    return DeleteUserResponse(deleted_email=deleted_email)
 
 
 class AdminProductResponse(BaseModel):
