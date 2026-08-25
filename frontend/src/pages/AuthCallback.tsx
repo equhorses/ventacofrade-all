@@ -12,11 +12,12 @@ export default function AuthCallback() {
   useEffect(() => {
     const token = searchParams.get('token');
     const error = searchParams.get('error');
+    const isNewUser = searchParams.get('welcome') === '1';
 
     if (token) {
       saveToken(token);
       toast.success('Sesión iniciada con Google');
-      navigate('/', { replace: true });
+      navigate(isNewUser ? '/?welcome=1' : '/', { replace: true });
       window.location.reload(); // refresh so the header picks up the logged-in user
     } else {
       toast.error(error || 'No se pudo iniciar sesión con Google');

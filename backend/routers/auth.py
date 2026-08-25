@@ -190,7 +190,7 @@ async def google_callback(
 
     auth_service = AuthService(db)
     try:
-        user = await auth_service.get_or_create_google_user(email=email, name=userinfo.get("name"))
+        user, is_new_user = await auth_service.get_or_create_google_user(email=email, name=userinfo.get("name"))
     except HTTPException as exc:
         await log_login_attempt(
             db, email=email, method="google", success=False,
@@ -204,8 +204,12 @@ async def google_callback(
     )
     token, expires_at, _ = await auth_service.issue_app_token(user=user)
 
+    callback_params = {"token": token}
+    if is_new_user:
+        callback_params["welcome"] = "1"
+
     redirect_response = RedirectResponse(
-        url=f"{frontend_url}/auth/callback?{urlencode({'token': token})}",
+        url=f"{frontend_url}/auth/callback?{urlencode(callback_params)}",
         status_code=status.HTTP_302_FOUND,
     )
     redirect_response.delete_cookie(GOOGLE_STATE_COOKIE)

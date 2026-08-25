@@ -80,10 +80,13 @@ class AuthService:
         await self.db.refresh(user)
         return user
 
-    async def get_or_create_google_user(self, email: str, name: Optional[str] = None) -> User:
+    async def get_or_create_google_user(self, email: str, name: Optional[str] = None) -> Tuple[User, bool]:
         """Find a user by email (created via Google or previously via password),
         or create a new one. Google-authenticated accounts have no password_hash,
-        so they can only ever log in again via Google."""
+        so they can only ever log in again via Google.
+
+        Returns (user, is_new_user) so the caller can show a welcome message
+        only to genuinely new accounts."""
         normalized_email = email.strip().lower()
 
         result = await self.db.execute(select(User).where(User.email == normalized_email))
@@ -115,7 +118,7 @@ class AuthService:
         await self.db.refresh(user)
         if is_new_user:
             await send_welcome_email(to_email=user.email, name=user.name)
-        return user
+        return user, is_new_user
 
     async def issue_app_token(
         self,
