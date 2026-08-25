@@ -1,9 +1,10 @@
 import logging
+import random
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from models.audit import AuditLog, LoginAttempt
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
@@ -86,5 +87,13 @@ async def log_login_attempt(
             )
         )
         await db.commit()
+
+        # Opportunistic cleanup (matches our privacy policy's 12-month
+        # retention promise) — runs on a small fraction of calls rather
+        # than every single one, to keep the extra cost negligible.
+        if random.random() < 0.02:
+            cutoff = datetime.now(timezone.utc) - timedelta(days=365)
+            await db.execute(delete(LoginAttempt).where(LoginAttempt.created_at < cutoff))
+            await db.commit()
     except Exception as e:
         logger.error(f"Failed to write login attempt entry: {e}")

@@ -125,21 +125,38 @@ export default function AvisoLegal() {
           <li>El uso indebido del sitio web por parte de terceros.</li>
         </ul>
 
-        <h2 className="text-xl font-semibold mt-6 mb-2">10. Modificaciones</h2>
+        <h2 className="text-xl font-semibold mt-6 mb-2">10. Fuerza mayor</h2>
+        <p>
+          VentaCofrade no será responsable del incumplimiento de sus obligaciones cuando dicho
+          incumplimiento se deba a causas de fuerza mayor o caso fortuito, incluyendo (sin
+          carácter exhaustivo) fallos generalizados de internet o de los proveedores de
+          alojamiento (Railway, Vercel, Cloudflare), ciberataques, catástrofes naturales,
+          pandemias, huelgas, cortes de suministro eléctrico o decisiones de las autoridades
+          públicas ajenas a su control.
+        </p>
+
+        <h2 className="text-xl font-semibold mt-6 mb-2">11. Modificaciones</h2>
         <p>
           VentaCofrade se reserva el derecho a modificar, sin previo aviso, la presentación,
           configuración y contenido del sitio web, así como este Aviso Legal, para adaptarlo a
           novedades legislativas o cambios en el servicio.
         </p>
 
-        <h2 className="text-xl font-semibold mt-6 mb-2">11. Nulidad e ineficacia de las cláusulas</h2>
+        <h2 className="text-xl font-semibold mt-6 mb-2">12. Nulidad e ineficacia de las cláusulas</h2>
         <p>
           Si alguna cláusula de este Aviso Legal fuera declarada nula o ineficaz, dicha
           declaración solo afectará a esa disposición concreta, manteniéndose la validez del resto
           de condiciones.
         </p>
 
-        <h2 className="text-xl font-semibold mt-6 mb-2">12. Legislación aplicable y jurisdicción</h2>
+        <h2 className="text-xl font-semibold mt-6 mb-2">13. Idioma</h2>
+        <p>
+          Este Aviso Legal está redactado en español. Si en el futuro se ofrecen traducciones a
+          otros idiomas, estas tendrán carácter meramente informativo y, en caso de discrepancia o
+          conflicto de interpretación, prevalecerá siempre la versión en español.
+        </p>
+
+        <h2 className="text-xl font-semibold mt-6 mb-2">14. Legislación aplicable y jurisdicción</h2>
         <p>
           Este Aviso Legal se rige por la legislación española. Para la resolución de cualquier
           controversia, las partes se someten a los juzgados y tribunales del domicilio de la

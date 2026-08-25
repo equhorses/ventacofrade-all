@@ -36,12 +36,26 @@ export default function Privacidad() {
             ciudad, teléfono de contacto.
           </li>
           <li>
+            <strong>Datos de perfil profesional (Red Profesional):</strong> especialidad,
+            descripción, provincia, ciudad, teléfono, WhatsApp y fotografías de portafolio, si
+            decides crear un perfil profesional.
+          </li>
+          <li>
+            <strong>Valoraciones:</strong> la puntuación y el comentario que dejas sobre un
+            vendedor o perfil profesional, o que otras personas dejan sobre el tuyo.
+          </li>
+          <li>
             <strong>Datos de pago:</strong> gestionados directamente por Stripe, nuestro
             proveedor de pasarela de pago. VentaCofrade no almacena ni tiene acceso en ningún
             momento a los números completos de tarjeta.
           </li>
           <li><strong>Comunicaciones:</strong> mensajes intercambiados entre personas compradoras y vendedoras dentro de la Plataforma.</li>
           <li><strong>Datos de lista de espera:</strong> email, durante la fase de lanzamiento de la Plataforma.</li>
+          <li>
+            <strong>Registro de seguridad:</strong> email, dirección IP y resultado (éxito o
+            fallo) de cada intento de inicio de sesión, conservado con fines de prevención de
+            fraude y detección de accesos indebidos.
+          </li>
           <li>
             <strong>Datos técnicos y de navegación:</strong> dirección IP, tipo de navegador y
             dispositivo, páginas visitadas, recogidos de forma automática por nuestros
@@ -68,6 +82,14 @@ export default function Privacidad() {
               <td className="py-2">Ejecución de contrato</td>
             </tr>
             <tr className="border-b">
+              <td className="py-2">Mostrar tu perfil profesional en la Red Profesional, si creas uno</td>
+              <td className="py-2">Ejecución de contrato</td>
+            </tr>
+            <tr className="border-b">
+              <td className="py-2">Mostrar las valoraciones que dejas o que recibes</td>
+              <td className="py-2">Ejecución de contrato</td>
+            </tr>
+            <tr className="border-b">
               <td className="py-2">Procesar el pago de tu suscripción de vendedor</td>
               <td className="py-2">Ejecución de contrato</td>
             </tr>
@@ -80,7 +102,7 @@ export default function Privacidad() {
               <td className="py-2">Consentimiento</td>
             </tr>
             <tr className="border-b">
-              <td className="py-2">Prevenir fraude y verificar que no eres un robot (hCaptcha)</td>
+              <td className="py-2">Prevenir fraude, detectar accesos indebidos y verificar que no eres un robot (hCaptcha)</td>
               <td className="py-2">Interés legítimo</td>
             </tr>
             <tr className="border-b">
@@ -137,6 +159,10 @@ export default function Privacidad() {
             <strong>Lista de espera:</strong> hasta el lanzamiento de la Plataforma o hasta que
             solicites tu baja.
           </li>
+          <li>
+            <strong>Registro de seguridad (intentos de inicio de sesión):</strong> hasta 12 meses
+            desde cada intento, pasado ese plazo lo eliminamos.
+          </li>
         </ul>
 
         <h2 className="text-xl font-semibold mt-6 mb-2">7. Tus derechos</h2>
@@ -175,8 +201,16 @@ export default function Privacidad() {
         <p>
           Aplicamos medidas técnicas y organizativas adecuadas para proteger tus datos frente a
           accesos no autorizados, pérdida o alteración, entre ellas el cifrado de contraseñas, el
-          uso de conexiones seguras (HTTPS) y el acceso restringido a la información por parte de
-          nuestro equipo.
+          uso de conexiones seguras (HTTPS), el bloqueo temporal de una cuenta tras varios
+          intentos de acceso fallidos, un registro interno de accesos del equipo de VentaCofrade
+          para fines de seguridad y auditoría, y el acceso restringido a la información por parte
+          de nuestro equipo, limitado a lo necesario según el rol de cada persona.
+        </p>
+        <p>
+          Si, a pesar de estas medidas, se produjera una violación de la seguridad de tus datos
+          personales que suponga un riesgo para tus derechos y libertades, te lo notificaremos sin
+          dilación indebida, junto con las medidas adoptadas, y lo comunicaremos también a la
+          Agencia Española de Protección de Datos (AEPD) cuando la normativa así lo exija.
         </p>
 
         <h2 className="text-xl font-semibold mt-6 mb-2">10. Cookies</h2>
