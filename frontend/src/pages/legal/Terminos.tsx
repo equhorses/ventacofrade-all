@@ -10,7 +10,8 @@ export default function Terminos() {
         <p>
           Estos Términos y Condiciones (en adelante, "los Términos") regulan el acceso y uso de
           VentaCofrade, un marketplace que conecta a personas compradoras y vendedoras de
-          artículos relacionados con el mundo cofrade. El registro de una cuenta y el uso
+          artículos relacionados con el mundo cofrade, y que además aloja un directorio de
+          profesionales del sector (la "Red Profesional"). El registro de una cuenta y el uso
           continuado de la Plataforma implican la aceptación plena y sin reservas de estos
           Términos, del Aviso Legal y de la Política de Privacidad.
         </p>
@@ -65,7 +66,50 @@ export default function Terminos() {
           pagado.
         </p>
 
-        <h2 className="text-xl font-semibold mt-6 mb-2">6. Derecho de desistimiento</h2>
+        <h2 className="text-xl font-semibold mt-6 mb-2">6. Proceso de contratación electrónica</h2>
+        <p>
+          Para contratar un plan de vendedor o la función de destacar anuncio, el proceso es el
+          siguiente: (1) seleccionas el plan o la duración que quieres desde la sección "Vender" o
+          "Mis anuncios"; (2) revisas el precio y las condiciones antes de continuar; (3) completas
+          el pago a través de Stripe, donde puedes corregir cualquier dato antes de confirmar; (4)
+          recibes confirmación inmediata en la propia Plataforma y, cuando corresponda, un email de
+          Stripe con el justificante del cargo. El contrato se entiende formalizado en el momento
+          en que el pago se confirma correctamente, y puedes acceder en cualquier momento al
+          historial de tus pagos desde tu panel de Stripe o solicitándolo a
+          contacto@ventacofrade.com. Si detectas un error en los datos introducidos antes de
+          confirmar el pago, puedes corregirlo directamente en el formulario de Stripe o cancelar
+          el proceso sin ningún cargo.
+        </p>
+
+        <h2 className="text-xl font-semibold mt-6 mb-2">7. Red Profesional y perfiles de servicios</h2>
+        <p>
+          VentaCofrade ofrece, además del marketplace de compraventa, un directorio de
+          profesionales y talleres del mundo cofrade (la "Red Profesional"), donde personas
+          usuarias pueden crear un perfil público con su especialidad, descripción, ubicación,
+          portafolio de trabajos y datos de contacto. Respecto a la Red Profesional:
+        </p>
+        <ul>
+          <li>La creación de un perfil profesional es actualmente gratuita; VentaCofrade se reserva el derecho de introducir en el futuro una cuota de activación u otras condiciones económicas, que se comunicarán con antelación razonable y no afectarán a los perfiles ya activos hasta su renovación o modificación;</li>
+          <li>VentaCofrade actúa como simple directorio informativo y no es parte en ningún encargo, contrato o relación de servicios que se acuerde entre una persona usuaria y un perfil profesional;</li>
+          <li>VentaCofrade no garantiza la veracidad, calidad, cualificación profesional, ni el resultado de los servicios ofrecidos por las personas que crean un perfil en la Red Profesional;</li>
+          <li>Quien crea un perfil profesional garantiza que la información y el portafolio publicados son veraces y que está autorizado a mostrar dichos trabajos;</li>
+          <li>Se aplican a los perfiles profesionales, en lo que resulte compatible, las mismas normas de conducta, contenido prohibido y procedimiento de notificación y retirada previstas en el Aviso Legal para los anuncios de artículos.</li>
+        </ul>
+
+        <h2 className="text-xl font-semibold mt-6 mb-2">8. Valoraciones y reseñas</h2>
+        <p>
+          VentaCofrade permite a las personas usuarias dejar valoraciones y reseñas sobre
+          vendedores y perfiles profesionales. Al publicar una valoración, te comprometes a que
+          refleje una experiencia real y honesta. Queda prohibido publicar valoraciones falsas,
+          manipuladas, contratadas, difamatorias o que persigan perjudicar injustificadamente a
+          otra persona usuaria. VentaCofrade no verifica de forma sistemática la veracidad de cada
+          valoración, pero se reserva el derecho de retirar aquellas que incumplan lo anterior o
+          que le sean notificadas conforme al procedimiento de notificación y retirada del Aviso
+          Legal, sin que ello suponga asumir responsabilidad alguna sobre el contenido publicado
+          por terceros.
+        </p>
+
+        <h2 className="text-xl font-semibold mt-6 mb-2">9. Derecho de desistimiento</h2>
         <p>
           De conformidad con el Real Decreto Legislativo 1/2007, si contratas un plan de
           vendedor como persona consumidora dispones de un plazo de 14 días naturales para
@@ -77,7 +121,7 @@ export default function Terminos() {
           citado Real Decreto Legislativo.
         </p>
 
-        <h2 className="text-xl font-semibold mt-6 mb-2">7. Conducta prohibida</h2>
+        <h2 className="text-xl font-semibold mt-6 mb-2">10. Conducta prohibida</h2>
         <p>Queda prohibido, entre otras conductas:</p>
         <ul>
           <li>Suplantar la identidad de otra persona o entidad;</li>
@@ -88,7 +132,7 @@ export default function Terminos() {
           <li>Utilizar herramientas automatizadas para extraer datos de la Plataforma (scraping) sin autorización expresa.</li>
         </ul>
 
-        <h2 className="text-xl font-semibold mt-6 mb-2">8. Suspensión y eliminación de cuenta</h2>
+        <h2 className="text-xl font-semibold mt-6 mb-2">11. Suspensión y eliminación de cuenta</h2>
         <p>
           Puedes suspender tu cuenta en cualquier momento desde "Mi perfil"; tu cuenta y anuncios
           quedarán ocultos hasta que vuelvas a iniciar sesión, momento en el que se reactivará
@@ -99,7 +143,7 @@ export default function Terminos() {
           sea razonablemente posible.
         </p>
 
-        <h2 className="text-xl font-semibold mt-6 mb-2">9. Limitación de responsabilidad</h2>
+        <h2 className="text-xl font-semibold mt-6 mb-2">12. Limitación de responsabilidad</h2>
         <p>
           En la máxima medida permitida por la ley, VentaCofrade no será responsable de daños
           indirectos, lucro cesante, pérdida de datos o de oportunidades de negocio derivados del
@@ -107,7 +151,7 @@ export default function Terminos() {
           en los supuestos en que la ley no permita su limitación o exclusión.
         </p>
 
-        <h2 className="text-xl font-semibold mt-6 mb-2">10. Modificaciones del servicio y de las tarifas</h2>
+        <h2 className="text-xl font-semibold mt-6 mb-2">13. Modificaciones del servicio y de las tarifas</h2>
         <p>
           VentaCofrade podrá modificar en cualquier momento las funcionalidades del servicio y
           las tarifas de los planes de vendedor. Cualquier cambio relevante en las tarifas se
@@ -115,21 +159,21 @@ export default function Terminos() {
           quienes podrán cancelar su suscripción antes de que el cambio surta efecto.
         </p>
 
-        <h2 className="text-xl font-semibold mt-6 mb-2">11. Cesión</h2>
+        <h2 className="text-xl font-semibold mt-6 mb-2">14. Cesión</h2>
         <p>
           VentaCofrade podrá ceder sus derechos y obligaciones derivados de estos Términos a un
           tercero en caso de fusión, adquisición o venta de activos, informando de ello a las
           personas usuarias.
         </p>
 
-        <h2 className="text-xl font-semibold mt-6 mb-2">12. Nulidad parcial</h2>
+        <h2 className="text-xl font-semibold mt-6 mb-2">15. Nulidad parcial</h2>
         <p>
           Si alguna cláusula de estos Términos fuera declarada nula o ineficaz, dicha declaración
           solo afectará a esa disposición concreta, manteniéndose la validez del resto de
           condiciones.
         </p>
 
-        <h2 className="text-xl font-semibold mt-6 mb-2">13. Legislación aplicable y resolución de litigios</h2>
+        <h2 className="text-xl font-semibold mt-6 mb-2">16. Legislación aplicable y resolución de litigios</h2>
         <p>
           Estos Términos se rigen por la legislación española. Para la resolución de cualquier
           controversia, las partes se someten a los juzgados y tribunales del domicilio de la

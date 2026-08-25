@@ -139,7 +139,14 @@ export default function AdminAnunciosPage() {
               <TableBody>
                 {products.map((p) => (
                   <TableRow key={p.id}>
-                    <TableCell className="font-medium max-w-xs truncate">{p.title}</TableCell>
+                    <TableCell className="font-medium max-w-xs truncate">
+                      {p.title}
+                      {p.featured_until && new Date(p.featured_until) > new Date() && (
+                        <Badge className="ml-2 bg-amber-100 text-amber-700 text-[10px] font-normal">
+                          Destacado hasta {new Date(p.featured_until).toLocaleDateString('es-ES')}
+                        </Badge>
+                      )}
+                    </TableCell>
                     <TableCell className="text-xs text-muted-foreground">{p.seller_email || '—'}</TableCell>
                     <TableCell>{p.price.toFixed(2)}€</TableCell>
                     <TableCell>
