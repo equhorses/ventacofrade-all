@@ -1,12 +1,15 @@
 import hashlib
 import logging
-from datetime import datetime
 from typing import Optional
 
 from core.auth import AccessTokenError, decode_access_token
+from core.database import get_db
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from models.auth import User
 from schemas.auth import UserResponse
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +27,20 @@ async def get_bearer_token(
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication credentials were not provided")
 
 
-async def get_current_user(token: str = Depends(get_bearer_token)) -> UserResponse:
-    """Dependency to get current authenticated user via JWT token."""
+async def get_current_user(
+    token: str = Depends(get_bearer_token),
+    db: AsyncSession = Depends(get_db),
+) -> UserResponse:
+    """Dependency to get the current authenticated user.
+
+    The JWT only proves *who* the person is (via the 'sub' claim) — it's
+    intentionally not the source of truth for mutable profile fields like
+    name or avatar_url, since those can change between login sessions
+    (which last up to an hour) and a stale JWT should never mask a fresh
+    profile update. So this always re-reads the current row from the
+    database rather than trusting whatever was baked into the token when
+    it was issued.
+    """
     try:
         payload = decode_access_token(token)
     except AccessTokenError as exc:
@@ -37,23 +52,23 @@ async def get_current_user(token: str = Depends(get_bearer_token)) -> UserRespon
     if not user_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication token")
 
-    last_login_raw = payload.get("last_login")
-    last_login = None
-    if isinstance(last_login_raw, str):
-        try:
-            last_login = datetime.fromisoformat(last_login_raw)
-        except ValueError:
-            # Log user hash instead of actual user ID to avoid exposing sensitive information
-            user_hash = hashlib.sha256(str(user_id).encode()).hexdigest()[:8] if user_id else "unknown"
-            logger.debug("Failed to parse last_login for user hash: %s", user_hash)
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
 
-    return UserResponse(
-        id=user_id,
-        email=payload.get("email", ""),
-        name=payload.get("name"),
-        role=payload.get("role", "user"),
-        last_login=last_login,
-    )
+    if not user:
+        # Token is otherwise valid but the account no longer exists (e.g. an
+        # admin deleted it) — treat exactly like an invalid session.
+        user_hash = hashlib.sha256(str(user_id).encode()).hexdigest()[:8]
+        logger.warning("Valid token for a user that no longer exists (hash: %s)", user_hash)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication token")
+
+    if user.account_status == "banned":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Esta cuenta ha sido suspendida por el equipo de VentaCofrade. Contacta con soporte.",
+        )
+
+    return UserResponse.model_validate(user)
 
 
 async def get_admin_user(current_user: UserResponse = Depends(get_current_user)) -> UserResponse:
