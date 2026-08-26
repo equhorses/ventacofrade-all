@@ -289,6 +289,7 @@ export default function Layout({ children }: LayoutProps) {
                 <li><Link to="/publicar" className="hover:text-primary-foreground transition-colors cursor-pointer">Publicar anuncio</Link></li>
                 <li><Link to="/red-profesional" className="hover:text-primary-foreground transition-colors cursor-pointer">Red Profesional</Link></li>
                 <li><Link to="/documentacion" className="hover:text-primary-foreground transition-colors cursor-pointer">Documentación</Link></li>
+                <li><Link to="/publicidad" className="hover:text-primary-foreground transition-colors cursor-pointer">Anúnciate aquí</Link></li>
               </ul>
             </div>
             <div>

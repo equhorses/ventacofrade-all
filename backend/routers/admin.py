@@ -23,6 +23,9 @@ from models.feature_purchases import FeaturePurchases
 from models.favorites import Favorites
 from models.reviews import Reviews
 from models.professional_profiles import ProfessionalProfiles
+from models.ad_slot_configs import AdSlotConfig
+from models.ad_bookings import AdBooking
+from services.house_ad_bookings import AdBookingsService
 from routers.house_ads import KNOWN_SLOTS
 from services.email import send_invitation_email
 from services.audit import log_admin_action
@@ -949,6 +952,34 @@ async def create_invitation(
     return invitation
 
 
+@router.delete("/invitations/{invitation_id}")
+async def delete_invitation(
+    invitation_id: int,
+    current_user: UserResponse = Depends(require_roles("admin", "marketing")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete an invitation that was never redeemed — for cleaning up test
+    invites before the real campaign. Redeemed invitations should be removed
+    by deleting the associated user account instead (that cascades and keeps
+    the audit trail consistent with an actual account having existed)."""
+    result = await db.execute(select(Invitation).where(Invitation.id == invitation_id))
+    invitation = result.scalar_one_or_none()
+    if not invitation:
+        raise HTTPException(status_code=404, detail="Invitación no encontrada")
+    if invitation.status == "redeemed":
+        raise HTTPException(
+            status_code=400,
+            detail="Esta invitación ya fue canjeada. Borra la cuenta de usuario asociada en vez de la invitación.",
+        )
+
+    email = invitation.email
+    await db.delete(invitation)
+    await db.commit()
+
+    await log_admin_action(db, current_user.id, current_user.email, "delete_invitation", target=email)
+    return {"deleted": True}
+
+
 @router.get("/staff", response_model=List[StaffMemberResponse])
 async def list_staff(
     current_user: UserResponse = Depends(get_admin_user),
@@ -1119,3 +1150,171 @@ async def delete_house_ad(
     await log_admin_action(db, current_user.id, current_user.email, "delete_house_ad", target=slot)
 
     return {"message": "Anuncio eliminado", "slot": slot}
+
+
+# --- Self-service ad slot bookings: pricing/availability config + approval queue ---
+
+class AdSlotAdminResponse(BaseModel):
+    slot: str
+    price_cents: int
+    self_service_enabled: bool
+    occupied_until: Optional[datetime] = None
+    queue_length: int = 0
+
+
+class UpdateAdSlotRequest(BaseModel):
+    price_cents: Optional[int] = None
+    self_service_enabled: Optional[bool] = None
+
+
+@router.get("/ad-slots", response_model=List[AdSlotAdminResponse])
+async def list_ad_slots(
+    current_user: UserResponse = Depends(require_roles("admin", "marketing")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Price, self-service toggle, and current occupancy for every ad slot."""
+    service = AdBookingsService(db)
+    out = []
+    for slot in KNOWN_SLOTS:
+        config = await service.get_slot_config(slot)
+        if not config:
+            config = AdSlotConfig(slot=slot, price_cents=4999, self_service_enabled=True)
+            db.add(config)
+            await db.commit()
+            await db.refresh(config)
+        active = await service.get_active_booking(slot)
+        queue_length = await service.get_queue_length(slot)
+        out.append(
+            AdSlotAdminResponse(
+                slot=slot,
+                price_cents=config.price_cents,
+                self_service_enabled=config.self_service_enabled,
+                occupied_until=active.ends_at if active else None,
+                queue_length=queue_length,
+            )
+        )
+    return out
+
+
+@router.put("/ad-slots/{slot}", response_model=AdSlotAdminResponse)
+async def update_ad_slot(
+    slot: str,
+    payload: UpdateAdSlotRequest,
+    current_user: UserResponse = Depends(require_roles("admin", "marketing")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Change the monthly price and/or block/allow self-service purchase of a slot."""
+    if slot not in KNOWN_SLOTS:
+        raise HTTPException(status_code=400, detail=f"Hueco desconocido. Usa uno de: {', '.join(KNOWN_SLOTS)}")
+
+    result = await db.execute(select(AdSlotConfig).where(AdSlotConfig.slot == slot))
+    config = result.scalar_one_or_none()
+    if not config:
+        config = AdSlotConfig(slot=slot)
+        db.add(config)
+
+    if payload.price_cents is not None:
+        if payload.price_cents < 0:
+            raise HTTPException(status_code=400, detail="El precio no puede ser negativo.")
+        config.price_cents = payload.price_cents
+    if payload.self_service_enabled is not None:
+        config.self_service_enabled = payload.self_service_enabled
+
+    await db.commit()
+    await db.refresh(config)
+
+    await log_admin_action(
+        db, current_user.id, current_user.email, "update_ad_slot", target=slot,
+        details=f"price_cents={config.price_cents}, self_service_enabled={config.self_service_enabled}",
+    )
+
+    service = AdBookingsService(db)
+    active = await service.get_active_booking(slot)
+    queue_length = await service.get_queue_length(slot)
+    return AdSlotAdminResponse(
+        slot=slot, price_cents=config.price_cents, self_service_enabled=config.self_service_enabled,
+        occupied_until=active.ends_at if active else None, queue_length=queue_length,
+    )
+
+
+class AdBookingAdminResponse(BaseModel):
+    id: int
+    slot: str
+    advertiser_name: str
+    advertiser_email: str
+    title: str
+    image_url: str
+    link_url: str
+    amount_cents: int
+    status: str
+    starts_at: Optional[datetime] = None
+    ends_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    rejected_reason: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/ad-bookings", response_model=List[AdBookingAdminResponse])
+async def list_ad_bookings(
+    status_filter: Optional[str] = Query(None, alias="status"),
+    current_user: UserResponse = Depends(require_roles("admin", "marketing")),
+    db: AsyncSession = Depends(get_db),
+):
+    """List advertiser slot bookings, most recent first. Filter by status
+    (e.g. status=pending_approval) to see what's waiting for review."""
+    query = select(AdBooking).order_by(AdBooking.created_at.desc()).limit(200)
+    if status_filter:
+        query = select(AdBooking).where(AdBooking.status == status_filter).order_by(
+            AdBooking.created_at.desc()
+        ).limit(200)
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+class RejectAdBookingRequest(BaseModel):
+    reason: str
+
+
+@router.post("/ad-bookings/{booking_id}/approve", response_model=AdBookingAdminResponse)
+async def approve_ad_booking(
+    booking_id: int,
+    current_user: UserResponse = Depends(require_roles("admin", "marketing")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Approve a paid booking's creative. Goes live immediately if the slot
+    is free, otherwise joins the queue for when it frees up."""
+    service = AdBookingsService(db)
+    try:
+        booking = await service.approve_booking(booking_id, admin_id=current_user.id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    await log_admin_action(
+        db, current_user.id, current_user.email, "approve_ad_booking",
+        target=booking.advertiser_email, details=f"slot={booking.slot}, status={booking.status}",
+    )
+    return booking
+
+
+@router.post("/ad-bookings/{booking_id}/reject", response_model=AdBookingAdminResponse)
+async def reject_ad_booking(
+    booking_id: int,
+    payload: RejectAdBookingRequest,
+    current_user: UserResponse = Depends(require_roles("admin", "marketing")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Reject a paid booking's creative (e.g. inappropriate content). The
+    charge itself isn't refunded automatically — do that from Stripe if needed."""
+    service = AdBookingsService(db)
+    try:
+        booking = await service.reject_booking(booking_id, admin_id=current_user.id, reason=payload.reason)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    await log_admin_action(
+        db, current_user.id, current_user.email, "reject_ad_booking",
+        target=booking.advertiser_email, details=f"slot={booking.slot}, reason={payload.reason}",
+    )
+    return booking

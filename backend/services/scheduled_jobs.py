@@ -25,6 +25,7 @@ from services.email import (
     send_subscription_renewal_reminder_email,
 )
 from services.audit import log_admin_action
+from services.house_ad_bookings import AdBookingsService
 
 logger = logging.getLogger(__name__)
 
@@ -161,6 +162,16 @@ async def check_renewal_reminders() -> None:
                 logger.warning("No se pudo enviar recordatorio de renovacion a %s", user.email)
 
 
+async def check_ad_bookings() -> None:
+    """Expire ad slot bookings past their 30 days, and promote the next
+    queued advertiser (if any) into the freed-up slot."""
+    if not db_manager.async_session_maker:
+        await db_manager.ensure_initialized()
+    async with db_manager.async_session_maker() as db:
+        service = AdBookingsService(db)
+        await service.expire_and_promote()
+
+
 async def run_daily_jobs() -> None:
     """Entry point called by the scheduler once a day."""
     try:
@@ -172,3 +183,8 @@ async def run_daily_jobs() -> None:
         await check_renewal_reminders()
     except Exception:
         logger.exception("Fallo en check_renewal_reminders")
+
+    try:
+        await check_ad_bookings()
+    except Exception:
+        logger.exception("Fallo en check_ad_bookings")

@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from schemas.auth import UserResponse
 from services.subscriptions import SubscriptionsNotConfiguredError, SubscriptionsService
 from services.featured_listings import FeaturedListingsNotConfiguredError, FeaturedListingsService, FEATURE_PRICES_CENTS
+from services.house_ad_bookings import AdBookingsService
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
@@ -208,6 +209,7 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
 
     service = SubscriptionsService(db)
     featured_service = FeaturedListingsService(db)
+    ad_bookings_service = AdBookingsService(db)
     try:
         if event.type == "checkout.session.completed":
             session = event.data.object
@@ -215,6 +217,8 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
             purpose = getattr(metadata, "purpose", None) if metadata else None
             if purpose == "feature_listing":
                 await featured_service.handle_feature_payment_completed(session)
+            elif purpose == "house_ad_booking":
+                await ad_bookings_service.handle_booking_payment_completed(session)
             else:
                 await service.handle_webhook_event(event)
         else:

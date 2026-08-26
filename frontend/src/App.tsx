@@ -11,6 +11,7 @@ import VendedorPage from './pages/Vendedor';
 import Vender from './pages/Vender';
 import Publicar from './pages/Publicar';
 import Documentacion from './pages/Documentacion';
+import Publicidad from './pages/Publicidad';
 import AuthCallback from './pages/AuthCallback';
 import AuthError from './pages/AuthError';
 import Login from './pages/Login';
@@ -53,6 +54,7 @@ const AppRoutes = () => (
     <Route path="/vender" element={<Vender />} />
     <Route path="/publicar" element={<Publicar />} />
     <Route path="/documentacion" element={<Documentacion />} />
+    <Route path="/publicidad" element={<Publicidad />} />
     <Route path="/legal/aviso-legal" element={<AvisoLegal />} />
     <Route path="/legal/privacidad" element={<Privacidad />} />
     <Route path="/legal/terminos" element={<Terminos />} />

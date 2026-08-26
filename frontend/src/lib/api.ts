@@ -232,6 +232,18 @@ export const client = {
       const response = await http.get(`${baseUrl()}/api/v1/house-ads/${slot}`);
       return { data: response.data as { slot: string; title: string; image_url: string; link_url: string } | null };
     },
+    async listSlots() {
+      const response = await http.get(`${baseUrl()}/api/v1/house-ads/slots`);
+      return { data: response.data as AdSlotAvailability[] };
+    },
+    async book(payload: { slot: string; advertiser_name: string; title: string; image_url: string; link_url: string }) {
+      const response = await http.post(`${baseUrl()}/api/v1/house-ads/book`, payload);
+      return { data: response.data as { url: string } };
+    },
+    async myBookings() {
+      const response = await http.get(`${baseUrl()}/api/v1/house-ads/my-bookings`);
+      return { data: response.data as MyAdBooking[] };
+    },
   },
   reviews: {
     async list(sellerProfileId: number) {
@@ -275,6 +287,9 @@ export const client = {
     async createInvitation(email: string, months: number, source?: string) {
       const response = await http.post(`${baseUrl()}/api/v1/admin/invitations`, { email, months, source });
       return { data: response.data as AdminInvitation };
+    },
+    async deleteInvitation(invitationId: number) {
+      await http.delete(`${baseUrl()}/api/v1/admin/invitations/${invitationId}`);
     },
     async getPlatformSettings() {
       const response = await http.get(`${baseUrl()}/api/v1/admin/platform-settings`);
@@ -357,6 +372,26 @@ export const client = {
     async deleteHouseAd(slot: string) {
       const response = await http.delete(`${baseUrl()}/api/v1/admin/house-ads/${slot}`);
       return { data: response.data as { message: string; slot: string } };
+    },
+    async listAdSlots() {
+      const response = await http.get(`${baseUrl()}/api/v1/admin/ad-slots`);
+      return { data: response.data as AdSlotAvailability[] };
+    },
+    async updateAdSlot(slot: string, payload: { price_cents?: number; self_service_enabled?: boolean }) {
+      const response = await http.put(`${baseUrl()}/api/v1/admin/ad-slots/${slot}`, payload);
+      return { data: response.data as AdSlotAvailability };
+    },
+    async listAdBookings(status?: string) {
+      const response = await http.get(`${baseUrl()}/api/v1/admin/ad-bookings`, { params: status ? { status } : {} });
+      return { data: response.data as AdBookingAdmin[] };
+    },
+    async approveAdBooking(bookingId: number) {
+      const response = await http.post(`${baseUrl()}/api/v1/admin/ad-bookings/${bookingId}/approve`, {});
+      return { data: response.data as AdBookingAdmin };
+    },
+    async rejectAdBooking(bookingId: number, reason: string) {
+      const response = await http.post(`${baseUrl()}/api/v1/admin/ad-bookings/${bookingId}/reject`, { reason });
+      return { data: response.data as AdBookingAdmin };
     },
     async assignRole(email: string, role: string) {
       const response = await http.post(`${baseUrl()}/api/v1/admin/staff/assign-role`, { email, role });
@@ -507,6 +542,42 @@ export interface HouseAdAdmin {
   image_url?: string | null;
   link_url?: string | null;
   active: boolean;
+}
+
+export interface AdSlotAvailability {
+  slot: string;
+  price_cents: number;
+  self_service_enabled: boolean;
+  occupied_until?: string | null;
+  queue_length: number;
+}
+
+export interface MyAdBooking {
+  id: number;
+  slot: string;
+  title: string;
+  status: string;
+  amount_cents: number;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  created_at?: string | null;
+  rejected_reason?: string | null;
+}
+
+export interface AdBookingAdmin {
+  id: number;
+  slot: string;
+  advertiser_name: string;
+  advertiser_email: string;
+  title: string;
+  image_url: string;
+  link_url: string;
+  amount_cents: number;
+  status: string;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  created_at?: string | null;
+  rejected_reason?: string | null;
 }
 
 export interface ProfessionalProfile {
