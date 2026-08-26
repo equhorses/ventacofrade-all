@@ -13,7 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { client, type AdminProduct } from '@/lib/api';
-import { Search, EyeOff, RotateCcw, Trash2 } from 'lucide-react';
+import { Search, Eye, EyeOff, RotateCcw, Trash2 } from 'lucide-react';
 import AdminNav from '@/components/admin/AdminNav';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -155,40 +155,45 @@ export default function AdminAnunciosPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      {!canModerate ? (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      ) : (
-                        <div className="flex justify-end gap-1">
-                          {p.status === 'removed' ? (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={actingId === p.id}
-                              onClick={() => handleRestore(p)}
-                            >
-                              <RotateCcw className="h-3 w-3 mr-1" /> Restaurar
-                            </Button>
-                          ) : (
+                      <div className="flex justify-end gap-1">
+                        <Button size="sm" variant="ghost" asChild>
+                          <a href={`/producto/${p.id}`} target="_blank" rel="noreferrer" title="Ver el anuncio real">
+                            <Eye className="h-3 w-3 mr-1" /> Ver
+                          </a>
+                        </Button>
+                        {canModerate && (
+                          <>
+                            {p.status === 'removed' ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={actingId === p.id}
+                                onClick={() => handleRestore(p)}
+                              >
+                                <RotateCcw className="h-3 w-3 mr-1" /> Restaurar
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={actingId === p.id}
+                                onClick={() => handleRemove(p)}
+                              >
+                                <EyeOff className="h-3 w-3 mr-1" /> Retirar
+                              </Button>
+                            )}
                             <Button
                               size="sm"
                               variant="ghost"
+                              className="text-destructive hover:text-destructive"
                               disabled={actingId === p.id}
-                              onClick={() => handleRemove(p)}
+                              onClick={() => handleDelete(p)}
                             >
-                              <EyeOff className="h-3 w-3 mr-1" /> Retirar
+                              <Trash2 className="h-3 w-3" />
                             </Button>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-destructive hover:text-destructive"
-                            disabled={actingId === p.id}
-                            onClick={() => handleDelete(p)}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      )}
+                          </>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
