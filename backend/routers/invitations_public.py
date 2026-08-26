@@ -21,6 +21,7 @@ class VerifyTokenResponse(BaseModel):
     email: Optional[str] = None
     months: Optional[int] = None
     already_redeemed: Optional[bool] = None
+    source: Optional[str] = None
 
 
 @router.get("/verify", response_model=VerifyTokenResponse)
@@ -44,4 +45,5 @@ async def verify_invitation_token(
         email=invitation.email,
         months=invitation.months,
         already_redeemed=invitation.status == "redeemed",
+        source=invitation.source,
     )

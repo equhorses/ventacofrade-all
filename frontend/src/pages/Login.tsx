@@ -91,7 +91,7 @@ export default function LoginPage() {
   const captchaContainerRef = useRef<HTMLDivElement>(null);
   const captchaWidgetId = useRef<string | null>(null);
 
-  const [pendingInvite, setPendingInvite] = useState<{ email: string; months: number } | null>(null);
+  const [pendingInvite, setPendingInvite] = useState<{ email: string; months: number; isRaffle: boolean } | null>(null);
   const [inviteAlreadyRedeemed, setInviteAlreadyRedeemed] = useState(false);
   const [ageConfirmed, setAgeConfirmed] = useState(false);
 
@@ -117,7 +117,7 @@ export default function LoginPage() {
           setInviteAlreadyRedeemed(true);
           return;
         }
-        setPendingInvite({ email: data.email, months: data.months || 1 });
+        setPendingInvite({ email: data.email, months: data.months || 1, isRaffle: data.source === 'sorteo_instagram' });
         setMode('register');
         setEmail((current) => current || data.email);
       })
@@ -148,7 +148,7 @@ export default function LoginPage() {
   }, [mode]);
 
   const handleGoogleLogin = () => {
-    if (pendingInvite && !ageConfirmed) {
+    if (pendingInvite?.isRaffle && !ageConfirmed) {
       toast.error('Confirma que eres mayor de 18 años para activar el premio del sorteo');
       return;
     }
@@ -164,7 +164,7 @@ export default function LoginPage() {
       return;
     }
 
-    if (mode === 'register' && pendingInvite && !ageConfirmed) {
+    if (mode === 'register' && pendingInvite?.isRaffle && !ageConfirmed) {
       toast.error('Confirma que eres mayor de 18 años para activar el premio del sorteo');
       return;
     }
@@ -210,15 +210,17 @@ export default function LoginPage() {
                     con ese mismo correo (o con Google usando esa cuenta) para activarlo automáticamente.
                   </span>
                 </div>
-                <label className="mt-3 flex items-start gap-2 text-sm text-purple-900 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={ageConfirmed}
-                    onChange={(e) => setAgeConfirmed(e.target.checked)}
-                    className="mt-0.5 cursor-pointer"
-                  />
-                  Confirmo que soy mayor de 18 años.
-                </label>
+                {pendingInvite.isRaffle && (
+                  <label className="mt-3 flex items-start gap-2 text-sm text-purple-900 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={ageConfirmed}
+                      onChange={(e) => setAgeConfirmed(e.target.checked)}
+                      className="mt-0.5 cursor-pointer"
+                    />
+                    Confirmo que soy mayor de 18 años.
+                  </label>
+                )}
               </div>
             )}
             {inviteAlreadyRedeemed && (
