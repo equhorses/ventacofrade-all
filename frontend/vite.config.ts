@@ -45,7 +45,7 @@ export default defineConfig(({ command }) => {
       react(),
       ensureBuildOutDir(),
       Sitemap({
-        hostname: 'https://ventacofrade.com',
+        hostname: 'https://www.ventacofrade.com',
         lastmod: getSitemapLastmod(),
         readable: true,
         generateRobotsTxt: false,
