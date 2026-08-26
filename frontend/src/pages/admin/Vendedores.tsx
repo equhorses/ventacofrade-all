@@ -13,7 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { client, type AdminSeller, type AdminInvitation } from '@/lib/api';
-import { Gift, Search, XCircle, Mail, Send, Rocket, Sparkles } from 'lucide-react';
+import { Gift, Search, XCircle, Mail, Send, Rocket, Sparkles, Trash2 } from 'lucide-react';
 import AdminNav from '@/components/admin/AdminNav';
 
 const MONTH_OPTIONS = [1, 3, 6, 12];
@@ -120,6 +120,23 @@ export default function AdminVendedoresPage() {
       toast.error('No se pudo actualizar el acceso gratis');
     } finally {
       setSavingId(null);
+    }
+  };
+
+  const [deletingInviteId, setDeletingInviteId] = useState<number | null>(null);
+
+  const handleDeleteInvitation = async (inv: AdminInvitation) => {
+    if (!confirm(`¿Borrar la invitación de prueba enviada a ${inv.email}?`)) return;
+    setDeletingInviteId(inv.id);
+    try {
+      await client.admin.deleteInvitation(inv.id);
+      setInvitations((prev) => prev.filter((i) => i.id !== inv.id));
+      toast.success('Invitación borrada');
+    } catch (err) {
+      console.error('Error deleting invitation:', err);
+      toast.error('No se pudo borrar la invitación');
+    } finally {
+      setDeletingInviteId(null);
     }
   };
 
@@ -260,6 +277,7 @@ export default function AdminVendedoresPage() {
                 <TableHead>Origen</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Enviada</TableHead>
+                <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -300,11 +318,25 @@ export default function AdminVendedoresPage() {
                   <TableCell className="text-xs text-muted-foreground">
                     {inv.created_at ? new Date(inv.created_at).toLocaleDateString('es-ES') : '—'}
                   </TableCell>
+                  <TableCell className="text-right">
+                    {inv.status !== 'redeemed' && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-destructive hover:text-destructive"
+                        disabled={deletingInviteId === inv.id}
+                        onClick={() => handleDeleteInvitation(inv)}
+                        title="Borrar invitación de prueba"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))}
               {!loadingInvitations && invitations.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-6">
                     Todavía no has enviado ninguna invitación.
                   </TableCell>
                 </TableRow>
