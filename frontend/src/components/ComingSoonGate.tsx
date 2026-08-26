@@ -68,16 +68,29 @@ export default function ComingSoonGate({ children }: { children: ReactNode }) {
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
-    if (hasStoredOrKeyBypass()) {
+    let cancelled = false;
+    const alreadyBypassed = hasStoredOrKeyBypass();
+    if (alreadyBypassed) {
+      // Let them in immediately — no loading flash — but still check below
+      // for a (possibly new) invite token, so returning testers/visitors
+      // still get their invitation's details stored for the login banner.
       setBypassed(true);
       setChecked(true);
-      return;
     }
 
     checkInviteToken().then((valid) => {
-      setBypassed(valid);
+      if (cancelled) return;
+      if (valid) {
+        setBypassed(true);
+      } else if (!alreadyBypassed) {
+        setBypassed(false);
+      }
       setChecked(true);
     });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   if (!COMING_SOON_ENABLED) {

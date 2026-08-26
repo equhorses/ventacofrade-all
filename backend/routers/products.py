@@ -208,7 +208,17 @@ async def get_products(
         if not result:
             logger.warning(f"Products with id {id} not found")
             raise HTTPException(status_code=404, detail="Products not found")
-        
+
+        # Count this as a real view. Best-effort: a failure here should never
+        # break loading the product page itself.
+        try:
+            result.views_count = (result.views_count or 0) + 1
+            await db.commit()
+            await db.refresh(result)
+        except Exception:
+            logger.exception(f"No se pudo incrementar views_count para el producto {id}")
+            await db.rollback()
+
         return _refresh_featured_flag(result)
     except HTTPException:
         raise
