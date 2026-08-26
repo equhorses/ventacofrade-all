@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { client } from '@/lib/api';
 import { Megaphone } from 'lucide-react';
 
@@ -8,8 +9,6 @@ interface HouseAd {
   image_url: string;
   link_url: string;
 }
-
-const ADVERTISE_CONTACT_EMAIL = 'contacto@ventacofrade.com';
 
 /**
  * Reserved ad slot. Priority order:
@@ -130,13 +129,13 @@ export default function AdSlot({ slot, label = 'Publicidad' }: { slot: string; l
       )}
 
       {adSenseFilled === false && (
-        <a
-          href={`mailto:${ADVERTISE_CONTACT_EMAIL}?subject=Quiero anunciarme en VentaCofrade`}
+        <Link
+          to="/publicidad"
           className="w-full flex items-center justify-center gap-2 rounded-md border border-dashed border-primary/40 bg-primary/5 py-6 text-primary hover:bg-primary/10 transition-colors cursor-pointer"
         >
           <Megaphone className="h-4 w-4" />
-          <span className="text-sm font-medium">¿Quieres anunciarte aquí? Escríbenos</span>
-        </a>
+          <span className="text-sm font-medium">¿Quieres anunciarte aquí? Ver precios y reservar</span>
+        </Link>
       )}
     </div>
   );
