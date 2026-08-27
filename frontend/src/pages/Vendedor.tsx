@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import Layout from '@/components/Layout';
 import { client } from '@/lib/api';
-import { Store, Star, MapPin } from 'lucide-react';
+import { Store, Star, MapPin, BadgeCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Review } from '@/lib/api';
@@ -17,6 +17,8 @@ interface SellerProfile {
   shop_description?: string;
   province: string;
   rating?: number;
+  plan?: string | null;
+  subscription_status?: string | null;
 }
 
 interface Product {
@@ -126,7 +128,12 @@ export default function VendedorPage() {
             <Store className="h-8 w-8 text-primary" />
           </div>
           <div className="flex-1">
-            <h1 className="text-2xl font-bold text-foreground">{seller.shop_name}</h1>
+            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+              {seller.shop_name}
+              {seller.plan === 'profesional' && seller.subscription_status === 'active' && (
+                <BadgeCheck className="h-5 w-5 text-primary shrink-0" aria-label="Vendedor verificado" />
+              )}
+            </h1>
             <div className="flex items-center gap-3 mt-1 flex-wrap text-sm text-muted-foreground">
               <span className="flex items-center gap-1">
                 <MapPin className="h-3.5 w-3.5" /> {seller.province}

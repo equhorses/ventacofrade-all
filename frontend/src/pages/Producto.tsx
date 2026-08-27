@@ -7,7 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import Layout from '@/components/Layout';
 import { client } from '@/lib/api';
-import { MapPin, Heart, Share2, MessageCircle, Eye, ArrowLeft, Church, User, Star } from 'lucide-react';
+import { MapPin, Heart, Share2, MessageCircle, Eye, ArrowLeft, Church, User, Star, BadgeCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Review } from '@/lib/api';
@@ -16,6 +16,8 @@ interface SellerProfile {
   id: number;
   shop_name: string;
   rating?: number;
+  plan?: string | null;
+  subscription_status?: string | null;
 }
 
 interface Product {
@@ -326,8 +328,11 @@ export default function ProductoPage() {
               <Card>
                 <CardContent className="p-4 space-y-4">
                   <div className="flex items-center justify-between">
-                    <Link to={`/vendedor/${seller.id}`} className="font-medium text-sm hover:text-primary cursor-pointer">
+                    <Link to={`/vendedor/${seller.id}`} className="font-medium text-sm hover:text-primary cursor-pointer flex items-center gap-1">
                       {seller.shop_name}
+                      {seller.plan === 'profesional' && seller.subscription_status === 'active' && (
+                        <BadgeCheck className="h-4 w-4 text-primary shrink-0" aria-label="Vendedor verificado" />
+                      )}
                     </Link>
                     <div className="flex items-center gap-1">
                       <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
