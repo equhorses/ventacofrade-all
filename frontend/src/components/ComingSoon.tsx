@@ -21,6 +21,11 @@ export default function ComingSoon() {
       await client.waitlist.join(email.trim());
       setJoined(true);
       toast.success('¡Te avisaremos en cuanto abramos!');
+      // Meta Pixel: cuenta como "Lead" para poder construir públicos de gente
+      // realmente interesada antes del lanzamiento (retargeting, similares...).
+      if (typeof (window as any).fbq === 'function') {
+        (window as any).fbq('track', 'Lead');
+      }
     } catch (err) {
       toast.error('No se pudo completar el registro. Inténtalo de nuevo.');
     } finally {
