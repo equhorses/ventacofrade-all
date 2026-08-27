@@ -26,6 +26,11 @@ export default function ComingSoon() {
       if (typeof (window as any).fbq === 'function') {
         (window as any).fbq('track', 'Lead');
       }
+      // Google Ads: evento de conversión "join_waitlist" (acción de conversión
+      // "Registro" creada en Google Ads), para poder medir y optimizar campañas.
+      if (typeof (window as any).gtag === 'function') {
+        (window as any).gtag('event', 'join_waitlist');
+      }
     } catch (err) {
       toast.error('No se pudo completar el registro. Inténtalo de nuevo.');
     } finally {
