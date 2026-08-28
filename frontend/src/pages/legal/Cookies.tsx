@@ -1,6 +1,13 @@
 import Layout from '@/components/Layout';
+import { Button } from '@/components/ui/button';
+import { resetConsent } from '@/lib/consent';
 
 export default function Cookies() {
+  const handleChangePreferences = () => {
+    resetConsent();
+    window.location.reload();
+  };
+
   return (
     <Layout>
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12 prose prose-sm">
@@ -19,18 +26,24 @@ export default function Cookies() {
         <ul>
           <li>
             <strong>Cookies técnicas o necesarias:</strong> imprescindibles para el funcionamiento
-            básico del sitio (por ejemplo, mantener tu sesión iniciada). No requieren
-            consentimiento conforme a la normativa vigente.
+            básico del sitio (por ejemplo, mantener tu sesión iniciada, procesar un pago). No
+            requieren consentimiento conforme a la normativa vigente, y siempre están activas.
           </li>
           <li>
-            <strong>Cookies de terceros necesarias para el servicio:</strong> utilizadas por
-            proveedores como Stripe (pago) o hCaptcha (seguridad), imprescindibles para poder
-            completar determinadas funciones de la Plataforma.
+            <strong>Cookies de analítica y publicidad:</strong> Google Analytics, Google Ads,
+            Google AdSense y el píxel de Meta (Facebook/Instagram). Nos ayudan a entender cómo se
+            usa la web y a medir el rendimiento de nuestras campañas publicitarias. Estas cookies{' '}
+            <strong>solo se activan si nos das tu consentimiento expreso</strong> a través del
+            banner que aparece en tu primera visita. Si no aceptas, o si rechazas, estos scripts
+            no se cargan en tu navegador en ningún momento.
           </li>
         </ul>
         <p>
-          VentaCofrade <strong>no utiliza</strong> cookies de publicidad, de seguimiento
-          publicitario entre sitios web, ni cookies analíticas de terceros con fines de marketing.
+          Puedes cambiar tu decisión cuando quieras, sin tener que esperar a que caduque nada:{' '}
+          <Button variant="link" className="h-auto p-0 cursor-pointer" onClick={handleChangePreferences}>
+            cambiar mis preferencias de cookies
+          </Button>
+          .
         </p>
 
         <h2 className="text-xl font-semibold mt-6 mb-2">3. Cookies y almacenamiento que usamos</h2>
@@ -64,27 +77,66 @@ export default function Cookies() {
             </tr>
             <tr className="border-b">
               <td className="py-2">Preferencia de cookies</td>
-              <td className="py-2">Recordar que has aceptado esta política</td>
+              <td className="py-2">Recordar tu decisión sobre esta política</td>
               <td className="py-2">Propia</td>
-              <td className="py-2">12 meses</td>
+              <td className="py-2">Hasta que la cambies</td>
+            </tr>
+            <tr className="border-b bg-muted/30">
+              <td className="py-2" colSpan={4}>
+                <strong>Solo si aceptas cookies de analítica y publicidad:</strong>
+              </td>
+            </tr>
+            <tr className="border-b">
+              <td className="py-2">Google Analytics (_ga, _gid...)</td>
+              <td className="py-2">Estadísticas de uso de la web (visitas, páginas vistas)</td>
+              <td className="py-2">Tercero (Google)</td>
+              <td className="py-2">Hasta 24 meses</td>
+            </tr>
+            <tr className="border-b">
+              <td className="py-2">Google Ads</td>
+              <td className="py-2">Medir conversiones de nuestras campañas publicitarias</td>
+              <td className="py-2">Tercero (Google)</td>
+              <td className="py-2">Hasta 24 meses</td>
+            </tr>
+            <tr className="border-b">
+              <td className="py-2">Google AdSense</td>
+              <td className="py-2">Mostrar anuncios de terceros y medir su rendimiento</td>
+              <td className="py-2">Tercero (Google)</td>
+              <td className="py-2">Hasta 24 meses</td>
+            </tr>
+            <tr className="border-b">
+              <td className="py-2">Meta Pixel (Facebook/Instagram)</td>
+              <td className="py-2">Medir conversiones y crear públicos para campañas en Meta</td>
+              <td className="py-2">Tercero (Meta)</td>
+              <td className="py-2">Hasta 90 días</td>
             </tr>
           </tbody>
         </table>
 
         <h2 className="text-xl font-semibold mt-6 mb-2">4. Base legal</h2>
         <p>
-          Al tratarse exclusivamente de cookies técnicas y necesarias para prestar el servicio
-          solicitado, su uso se ampara en la excepción prevista en el artículo 22.2 de la LSSI-CE,
-          que no exige consentimiento previo para este tipo de cookies. Aun así, te informamos de
-          su uso a través del banner y de esta política, en aras de la transparencia.
+          Las cookies técnicas y necesarias para prestar el servicio solicitado se amparan en la
+          excepción prevista en el artículo 22.2 de la LSSI-CE, que no exige consentimiento
+          previo para este tipo de cookies. Las cookies de analítica y publicidad (Google
+          Analytics, Google Ads, Google AdSense y Meta Pixel), en cambio, se basan en tu{' '}
+          <strong>consentimiento expreso</strong>, que puedes dar o denegar libremente a través
+          del banner, y que puedes retirar en cualquier momento con el mismo grado de facilidad
+          con el que lo diste.
         </p>
 
         <h2 className="text-xl font-semibold mt-6 mb-2">5. Cómo gestionar o eliminar las cookies</h2>
         <p>
-          Puedes permitir, bloquear o eliminar las cookies instaladas en tu equipo mediante la
-          configuración de tu navegador. Ten en cuenta que bloquear las cookies técnicas puede
-          impedir el correcto funcionamiento de la Plataforma (por ejemplo, no podrás mantener la
-          sesión iniciada ni completar pagos).
+          Puedes cambiar tu decisión sobre las cookies de analítica y publicidad en cualquier
+          momento:
+        </p>
+        <Button onClick={handleChangePreferences} className="cursor-pointer">
+          Cambiar mis preferencias de cookies
+        </Button>
+        <p className="mt-4">
+          También puedes permitir, bloquear o eliminar cualquier cookie instalada en tu equipo
+          mediante la configuración de tu navegador. Ten en cuenta que bloquear las cookies
+          técnicas puede impedir el correcto funcionamiento de la Plataforma (por ejemplo, no
+          podrás mantener la sesión iniciada ni completar pagos).
         </p>
         <ul>
           <li>

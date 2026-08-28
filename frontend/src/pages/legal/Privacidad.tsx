@@ -102,6 +102,10 @@ export default function Privacidad() {
               <td className="py-2">Consentimiento</td>
             </tr>
             <tr className="border-b">
+              <td className="py-2">Medir el rendimiento de nuestras campañas publicitarias (Google, Meta) y mostrar anuncios de terceros (Google AdSense)</td>
+              <td className="py-2">Consentimiento (cookies, ver Política de Cookies)</td>
+            </tr>
+            <tr className="border-b">
               <td className="py-2">Prevenir fraude, detectar accesos indebidos y verificar que no eres un robot (hCaptcha)</td>
               <td className="py-2">Interés legítimo</td>
             </tr>
@@ -125,6 +129,13 @@ export default function Privacidad() {
           <li><strong>Stripe</strong> — procesamiento seguro de pagos.</li>
           <li><strong>Resend</strong> — envío de emails transaccionales.</li>
           <li><strong>hCaptcha</strong> — verificación anti-spam en el registro.</li>
+          <li>
+            <strong>Google (Analytics, Ads, AdSense) y Meta (Facebook/Instagram)</strong> —
+            medición de campañas publicitarias y estadísticas de uso, únicamente si aceptas las
+            cookies de analítica y publicidad. Consulta nuestra{' '}
+            <a href="/cookies">Política de Cookies</a> para más detalle y para retirar tu
+            consentimiento cuando quieras.
+          </li>
         </ul>
 
         <h2 className="text-xl font-semibold mt-6 mb-2">5. Transferencias internacionales</h2>

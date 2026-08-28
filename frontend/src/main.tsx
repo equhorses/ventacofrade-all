@@ -2,6 +2,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 import { loadRuntimeConfig } from './lib/config.ts';
+import { loadTrackingScriptsIfConsented } from './lib/consent.ts';
 
 // Load runtime configuration before rendering the app
 async function initializeApp() {
@@ -15,6 +16,10 @@ async function initializeApp() {
   ) {
     return;
   }
+
+  // If this person already accepted cookies on a previous visit, load
+  // Analytics/Ads/Meta Pixel right away — no need to ask again.
+  loadTrackingScriptsIfConsented();
 
   try {
     await loadRuntimeConfig();
