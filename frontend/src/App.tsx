@@ -155,8 +155,8 @@ const App = () => (
         <AuthProvider>
           <ComingSoonGate>
             <AppRoutes />
-            <CookieBanner />
           </ComingSoonGate>
+          <CookieBanner />
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
