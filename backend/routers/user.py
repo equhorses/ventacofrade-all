@@ -75,3 +75,16 @@ async def request_account_deletion(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User profile not found")
     return user
+
+
+@router.post("/account/cancel-deletion", response_model=UserResponse)
+async def cancel_account_deletion(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Cancel a pending self-service deletion request. The account goes back
+    to normal, and the 5-year scheduled purge is called off."""
+    user = await UserService.cancel_account_deletion(db, current_user.id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User profile not found")
+    return user

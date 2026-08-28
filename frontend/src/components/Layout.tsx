@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { client } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -34,8 +35,23 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { user, logout } = useAuth();
+  const { user, logout, refetch } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [cancelingDeletion, setCancelingDeletion] = useState(false);
+
+  const handleCancelDeletion = async () => {
+    setCancelingDeletion(true);
+    try {
+      await client.users.cancelAccountDeletion();
+      await refetch();
+      toast.success('Baja cancelada. Tu cuenta sigue como siempre, ¡bienvenido/a de nuevo!');
+    } catch (err) {
+      console.error('Error canceling deletion:', err);
+      toast.error('No se pudo cancelar la baja. Inténtalo de nuevo.');
+    } finally {
+      setCancelingDeletion(false);
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -92,6 +108,28 @@ export default function Layout({ children }: LayoutProps) {
 
   return (
     <div className="min-h-screen flex flex-col">
+      {/* Pending self-service deletion notice */}
+      {user?.account_status === 'pending_deletion' && (
+        <div className="bg-amber-50 border-b border-amber-200 text-amber-900 text-sm px-4 py-2.5">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-center gap-2 text-center sm:text-left">
+            <span>
+              Tu cuenta está pendiente de borrado
+              {user.scheduled_purge_at &&
+                ` (se eliminará definitivamente el ${new Date(user.scheduled_purge_at).toLocaleDateString('es-ES')})`}
+              . Si ha sido un error o has cambiado de idea, puedes recuperarla.
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-amber-300 bg-white hover:bg-amber-100 cursor-pointer shrink-0"
+              disabled={cancelingDeletion}
+              onClick={handleCancelDeletion}
+            >
+              {cancelingDeletion ? 'Cancelando…' : 'Cancelar baja'}
+            </Button>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

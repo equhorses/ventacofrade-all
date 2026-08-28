@@ -11,6 +11,8 @@ class UserResponse(BaseModel):
     avatar_url: Optional[str] = None
     role: str = "user"  # user/admin
     last_login: Optional[datetime] = None
+    account_status: str = "active"
+    scheduled_purge_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

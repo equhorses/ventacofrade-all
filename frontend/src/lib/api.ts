@@ -154,6 +154,10 @@ export const client = {
       const response = await http.post(`${baseUrl()}/api/v1/users/account/delete`, { reasons, feedback });
       return { data: response.data };
     },
+    async cancelAccountDeletion() {
+      const response = await http.post(`${baseUrl()}/api/v1/users/account/cancel-deletion`, {});
+      return { data: response.data };
+    },
   },
   storage: {
     /**

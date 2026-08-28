@@ -14,6 +14,8 @@ interface User {
   avatar_url?: string;
   role: string;
   last_login?: string;
+  account_status?: string;
+  scheduled_purge_at?: string;
 }
 
 interface AuthContextType {
