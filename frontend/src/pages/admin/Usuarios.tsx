@@ -13,7 +13,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { client, type AdminUser, type AdminChatMessage } from '@/lib/api';
-import { Search, Ban, RotateCcw, MessageCircle, Send, Trash2 } from 'lucide-react';
+import { Search, Ban, RotateCcw, MessageCircle, Send, Trash2, Star, Gift } from 'lucide-react';
 import AdminNav from '@/components/admin/AdminNav';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -37,6 +37,19 @@ const ROLE_LABELS: Record<string, string> = {
   seguridad: 'Seguridad',
   moderacion: 'Moderación',
   soporte: 'Soporte',
+};
+
+const PLAN_LABELS: Record<string, string> = {
+  mensual: 'Mensual',
+  anual: 'Anual',
+};
+
+const SUBSCRIPTION_STATUS_LABELS: Record<string, { label: string; className: string }> = {
+  active: { label: 'Activa', className: 'bg-green-100 text-green-700' },
+  trialing: { label: 'Prueba', className: 'bg-blue-100 text-blue-700' },
+  past_due: { label: 'Pago pendiente', className: 'bg-amber-100 text-amber-700' },
+  canceled: { label: 'Cancelada', className: 'bg-red-100 text-red-700' },
+  inactive: { label: 'Sin activar', className: 'bg-muted text-muted-foreground' },
 };
 
 const PAGE_SIZE = 50;
@@ -198,6 +211,7 @@ export default function AdminUsuariosPage() {
                   <TableHead>Cuenta</TableHead>
                   <TableHead>Rol</TableHead>
                   <TableHead>Estado</TableHead>
+                  <TableHead>Plan</TableHead>
                   <TableHead>Alta</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
@@ -214,6 +228,38 @@ export default function AdminUsuariosPage() {
                       <Badge className={STATUS_LABELS[u.account_status]?.className || 'bg-muted'}>
                         {STATUS_LABELS[u.account_status]?.label || u.account_status}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {!u.is_seller ? (
+                        <span className="text-xs text-muted-foreground">Perfil gratuito</span>
+                      ) : (
+                        <div className="flex flex-wrap items-center gap-1">
+                          <Badge
+                            className={
+                              SUBSCRIPTION_STATUS_LABELS[u.subscription_status || 'inactive']?.className ||
+                              'bg-muted'
+                            }
+                          >
+                            {u.plan ? `${PLAN_LABELS[u.plan] || u.plan} · ` : ''}
+                            {SUBSCRIPTION_STATUS_LABELS[u.subscription_status || 'inactive']?.label ||
+                              u.subscription_status ||
+                              'Sin activar'}
+                          </Badge>
+                          {u.free_access_until && new Date(u.free_access_until) > new Date() && (
+                            <Badge
+                              className="bg-purple-100 text-purple-700"
+                              title={`Regalo hasta ${new Date(u.free_access_until).toLocaleDateString('es-ES')}`}
+                            >
+                              <Gift className="h-3 w-3 mr-1" /> Regalo
+                            </Badge>
+                          )}
+                          {u.has_active_featured && (
+                            <Badge className="bg-amber-100 text-amber-700" title="Tiene un anuncio destacado activo">
+                              <Star className="h-3 w-3 mr-1 fill-amber-700" /> Destacado
+                            </Badge>
+                          )}
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {u.created_at ? new Date(u.created_at).toLocaleDateString('es-ES') : '—'}
@@ -267,7 +313,7 @@ export default function AdminUsuariosPage() {
                 ))}
                 {!loading && users.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                       No se encontraron usuarios.
                     </TableCell>
                   </TableRow>

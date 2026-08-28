@@ -103,6 +103,11 @@ class AdminUserResponse(BaseModel):
     account_status: str
     created_at: Optional[datetime] = None
     last_login: Optional[datetime] = None
+    is_seller: bool = False
+    plan: Optional[str] = None
+    subscription_status: Optional[str] = None
+    free_access_until: Optional[datetime] = None
+    has_active_featured: bool = False
 
     class Config:
         from_attributes = True
@@ -126,7 +131,11 @@ async def list_users(
     current_user: UserResponse = Depends(get_staff_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """List every user account — not just sellers. Visible to any staff role."""
+    """List every user account — not just sellers. Visible to any staff role.
+    Also surfaces, per user, whether they're a seller and if so their plan,
+    subscription status, any free/gifted access, and whether they currently
+    have a featured listing — so staff don't have to jump into Vendedores to
+    see what someone has."""
     query = select(User)
     count_query = select(func.count()).select_from(User)
 
@@ -145,7 +154,47 @@ async def list_users(
     result = await db.execute(query)
     users = result.scalars().all()
 
-    return AdminUsersListResponse(items=users, total=total)
+    user_ids = [u.id for u in users]
+    sellers_by_user_id = {}
+    if user_ids:
+        seller_result = await db.execute(
+            select(Seller_profiles).where(Seller_profiles.user_id.in_(user_ids))
+        )
+        sellers_by_user_id = {s.user_id: s for s in seller_result.scalars().all()}
+
+    now = datetime.now(timezone.utc)
+    featured_user_ids: set = set()
+    if sellers_by_user_id:
+        featured_result = await db.execute(
+            select(Products.user_id)
+            .where(Products.user_id.in_(sellers_by_user_id.keys()))
+            .where(Products.featured_until.isnot(None))
+            .where(Products.featured_until > now)
+            .distinct()
+        )
+        featured_user_ids = {row[0] for row in featured_result.all()}
+
+    items = []
+    for u in users:
+        seller = sellers_by_user_id.get(u.id)
+        items.append(
+            AdminUserResponse(
+                id=u.id,
+                email=u.email,
+                name=u.name,
+                role=u.role,
+                account_status=u.account_status,
+                created_at=u.created_at,
+                last_login=u.last_login,
+                is_seller=seller is not None,
+                plan=seller.plan if seller else None,
+                subscription_status=seller.subscription_status if seller else None,
+                free_access_until=seller.free_access_until if seller else None,
+                has_active_featured=u.id in featured_user_ids,
+            )
+        )
+
+    return AdminUsersListResponse(items=items, total=total)
 
 
 @router.post("/users/{user_id}/ban", response_model=AdminUserResponse)
@@ -526,7 +575,9 @@ class AdminConversationResponse(BaseModel):
     product_id: int
     product_title: str
     buyer_email: Optional[str] = None
+    buyer_user_id: Optional[str] = None
     seller_email: Optional[str] = None
+    seller_user_id: Optional[str] = None
     last_message: str
     last_message_at: Optional[datetime] = None
     message_count: int
@@ -589,14 +640,29 @@ async def list_conversations_admin(
         product = products_by_id.get(c["product_id"])
         participant_ids = list(c["participants"])
         seller_email = None
+        seller_user_id = None
         buyer_email = None
+        buyer_user_id = None
+
         if product:
+            seller_user_id = product.user_id
             seller_user = users_by_id.get(product.user_id)
             seller_email = seller_user.email if seller_user else None
             other_ids = [pid for pid in participant_ids if pid != product.user_id]
             if other_ids:
-                buyer_user = users_by_id.get(other_ids[0])
+                buyer_user_id = other_ids[0]
+                buyer_user = users_by_id.get(buyer_user_id)
                 buyer_email = buyer_user.email if buyer_user else None
+        else:
+            # Support conversation (product_id == 0): one side is staff, the
+            # other is the regular user — show the regular user, not blank.
+            for pid in participant_ids:
+                person = users_by_id.get(pid)
+                if person and person.role in STAFF_ROLES:
+                    seller_user_id = pid
+                else:
+                    buyer_user_id = pid
+                    buyer_email = person.email if person else None
 
         if c["product_id"] == 0:
             title = "Soporte VentaCofrade"
@@ -614,7 +680,9 @@ async def list_conversations_admin(
                 product_id=c["product_id"],
                 product_title=title,
                 buyer_email=buyer_email,
+                buyer_user_id=buyer_user_id,
                 seller_email=seller_email,
+                seller_user_id=seller_user_id,
                 last_message=c["last_message"],
                 last_message_at=c["last_message_at"],
                 message_count=c["message_count"],
@@ -623,6 +691,75 @@ async def list_conversations_admin(
 
     responses.sort(key=lambda r: r.last_message_at or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
     return responses[:200]
+
+
+class AdminThreadMessage(BaseModel):
+    id: int
+    user_id: str
+    sender_email: Optional[str] = None
+    content: str
+    created_at: Optional[datetime] = None
+
+
+@router.get("/conversations/thread", response_model=List[AdminThreadMessage])
+async def get_conversation_thread(
+    product_id: int = Query(...),
+    user_a: str = Query(...),
+    user_b: str = Query(...),
+    current_user: UserResponse = Depends(require_roles("admin", "soporte")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Read-only view of a full buyer-seller conversation about a listing,
+    for support supervision. Not for replying — staff who need to intervene
+    should contact the person directly via the support chat."""
+    result = await db.execute(
+        select(Messages)
+        .where(
+            Messages.product_id == product_id,
+            ((Messages.user_id == user_a) & (Messages.receiver_id == user_b))
+            | ((Messages.user_id == user_b) & (Messages.receiver_id == user_a)),
+        )
+        .order_by(Messages.created_at.asc())
+    )
+    messages = result.scalars().all()
+
+    sender_ids = {m.user_id for m in messages}
+    users_by_id = {}
+    if sender_ids:
+        user_result = await db.execute(select(User).where(User.id.in_(sender_ids)))
+        users_by_id = {u.id: u for u in user_result.scalars().all()}
+
+    return [
+        AdminThreadMessage(
+            id=m.id,
+            user_id=m.user_id,
+            sender_email=users_by_id[m.user_id].email if m.user_id in users_by_id else None,
+            content=m.content,
+            created_at=m.created_at,
+        )
+        for m in messages
+    ]
+
+
+@router.get("/messages/unread-count")
+async def get_unread_support_count(
+    current_user: UserResponse = Depends(require_roles("admin", "soporte")),
+    db: AsyncSession = Depends(get_db),
+):
+    """How many support messages (written by regular users, not staff) are
+    still unread. Used for the notification badge on the 'Mensajes' tab."""
+    staff_result = await db.execute(select(User.id).where(User.role.in_(STAFF_ROLES)))
+    staff_ids = {row[0] for row in staff_result.all()}
+
+    result = await db.execute(
+        select(func.count())
+        .select_from(Messages)
+        .where(Messages.product_id == SUPPORT_PRODUCT_ID)
+        .where(Messages.is_read.is_(False))
+        .where(Messages.user_id.notin_(staff_ids) if staff_ids else True)
+    )
+    count = result.scalar_one()
+    return {"unread_count": count}
 
 
 class AdminChatMessage(BaseModel):

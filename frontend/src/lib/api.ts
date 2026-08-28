@@ -353,6 +353,16 @@ export const client = {
       });
       return { data: response.data as AdminConversation[] };
     },
+    async getConversationThread(productId: number, userA: string, userB: string) {
+      const response = await http.get(`${baseUrl()}/api/v1/admin/conversations/thread`, {
+        params: { product_id: productId, user_a: userA, user_b: userB },
+      });
+      return { data: response.data as AdminThreadMessage[] };
+    },
+    async getUnreadSupportCount() {
+      const response = await http.get(`${baseUrl()}/api/v1/admin/messages/unread-count`);
+      return { data: response.data as { unread_count: number } };
+    },
     async getSupportThread(userId: string) {
       const response = await http.get(`${baseUrl()}/api/v1/admin/users/${userId}/messages`);
       return { data: response.data as AdminChatMessage[] };
@@ -468,6 +478,11 @@ export interface AdminUser {
   account_status: string;
   created_at?: string | null;
   last_login?: string | null;
+  is_seller: boolean;
+  plan?: string | null;
+  subscription_status?: string | null;
+  free_access_until?: string | null;
+  has_active_featured: boolean;
 }
 
 export interface AdminProduct {
@@ -497,10 +512,20 @@ export interface AdminConversation {
   product_id: number;
   product_title: string;
   buyer_email?: string | null;
+  buyer_user_id?: string | null;
   seller_email?: string | null;
+  seller_user_id?: string | null;
   last_message: string;
   last_message_at?: string | null;
   message_count: number;
+}
+
+export interface AdminThreadMessage {
+  id: number;
+  user_id: string;
+  sender_email?: string | null;
+  content: string;
+  created_at?: string | null;
 }
 
 export interface AdminChatMessage {

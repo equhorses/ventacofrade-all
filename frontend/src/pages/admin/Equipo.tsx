@@ -32,6 +32,19 @@ const ROLE_BADGE_CLASSES: Record<string, string> = {
   soporte: 'bg-green-100 text-green-700',
 };
 
+const ROLE_DESCRIPTIONS: Record<string, string> = {
+  admin:
+    'Acceso total al panel. Es el único rol que puede asignar roles a otras personas, ver la Auditoría y borrar cuentas de usuario para siempre.',
+  marketing:
+    'Pestañas Vendedores y Publicidad: enviar invitaciones de acceso gratuito, fijar la fecha de lanzamiento, y aprobar o gestionar los anuncios de publicidad de pago.',
+  seguridad:
+    'Pestaña Seguridad: banear o desbanear cuentas de usuario, y ver los intentos de inicio de sesión (para detectar accesos sospechosos).',
+  moderacion:
+    'Pestaña Anuncios: retirar o eliminar publicaciones y valoraciones que incumplan las normas (spam, contenido inapropiado, etc.).',
+  soporte:
+    'Pestaña Mensajes: leer las conversaciones entre compradores y vendedores (solo lectura) y chatear directamente con cualquier usuario desde Usuarios. Recibe aviso cuando alguien escribe.',
+};
+
 export default function AdminEquipoPage() {
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -106,6 +119,24 @@ export default function AdminEquipoPage() {
           Da acceso al panel interno a otras personas del equipo, según su función.
         </p>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">¿Qué puede hacer cada rol?</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {ROLE_OPTIONS.map((opt) => (
+            <div key={opt.value} className="flex items-start gap-3">
+              <Badge className={`${ROLE_BADGE_CLASSES[opt.value]} shrink-0 mt-0.5`}>{opt.label}</Badge>
+              <p className="text-sm text-muted-foreground">{ROLE_DESCRIPTIONS[opt.value]}</p>
+            </div>
+          ))}
+          <p className="text-xs text-muted-foreground pt-1">
+            El "Super admin" ve siempre todas las pestañas, sea cual sea la lista de arriba. El resto de roles
+            solo ven las pestañas de su función (más Resumen, Usuarios y Anuncios, comunes a todos).
+          </p>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
