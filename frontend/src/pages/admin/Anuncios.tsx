@@ -12,8 +12,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { client, type AdminProduct } from '@/lib/api';
-import { Search, Eye, EyeOff, RotateCcw, Trash2 } from 'lucide-react';
+import { client, type AdminProduct, type AdminReview } from '@/lib/api';
+import { Search, Eye, EyeOff, RotateCcw, Trash2, Star } from 'lucide-react';
 import AdminNav from '@/components/admin/AdminNav';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -36,6 +36,50 @@ export default function AdminAnunciosPage() {
   const [skip, setSkip] = useState(0);
   const [actingId, setActingId] = useState<number | null>(null);
 
+  const [reviews, setReviews] = useState<AdminReview[]>([]);
+  const [reviewsTotal, setReviewsTotal] = useState(0);
+  const [loadingReviews, setLoadingReviews] = useState(true);
+  const [reviewSearch, setReviewSearch] = useState('');
+  const [reviewsSkip, setReviewsSkip] = useState(0);
+  const [deletingReviewId, setDeletingReviewId] = useState<number | null>(null);
+  const REVIEWS_PAGE_SIZE = 50;
+
+  const loadReviews = async (query?: string, offset = 0) => {
+    setLoadingReviews(true);
+    try {
+      const { data } = await client.admin.listReviews({ search: query, skip: offset, limit: REVIEWS_PAGE_SIZE });
+      setReviews(data.items);
+      setReviewsTotal(data.total);
+      setReviewsSkip(offset);
+    } catch (err) {
+      console.error('Error loading reviews:', err);
+      toast.error('No se pudo cargar la lista de valoraciones');
+    } finally {
+      setLoadingReviews(false);
+    }
+  };
+
+  const handleReviewSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    loadReviews(reviewSearch.trim() || undefined, 0);
+  };
+
+  const handleDeleteReview = async (review: AdminReview) => {
+    if (!confirm('¿Eliminar esta valoración PARA SIEMPRE? Esto no se puede deshacer.')) return;
+    setDeletingReviewId(review.id);
+    try {
+      await client.admin.deleteReviewAdmin(review.id);
+      setReviews((prev) => prev.filter((r) => r.id !== review.id));
+      setReviewsTotal((prev) => prev - 1);
+      toast.success('Valoración eliminada');
+    } catch (err) {
+      console.error('Error deleting review:', err);
+      toast.error('No se pudo eliminar la valoración.');
+    } finally {
+      setDeletingReviewId(null);
+    }
+  };
+
   const loadProducts = async (query?: string, offset = 0) => {
     setLoading(true);
     try {
@@ -53,6 +97,7 @@ export default function AdminAnunciosPage() {
 
   useEffect(() => {
     loadProducts();
+    loadReviews();
   }, []);
 
   const handleSearch = (e: React.FormEvent) => {
@@ -225,6 +270,110 @@ export default function AdminAnunciosPage() {
                   size="sm"
                   disabled={skip + PAGE_SIZE >= total || loading}
                   onClick={() => loadProducts(search.trim() || undefined, skip + PAGE_SIZE)}
+                >
+                  Siguiente
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <div>
+          <h2 className="text-2xl font-bold mb-1">Valoraciones</h2>
+          <p className="text-muted-foreground">Modera los comentarios que dejan los usuarios a los vendedores.</p>
+        </div>
+
+        <form onSubmit={handleReviewSearch} className="flex gap-2 max-w-md">
+          <Input
+            placeholder="Buscar por texto del comentario..."
+            value={reviewSearch}
+            onChange={(e) => setReviewSearch(e.target.value)}
+          />
+          <Button type="submit" variant="outline">
+            <Search className="h-4 w-4" />
+          </Button>
+        </form>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              {loadingReviews ? 'Cargando...' : `${reviewsTotal} valoración(es)`}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Estrellas</TableHead>
+                  <TableHead>Comentario</TableHead>
+                  <TableHead>De</TableHead>
+                  <TableHead>Al vendedor</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {reviews.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-0.5">
+                        {[1, 2, 3, 4, 5].map((n) => (
+                          <Star
+                            key={n}
+                            className={`h-3.5 w-3.5 ${
+                              n <= r.rating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell className="max-w-xs truncate text-sm">{r.comment || '—'}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{r.reviewer_email || '—'}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{r.seller_email || '—'}</TableCell>
+                    <TableCell className="text-right">
+                      {canModerate && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive"
+                          disabled={deletingReviewId === r.id}
+                          onClick={() => handleDeleteReview(r)}
+                        >
+                          <Trash2 className="h-3 w-3 mr-1" /> Eliminar
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {!loadingReviews && reviews.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                      No hay valoraciones.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+
+            {reviewsTotal > REVIEWS_PAGE_SIZE && (
+              <div className="flex items-center justify-between mt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={reviewsSkip === 0 || loadingReviews}
+                  onClick={() =>
+                    loadReviews(reviewSearch.trim() || undefined, Math.max(0, reviewsSkip - REVIEWS_PAGE_SIZE))
+                  }
+                >
+                  Anterior
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  {reviewsSkip + 1}–{Math.min(reviewsSkip + REVIEWS_PAGE_SIZE, reviewsTotal)} de {reviewsTotal}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={reviewsSkip + REVIEWS_PAGE_SIZE >= reviewsTotal || loadingReviews}
+                  onClick={() => loadReviews(reviewSearch.trim() || undefined, reviewsSkip + REVIEWS_PAGE_SIZE)}
                 >
                   Siguiente
                 </Button>

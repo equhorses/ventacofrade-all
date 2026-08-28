@@ -398,6 +398,106 @@ async def restore_product(
     )
 
 
+class AdminReviewResponse(BaseModel):
+    id: int
+    seller_profile_id: int
+    seller_email: Optional[str] = None
+    reviewer_user_id: str
+    reviewer_email: Optional[str] = None
+    rating: int
+    comment: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class AdminReviewsListResponse(BaseModel):
+    items: List[AdminReviewResponse]
+    total: int
+
+
+@router.get("/reviews", response_model=AdminReviewsListResponse)
+async def list_reviews_admin(
+    search: Optional[str] = Query(None, description="Filtra por texto del comentario"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    current_user: UserResponse = Depends(get_staff_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """List every review left on any seller profile, for moderation.
+    Visible to any staff role."""
+    reviewer = User.__table__.alias("reviewer")
+    seller_owner = User.__table__.alias("seller_owner")
+
+    query = (
+        select(Reviews, reviewer.c.email, seller_owner.c.email)
+        .join(reviewer, reviewer.c.id == Reviews.reviewer_user_id, isouter=True)
+        .join(Seller_profiles, Seller_profiles.id == Reviews.seller_profile_id, isouter=True)
+        .join(seller_owner, seller_owner.c.id == Seller_profiles.user_id, isouter=True)
+    )
+    count_query = select(func.count()).select_from(Reviews)
+
+    if search:
+        like = f"%{search.strip().lower()}%"
+        query = query.where(Reviews.comment.ilike(like))
+        count_query = count_query.where(Reviews.comment.ilike(like))
+
+    total = (await db.execute(count_query)).scalar_one()
+
+    query = query.order_by(Reviews.created_at.desc()).offset(skip).limit(limit)
+    result = await db.execute(query)
+    rows = result.all()
+
+    return AdminReviewsListResponse(
+        items=[
+            AdminReviewResponse(
+                id=r.id,
+                seller_profile_id=r.seller_profile_id,
+                seller_email=seller_email,
+                reviewer_user_id=r.reviewer_user_id,
+                reviewer_email=reviewer_email,
+                rating=r.rating,
+                comment=r.comment,
+                created_at=r.created_at,
+            )
+            for r, reviewer_email, seller_email in rows
+        ],
+        total=total,
+    )
+
+
+@router.delete("/reviews/{review_id}")
+async def delete_review_admin(
+    review_id: int,
+    current_user: UserResponse = Depends(require_roles("admin", "moderacion")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Permanently delete a single review (e.g. abuse, spam, insults) and
+    recalculate the seller's average rating."""
+    result = await db.execute(select(Reviews).where(Reviews.id == review_id))
+    review = result.scalar_one_or_none()
+    if not review:
+        raise HTTPException(status_code=404, detail="Valoración no encontrada")
+
+    seller_profile_id = review.seller_profile_id
+    review_comment = review.comment
+
+    await db.delete(review)
+    await db.commit()
+
+    # Reuse the same average-rating logic the public reviews router uses.
+    from routers.reviews import _recalculate_seller_rating
+    await _recalculate_seller_rating(db, seller_profile_id)
+
+    logger.info("Admin %s deleted review %s", current_user.email, review_id)
+    await log_admin_action(
+        db, current_user.id, current_user.email, "delete_review",
+        target=f"review:{review_id}", details=review_comment,
+    )
+    return {"message": "Valoración eliminada", "id": review_id}
+
+
 @router.delete("/products/{product_id}")
 async def delete_product_admin(
     product_id: int,

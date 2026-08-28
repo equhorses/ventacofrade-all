@@ -39,6 +39,8 @@ export default function VendedorPage() {
   const [myRating, setMyRating] = useState(0);
   const [myComment, setMyComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [hasReviewed, setHasReviewed] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -69,6 +71,7 @@ export default function VendedorPage() {
         if (mine) {
           setMyRating(mine.rating);
           setMyComment(mine.comment || '');
+          setHasReviewed(true);
         }
       } catch (err) {
         console.error('Error loading seller profile:', err);
@@ -87,6 +90,8 @@ export default function VendedorPage() {
       const reviewsRes = await client.reviews.list(seller.id);
       setReviews(reviewsRes.data.items);
       setAvgRating(reviewsRes.data.average_rating);
+      setHasReviewed(true);
+      setEditing(false);
       toast.success('¡Gracias por tu valoración!');
     } catch (err: unknown) {
       console.error('Error submitting review:', err);
@@ -187,38 +192,78 @@ export default function VendedorPage() {
           {!isOwnProfile && user && (
             <Card className="mb-4">
               <CardContent className="p-4 space-y-2">
-                <p className="text-xs text-muted-foreground">
-                  {myRating > 0 ? 'Tu valoración' : '¿Has tenido trato con este vendedor? Cuéntanos qué tal fue'}
-                </p>
-                <div className="flex items-center gap-1">
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <button
-                      key={n}
-                      type="button"
-                      onClick={() => setMyRating(n)}
-                      className="cursor-pointer"
-                      aria-label={`${n} estrellas`}
-                    >
-                      <Star
-                        className={`h-6 w-6 ${
-                          n <= myRating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30'
-                        }`}
-                      />
-                    </button>
-                  ))}
-                </div>
-                {myRating > 0 && (
+                {hasReviewed && !editing ? (
                   <>
-                    <Textarea
-                      value={myComment}
-                      onChange={(e) => setMyComment(e.target.value)}
-                      placeholder="Comparte tu experiencia (opcional)"
-                      rows={2}
-                      className="resize-none text-sm"
-                    />
-                    <Button size="sm" disabled={submitting} onClick={handleSubmitReview} className="cursor-pointer">
-                      Guardar valoración
+                    <p className="text-xs text-muted-foreground">Tu valoración</p>
+                    <div className="flex items-center gap-1">
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <Star
+                          key={n}
+                          className={`h-5 w-5 ${
+                            n <= myRating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    {myComment && <p className="text-sm text-muted-foreground">{myComment}</p>}
+                    <Button size="sm" variant="outline" onClick={() => setEditing(true)} className="cursor-pointer">
+                      Editar valoración
                     </Button>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs text-muted-foreground">
+                      {hasReviewed ? 'Edita tu valoración' : '¿Has tenido trato con este vendedor? Cuéntanos qué tal fue'}
+                    </p>
+                    <div className="flex items-center gap-1">
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          onClick={() => setMyRating(n)}
+                          className="cursor-pointer"
+                          aria-label={`${n} estrellas`}
+                        >
+                          <Star
+                            className={`h-6 w-6 ${
+                              n <= myRating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30'
+                            }`}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                    {myRating > 0 && (
+                      <>
+                        <Textarea
+                          value={myComment}
+                          onChange={(e) => setMyComment(e.target.value)}
+                          placeholder="Comparte tu experiencia (opcional)"
+                          rows={2}
+                          className="resize-none text-sm"
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            disabled={submitting}
+                            onClick={handleSubmitReview}
+                            className="cursor-pointer"
+                          >
+                            Guardar valoración
+                          </Button>
+                          {hasReviewed && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={submitting}
+                              onClick={() => setEditing(false)}
+                              className="cursor-pointer"
+                            >
+                              Cancelar
+                            </Button>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </>
                 )}
               </CardContent>

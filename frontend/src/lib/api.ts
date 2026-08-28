@@ -339,6 +339,14 @@ export const client = {
       const response = await http.delete(`${baseUrl()}/api/v1/admin/products/${productId}`);
       return { data: response.data as { message: string; id: number } };
     },
+    async listReviews(params: { search?: string; skip?: number; limit?: number } = {}) {
+      const response = await http.get(`${baseUrl()}/api/v1/admin/reviews`, { params });
+      return { data: response.data as { items: AdminReview[]; total: number } };
+    },
+    async deleteReviewAdmin(reviewId: number) {
+      const response = await http.delete(`${baseUrl()}/api/v1/admin/reviews/${reviewId}`);
+      return { data: response.data as { message: string; id: number } };
+    },
     async listConversationsAdmin(search?: string) {
       const response = await http.get(`${baseUrl()}/api/v1/admin/conversations`, {
         params: search ? { search } : {},
@@ -471,6 +479,17 @@ export interface AdminProduct {
   status?: string | null;
   images?: string | null;
   featured_until?: string | null;
+  created_at?: string | null;
+}
+
+export interface AdminReview {
+  id: number;
+  seller_profile_id: number;
+  seller_email?: string | null;
+  reviewer_user_id: string;
+  reviewer_email?: string | null;
+  rating: number;
+  comment?: string | null;
   created_at?: string | null;
 }
 
