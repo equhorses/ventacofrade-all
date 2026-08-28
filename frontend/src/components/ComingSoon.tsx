@@ -107,6 +107,22 @@ export default function ComingSoon() {
           <a href="/legal/bases-sorteo" className="underline hover:text-primary-foreground">
             Bases del sorteo
           </a>
+          {' · '}
+          <a href="/legal/aviso-legal" className="underline hover:text-primary-foreground">
+            Aviso Legal
+          </a>
+          {' · '}
+          <a href="/legal/privacidad" className="underline hover:text-primary-foreground">
+            Privacidad
+          </a>
+          {' · '}
+          <a href="/legal/terminos" className="underline hover:text-primary-foreground">
+            Términos y Condiciones
+          </a>
+          {' · '}
+          <a href="/cookies" className="underline hover:text-primary-foreground">
+            Cookies
+          </a>
         </p>
       </div>
     </div>

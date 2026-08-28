@@ -100,7 +100,7 @@ export default function ComingSoonGate({ children }: { children: ReactNode }) {
   // Re-evaluated on every navigation (location changes), unlike a plain
   // window.location.pathname check — legal pages stay open, but navigating
   // away from them correctly re-applies the gate.
-  const isLegalPage = location.pathname.startsWith('/legal/');
+  const isLegalPage = location.pathname.startsWith('/legal/') || location.pathname === '/cookies';
   if (isLegalPage) {
     return <>{children}</>;
   }
