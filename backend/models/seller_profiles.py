@@ -26,5 +26,10 @@ class Seller_profiles(Base):
     stripe_subscription_id = Column(String(100), nullable=True)
     rating = Column(Float, nullable=True, default=0, server_default='0')
     total_sales = Column(Integer, nullable=True, default=0, server_default='0')
+    # True si el email de la cuenta ya estaba en la lista de espera antes del
+    # lanzamiento — se calcula una vez, al crear el perfil (ver
+    # routers/seller_profiles.py::create_seller_profiles), y da derecho a la
+    # insignia pública "Fundador".
+    is_founder = Column(Boolean, nullable=True, default=False, server_default='false')
     created_at = Column(DateTime(timezone=True), default=datetime.now)
     updated_at = Column(DateTime(timezone=True), default=datetime.now, onupdate=datetime.now)

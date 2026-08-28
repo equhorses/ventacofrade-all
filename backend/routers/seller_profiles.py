@@ -71,6 +71,7 @@ class Seller_profilesResponse(BaseModel):
     activation_paid: Optional[bool] = None
     rating: Optional[float] = None
     total_sales: Optional[int] = None
+    is_founder: Optional[bool] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -264,6 +265,17 @@ async def create_seller_profiles(
                 await db.commit()
                 await db.refresh(result)
                 logger.info(f"Invitacion redimida automaticamente para {normalized_email}")
+
+            # Insignia "Fundador": si el email ya estaba en la lista de espera
+            # antes de tener cuenta, se marca una sola vez, al crear el perfil.
+            from models.waitlist import Waitlist
+            waitlist_result = await db.execute(
+                select(Waitlist).where(Waitlist.email == normalized_email)
+            )
+            if waitlist_result.scalar_one_or_none():
+                result.is_founder = True
+                await db.commit()
+                await db.refresh(result)
 
         logger.info(f"Seller_profiles created successfully with id: {result.id}")
         return result

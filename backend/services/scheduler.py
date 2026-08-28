@@ -24,7 +24,9 @@ def start_scheduler() -> None:
     # 08:00 UTC ≈ 09:00/10:00 hora peninsular española (según horario de verano/invierno).
     _scheduler.add_job(run_daily_jobs, CronTrigger(hour=8, minute=0), id="daily_jobs", replace_existing=True)
     _scheduler.start()
-    logger.info("Scheduler iniciado: trabajos diarios (sorteo + renovaciones) a las 08:00 UTC")
+    logger.info(
+        "Scheduler iniciado: trabajos diarios (sorteo + renovaciones + lanzamiento + purga de cuentas) a las 08:00 UTC"
+    )
 
 
 def stop_scheduler() -> None:

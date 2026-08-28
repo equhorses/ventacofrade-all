@@ -1,12 +1,17 @@
 """Daily background jobs, run in-process via APScheduler (see services/scheduler.py).
 
-Two independent jobs live here:
+Jobs living here:
   - check_raffle_deadlines: reminds / revokes raffle winners who haven't
     published a real listing within 15 days of their prize activating.
   - check_renewal_reminders: emails sellers 7 days before their subscription
     auto-renews.
+  - check_ad_bookings: expires ad slot bookings past their 30 days.
+  - check_launch_announcement: emails everyone still on the waitlist once
+    the platform's launch date is reached.
+  - purge_scheduled_account_deletions: permanently erases accounts whose
+    5-year retention window (after a self-service deletion request) is up.
 
-Both are defensive: any single row failing (bad email config, etc.) is logged
+All are defensive: any single row failing (bad email config, etc.) is logged
 and skipped rather than aborting the whole run.
 """
 import logging
@@ -19,13 +24,17 @@ from models.invitations import Invitation
 from models.seller_profiles import Seller_profiles
 from models.products import Products
 from models.renewal_reminders import RenewalReminderSent
+from models.waitlist import Waitlist
 from services.email import (
     send_raffle_deadline_reminder_email,
     send_raffle_prize_revoked_email,
     send_subscription_renewal_reminder_email,
+    send_launch_announcement_email,
 )
 from services.audit import log_admin_action
 from services.house_ad_bookings import AdBookingsService
+from services.platform_settings import get_launch_at
+from services.user import purge_user_completely
 
 logger = logging.getLogger(__name__)
 
@@ -172,6 +181,73 @@ async def check_ad_bookings() -> None:
         await service.expire_and_promote()
 
 
+async def check_launch_announcement() -> None:
+    """The day the platform's launch date is reached (or any day after, if
+    this runs late), email everyone still on the waitlist to let them know
+    it's open. Runs once per person — tracked via Waitlist.launch_email_sent_at
+    so touching the launch date again later doesn't re-send anything."""
+    if not db_manager.async_session_maker:
+        await db_manager.ensure_initialized()
+    async with db_manager.async_session_maker() as db:
+        launch_at = await get_launch_at(db)
+        if launch_at is None:
+            return
+
+        now = datetime.now(timezone.utc)
+        if now < launch_at:
+            return
+
+        result = await db.execute(
+            select(Waitlist).where(Waitlist.launch_email_sent_at.is_(None))
+        )
+        entries = result.scalars().all()
+
+        for entry in entries:
+            sent = await send_launch_announcement_email(to_email=entry.email)
+            if sent:
+                entry.launch_email_sent_at = now
+                await db.commit()
+            else:
+                logger.warning("No se pudo enviar email de lanzamiento a %s", entry.email)
+
+
+async def purge_scheduled_account_deletions() -> None:
+    """Permanently erase accounts that requested self-service deletion once
+    their retention window (scheduled_purge_at, set 5 years out at request
+    time — see services/user.py) has passed. Runs daily; most days this finds
+    nothing to do."""
+    from models.auth import User
+
+    if not db_manager.async_session_maker:
+        await db_manager.ensure_initialized()
+    async with db_manager.async_session_maker() as db:
+        now = datetime.now(timezone.utc)
+        result = await db.execute(
+            select(User).where(
+                User.account_status == "pending_deletion",
+                User.scheduled_purge_at.isnot(None),
+                User.scheduled_purge_at <= now,
+            )
+        )
+        users = result.scalars().all()
+
+        for user in users:
+            user_id = user.id
+            try:
+                deleted_email = await purge_user_completely(db, user_id)
+            except Exception:
+                logger.exception("Error purgando la cuenta %s tras cumplirse su plazo", user_id)
+                continue
+
+            if deleted_email:
+                await log_admin_action(
+                    db, None, "system", "purge_scheduled_deletion",
+                    target=deleted_email,
+                    details="Purga automatica tras 5 años desde la solicitud de baja",
+                )
+                logger.info("Cuenta %s purgada automaticamente (plazo de 5 anios cumplido)", deleted_email)
+
+
 async def run_daily_jobs() -> None:
     """Entry point called by the scheduler once a day."""
     try:
@@ -188,3 +264,13 @@ async def run_daily_jobs() -> None:
         await check_ad_bookings()
     except Exception:
         logger.exception("Fallo en check_ad_bookings")
+
+    try:
+        await check_launch_announcement()
+    except Exception:
+        logger.exception("Fallo en check_launch_announcement")
+
+    try:
+        await purge_scheduled_account_deletions()
+    except Exception:
+        logger.exception("Fallo en purge_scheduled_account_deletions")

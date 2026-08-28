@@ -152,6 +152,60 @@ async def send_waitlist_confirmation_email(to_email: str) -> bool:
         return False
 
 
+async def send_launch_announcement_email(to_email: str) -> bool:
+    """Sent once, the day VentaCofrade actually launches, to everyone still
+    on the waitlist (see services/scheduled_jobs.py::check_launch_announcement).
+    Never raises."""
+    api_key = getattr(settings, "resend_api_key", None)
+    from_email = getattr(settings, "resend_from_email", None)
+
+    if not api_key or not from_email:
+        logger.warning("Resend no configurado; email de lanzamiento omitido")
+        return False
+
+    html_content = """
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+      <h2 style="color: #6d28d9;">¡Ya hemos abierto!</h2>
+      <p>Han pasado semanas de espera y por fin es el día: <strong>VentaCofrade ya está abierto</strong>.</p>
+      <p>
+        Fuiste de los primeros en apuntarte, y eso significa algo para nosotros. Si te registras
+        con este mismo email, tu perfil llevará la insignia <strong>Fundador</strong>, visible
+        para siempre, como agradecimiento por haber confiado en el proyecto desde el principio.
+      </p>
+      <p style="margin: 24px 0;">
+        <a href="https://www.ventacofrade.com" style="background:#6d28d9;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;">
+          Entrar en VentaCofrade
+        </a>
+      </p>
+      <p style="margin-top: 24px; color: #666; font-size: 13px;">
+        Si tienes cualquier duda, escríbenos a
+        <a href="mailto:contacto@ventacofrade.com">contacto@ventacofrade.com</a>.
+      </p>
+    </div>
+    """
+
+    payload = {
+        "from": from_email,
+        "to": [to_email],
+        "subject": "¡VentaCofrade ya está abierto! 🎉",
+        "html": html_content,
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                RESEND_API_URL,
+                headers={"Authorization": f"Bearer {api_key}"},
+                json=payload,
+            )
+            response.raise_for_status()
+        logger.info(f"Email de lanzamiento enviado a {to_email}")
+        return True
+    except httpx.HTTPError as exc:
+        logger.error(f"Fallo al enviar email de lanzamiento a {to_email}: {exc}")
+        return False
+
+
 async def send_invitation_email(to_email: str, months: int, token: str) -> bool:
     """Send a branded 'you're invited, free access' email via Resend.
 

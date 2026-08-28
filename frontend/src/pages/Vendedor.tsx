@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import Layout from '@/components/Layout';
 import { client } from '@/lib/api';
-import { Store, Star, MapPin, BadgeCheck } from 'lucide-react';
+import { Store, Star, MapPin, BadgeCheck, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Review } from '@/lib/api';
@@ -19,6 +19,7 @@ interface SellerProfile {
   rating?: number;
   plan?: string | null;
   subscription_status?: string | null;
+  is_founder?: boolean;
 }
 
 interface Product {
@@ -137,6 +138,14 @@ export default function VendedorPage() {
               {seller.shop_name}
               {seller.plan === 'profesional' && seller.subscription_status === 'active' && (
                 <BadgeCheck className="h-5 w-5 text-primary shrink-0" aria-label="Vendedor verificado" />
+              )}
+              {seller.is_founder && (
+                <span
+                  className="inline-flex items-center gap-1 text-xs font-medium bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full shrink-0"
+                  title="Se apuntó a la lista de espera antes del lanzamiento"
+                >
+                  <Sparkles className="h-3 w-3" /> Fundador
+                </span>
               )}
             </h1>
             <div className="flex items-center gap-3 mt-1 flex-wrap text-sm text-muted-foreground">
