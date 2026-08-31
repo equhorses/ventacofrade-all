@@ -32,6 +32,10 @@ export default function Privacidad() {
         <ul>
           <li><strong>Datos de cuenta:</strong> email, nombre, contraseña (almacenada de forma cifrada), foto de perfil.</li>
           <li>
+            <strong>Confirmación de edad:</strong> fecha en la que confirmas, al registrarte, que
+            eres mayor de 18 años.
+          </li>
+          <li>
             <strong>Datos de perfil de vendedor:</strong> nombre de tienda, descripción, provincia,
             ciudad, teléfono de contacto.
           </li>
