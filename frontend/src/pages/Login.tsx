@@ -157,7 +157,8 @@ export default function LoginPage() {
       return;
     }
     localStorage.removeItem(INVITE_TOKEN_STORAGE_KEY);
-    window.location.href = `${getAPIBaseURL()}/api/v1/auth/google/login`;
+    const ageParam = mode === 'register' && ageConfirmed ? '1' : '0';
+    window.location.href = `${getAPIBaseURL()}/api/v1/auth/google/login?age_confirmed=${ageParam}`;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

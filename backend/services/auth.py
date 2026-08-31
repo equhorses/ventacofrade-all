@@ -21,8 +21,21 @@ class AuthService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def register_user(self, email: str, password: str, name: Optional[str] = None) -> User:
-        """Create a new user account with email + password."""
+    async def register_user(
+        self, email: str, password: str, name: Optional[str] = None, age_confirmed: bool = False
+    ) -> User:
+        """Create a new user account with email + password.
+
+        Requires an explicit self-declared 18+ confirmation, recorded with a
+        timestamp. Enforced here (not just in the request schema/router) so
+        this stays true even if a future caller forgets the frontend check.
+        """
+        if not age_confirmed:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Debes confirmar que eres mayor de 18 años para crear una cuenta",
+            )
+
         normalized_email = email.strip().lower()
 
         result = await self.db.execute(select(User).where(User.email == normalized_email))
@@ -37,6 +50,7 @@ class AuthService:
             name=name or normalized_email.split("@", 1)[0],
             role="user",
             last_login=datetime.now(timezone.utc),
+            age_confirmed_at=datetime.now(timezone.utc),
         )
         self.db.add(user)
         await self.db.commit()
@@ -80,10 +94,17 @@ class AuthService:
         await self.db.refresh(user)
         return user
 
-    async def get_or_create_google_user(self, email: str, name: Optional[str] = None) -> Tuple[User, bool]:
+    async def get_or_create_google_user(
+        self, email: str, name: Optional[str] = None, age_confirmed: bool = False
+    ) -> Tuple[User, bool]:
         """Find a user by email (created via Google or previously via password),
         or create a new one. Google-authenticated accounts have no password_hash,
         so they can only ever log in again via Google.
+
+        `age_confirmed` is only required — and only recorded — when this is a
+        genuinely new account. Google's own login doesn't expose the person's
+        age to us, so this self-declaration (ticked before the OAuth redirect)
+        is our only signal; existing users logging back in aren't asked again.
 
         Returns (user, is_new_user) so the caller can show a welcome message
         only to genuinely new accounts."""
@@ -103,6 +124,11 @@ class AuthService:
             if name and not user.name:
                 user.name = name
         else:
+            if not age_confirmed:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Debes confirmar que eres mayor de 18 años para crear una cuenta",
+                )
             is_new_user = True
             user = User(
                 id=str(uuid.uuid4()),
@@ -111,6 +137,7 @@ class AuthService:
                 name=name or normalized_email.split("@", 1)[0],
                 role="user",
                 last_login=datetime.now(timezone.utc),
+                age_confirmed_at=datetime.now(timezone.utc),
             )
             self.db.add(user)
 

@@ -37,6 +37,9 @@ class RegisterRequest(BaseModel):
     password: str = Field(min_length=8, max_length=128)
     name: Optional[str] = None
     captcha_token: Optional[str] = None
+    age_confirmed: bool = Field(
+        ..., description="The person must explicitly self-declare they are 18+ to register."
+    )
 
 
 class LoginRequest(BaseModel):

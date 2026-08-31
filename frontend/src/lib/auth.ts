@@ -68,6 +68,9 @@ class RPApi {
         password,
         name,
         captcha_token: captchaToken,
+        // The caller only invokes register() after the "soy mayor de 18
+        // años" checkbox has been validated client-side — see Login.tsx.
+        age_confirmed: true,
       });
       setStoredToken(response.data.token);
       return response.data.user;

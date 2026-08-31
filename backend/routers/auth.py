@@ -26,6 +26,7 @@ GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo"
 GOOGLE_STATE_COOKIE = "google_oauth_state"
+GOOGLE_AGE_CONFIRMED_COOKIE = "google_oauth_age_confirmed"
 
 
 @router.post("/register", response_model=AuthTokenResponse, status_code=status.HTTP_201_CREATED)
@@ -40,7 +41,12 @@ async def register(payload: RegisterRequest, request: Request, db: AsyncSession 
         )
 
     auth_service = AuthService(db)
-    user = await auth_service.register_user(email=payload.email, password=payload.password, name=payload.name)
+    user = await auth_service.register_user(
+        email=payload.email,
+        password=payload.password,
+        name=payload.name,
+        age_confirmed=payload.age_confirmed,
+    )
     token, expires_at, _ = await auth_service.issue_app_token(user=user)
     return AuthTokenResponse(token=token, user=UserResponse.model_validate(user))
 
@@ -85,8 +91,16 @@ async def login_with_password(payload: LoginRequest, request: Request, db: Async
 
 
 @router.get("/google/login")
-async def google_login(request: Request):
-    """Redirect the browser to Google's consent screen to sign in/register."""
+async def google_login(request: Request, age_confirmed: bool = False):
+    """Redirect the browser to Google's consent screen to sign in/register.
+
+    `age_confirmed` reflects whether the person ticked the "soy mayor de 18
+    años" checkbox before clicking "Continuar con Google" (the frontend only
+    sends it as True when the checkbox was checked in register mode). Google
+    doesn't tell us anyone's age, so this self-declaration — carried across
+    the OAuth round-trip in a short-lived cookie — is what lets the callback
+    below refuse to create a brand-new account without it.
+    """
     google_client_id = getattr(settings, "google_client_id", None)
     if not google_client_id:
         raise HTTPException(
@@ -119,6 +133,15 @@ async def google_login(request: Request):
         secure=True,
         samesite="lax",
     )
+    if age_confirmed:
+        response.set_cookie(
+            GOOGLE_AGE_CONFIRMED_COOKIE,
+            "1",
+            max_age=600,
+            httponly=True,
+            secure=True,
+            samesite="lax",
+        )
     return response
 
 
@@ -187,10 +210,13 @@ async def google_callback(
 
     client_ip = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent", "")[:255]
+    age_confirmed = request.cookies.get(GOOGLE_AGE_CONFIRMED_COOKIE) == "1"
 
     auth_service = AuthService(db)
     try:
-        user, is_new_user = await auth_service.get_or_create_google_user(email=email, name=userinfo.get("name"))
+        user, is_new_user = await auth_service.get_or_create_google_user(
+            email=email, name=userinfo.get("name"), age_confirmed=age_confirmed
+        )
     except HTTPException as exc:
         await log_login_attempt(
             db, email=email, method="google", success=False,
@@ -213,6 +239,7 @@ async def google_callback(
         status_code=status.HTTP_302_FOUND,
     )
     redirect_response.delete_cookie(GOOGLE_STATE_COOKIE)
+    redirect_response.delete_cookie(GOOGLE_AGE_CONFIRMED_COOKIE)
     return redirect_response
 
 
