@@ -54,6 +54,27 @@ export function loadTrackingScripts(): void {
   }
   (window as any).gtag = gtag;
   gtag('js', new Date());
+
+  // --- Google Consent Mode ---
+  // Sin esta señal explícita, gtag.js asume por defecto que NO hay
+  // consentimiento (sobre todo para visitantes de la UE) y descarta las
+  // peticiones de medición aunque el script se haya cargado correctamente.
+  // Como esta función solo se ejecuta después de que la persona ya ha
+  // aceptado nuestro propio banner, confirmamos aquí el consentimiento a
+  // Google para que sí procese y envíe los datos.
+  gtag('consent', 'default', {
+    analytics_storage: 'denied',
+    ad_storage: 'denied',
+    ad_user_data: 'denied',
+    ad_personalization: 'denied',
+  });
+  gtag('consent', 'update', {
+    analytics_storage: 'granted',
+    ad_storage: 'granted',
+    ad_user_data: 'granted',
+    ad_personalization: 'granted',
+  });
+
   gtag('config', GA4_ID);
   gtag('config', GOOGLE_ADS_ID);
 
