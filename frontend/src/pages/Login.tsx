@@ -148,8 +148,12 @@ export default function LoginPage() {
   }, [mode]);
 
   const handleGoogleLogin = () => {
-    if (pendingInvite?.isRaffle && !ageConfirmed) {
-      toast.error('Confirma que eres mayor de 18 años para activar el premio del sorteo');
+    // Age confirmation only applies when creating a new account. Google's
+    // own login doesn't expose birthdate/age to us, so this self-declared
+    // checkbox is our only signal here — required for every new signup,
+    // not just people arriving through a raffle invite.
+    if (mode === 'register' && !ageConfirmed) {
+      toast.error('Confirma que eres mayor de 18 años para crear una cuenta');
       return;
     }
     localStorage.removeItem(INVITE_TOKEN_STORAGE_KEY);
@@ -164,8 +168,8 @@ export default function LoginPage() {
       return;
     }
 
-    if (mode === 'register' && pendingInvite?.isRaffle && !ageConfirmed) {
-      toast.error('Confirma que eres mayor de 18 años para activar el premio del sorteo');
+    if (mode === 'register' && !ageConfirmed) {
+      toast.error('Confirma que eres mayor de 18 años para crear una cuenta');
       return;
     }
 
@@ -210,23 +214,26 @@ export default function LoginPage() {
                     con ese mismo correo (o con Google usando esa cuenta) para activarlo automáticamente.
                   </span>
                 </div>
-                {pendingInvite.isRaffle && (
-                  <label className="mt-3 flex items-start gap-2 text-sm text-purple-900 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={ageConfirmed}
-                      onChange={(e) => setAgeConfirmed(e.target.checked)}
-                      className="mt-0.5 cursor-pointer"
-                    />
-                    Confirmo que soy mayor de 18 años.
-                  </label>
-                )}
               </div>
             )}
             {inviteAlreadyRedeemed && (
               <div className="mb-5 rounded-lg border border-muted bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
                 Ya activaste tu acceso gratis con esta invitación — inicia sesión normalmente con esa cuenta.
               </div>
+            )}
+            {mode === 'register' && (
+              // Required for every new account, not just raffle invites.
+              // Google Sign-In doesn't tell us the person's age, so this
+              // self-declared checkbox is our age gate at signup time.
+              <label className="mb-5 flex items-start gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={ageConfirmed}
+                  onChange={(e) => setAgeConfirmed(e.target.checked)}
+                  className="mt-0.5 cursor-pointer"
+                />
+                Confirmo que soy mayor de 18 años.
+              </label>
             )}
             <Button
               type="button"
