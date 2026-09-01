@@ -12,7 +12,7 @@ export type ConsentValue = 'accepted' | 'rejected';
 
 const CONSENT_KEY = 'vc_cookie_consent';
 
-const GA4_ID = 'G-FYNG38QM60';
+const GA4_ID = 'G-M07YHZZN4J';
 const GOOGLE_ADS_ID = 'AW-18413520055';
 const ADSENSE_CLIENT = 'ca-pub-6143759492313729';
 const META_PIXEL_ID = '1080080141160565';
