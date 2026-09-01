@@ -42,6 +42,7 @@ export default function AdSlot({ slot, label = 'Publicidad' }: { slot: string; l
   }, [slot]);
 
   useEffect(() => {
+    if (houseAd === undefined) return; // house ad todavía cargando, esperar a que resuelva
     if (houseAd) return;
 
     if (!clientId) {
