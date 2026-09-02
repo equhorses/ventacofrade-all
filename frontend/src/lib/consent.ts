@@ -67,6 +67,7 @@ export function loadTrackingScripts(): void {
     ad_storage: 'denied',
     ad_user_data: 'denied',
     ad_personalization: 'denied',
+    wait_for_update: 500,
   });
   gtag('consent', 'update', {
     analytics_storage: 'granted',
