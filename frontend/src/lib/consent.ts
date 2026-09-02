@@ -6,6 +6,11 @@
  * Google AdSense y Meta Pixel — se carga EXCLUSIVAMENTE a través de
  * `loadTrackingScriptsIfConsented`, nunca de forma estática en index.html,
  * para que nada se dispare sin que la persona haya aceptado explícitamente.
+ *
+ * NOTA: gtag.js SÍ se carga en index.html porque es el motor de Consent Mode
+ * y debe estar presente para definir el estado de consentimiento por defecto.
+ * Sin embargo, no envía ningún hit hasta que se recibe el consentimiento
+ * explícito mediante `consent update`.
  */
 
 export type ConsentValue = 'accepted' | 'rejected';
@@ -34,50 +39,26 @@ export function resetConsent(): void {
 let alreadyLoaded = false;
 
 /**
- * Inyecta Google Analytics + Google Ads (comparten gtag.js), Google AdSense
- * y el píxel de Meta. Idempotente: si ya se cargaron en esta sesión de
- * navegación, no los vuelve a inyectar.
+ * Activa el envío de datos a Google Analytics + Google Ads mediante
+ * Consent Mode update, e inyecta Google AdSense y el píxel de Meta.
+ * Idempotente: si ya se ejecutó en esta sesión, no hace nada.
  */
 export function loadTrackingScripts(): void {
   if (alreadyLoaded) return;
   alreadyLoaded = true;
 
-  // --- Google tag (gtag.js): Analytics + Google Ads ---
-  const gtagScript = document.createElement('script');
-  gtagScript.async = true;
-  gtagScript.src = `https://www.googletagmanager.com/gtag/js?id=${GA4_ID}`;
-  document.head.appendChild(gtagScript);
-
-  (window as any).dataLayer = (window as any).dataLayer || [];
-  function gtag(...args: unknown[]) {
-    (window as any).dataLayer.push(args);
-  }
-  (window as any).gtag = gtag;
-  gtag('js', new Date());
-
-  // --- Google Consent Mode ---
-  // Sin esta señal explícita, gtag.js asume por defecto que NO hay
-  // consentimiento (sobre todo para visitantes de la UE) y descarta las
-  // peticiones de medición aunque el script se haya cargado correctamente.
-  // Como esta función solo se ejecuta después de que la persona ya ha
-  // aceptado nuestro propio banner, confirmamos aquí el consentimiento a
-  // Google para que sí procese y envíe los datos.
-  gtag('consent', 'default', {
-    analytics_storage: 'denied',
-    ad_storage: 'denied',
-    ad_user_data: 'denied',
-    ad_personalization: 'denied',
-    wait_for_update: 500,
-  });
-  gtag('consent', 'update', {
+  // --- Google Consent Mode: update (solo tras aceptación explícita) ---
+  // gtag.js ya está cargado desde index.html con consent default='denied'.
+  // Ahora le decimos a Google que el usuario ha otorgado consentimiento.
+  (window as any).gtag('consent', 'update', {
     analytics_storage: 'granted',
     ad_storage: 'granted',
     ad_user_data: 'granted',
     ad_personalization: 'granted',
   });
 
-  gtag('config', GA4_ID);
-  gtag('config', GOOGLE_ADS_ID);
+  (window as any).gtag('config', GA4_ID);
+  (window as any).gtag('config', GOOGLE_ADS_ID);
 
   // --- Google AdSense ---
   const adsenseScript = document.createElement('script');
@@ -109,7 +90,7 @@ export function loadTrackingScripts(): void {
   (window as any).fbq('track', 'PageView');
 }
 
-/** Llamar una vez al arrancar la app: si ya había consentimiento de una visita anterior, carga los scripts sin volver a preguntar. */
+/** Llamar una vez al arrancar la app: si ya había consentimiento de una visita anterior, activa el envío de datos sin volver a preguntar. */
 export function loadTrackingScriptsIfConsented(): void {
   if (getConsent() === 'accepted') {
     loadTrackingScripts();
