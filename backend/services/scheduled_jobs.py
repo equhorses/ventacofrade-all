@@ -30,6 +30,7 @@ from services.email import (
     send_raffle_prize_revoked_email,
     send_subscription_renewal_reminder_email,
     send_launch_announcement_email,
+    send_invitation_email,
 )
 from services.audit import log_admin_action
 from services.house_ad_bookings import AdBookingsService
@@ -247,6 +248,49 @@ async def purge_scheduled_account_deletions() -> None:
                     details="Purga automatica tras 5 años desde la solicitud de baja",
                 )
                 logger.info("Cuenta %s purgada automaticamente (plazo de 5 anios cumplido)", deleted_email)
+
+
+INVITATION_EMAIL_BATCH_SIZE = 20
+
+
+async def send_pending_invitation_emails() -> None:
+    """Sends the actual 'you're invited' email for invitations that were
+    already created (e.g. by the admin's 'invite all waitlist' button) but
+    haven't been emailed yet — a small batch at a time, so a big waitlist
+    doesn't go out as a spam-looking blast all at once. Runs every couple of
+    hours (see services.scheduler) until everyone pending has been reached.
+    """
+    if not db_manager.async_session_maker:
+        await db_manager.ensure_initialized()
+    async with db_manager.async_session_maker() as db:
+        result = await db.execute(
+            select(Invitation)
+            .where(Invitation.invite_email_sent_at.is_(None))
+            .order_by(Invitation.created_at.asc())
+            .limit(INVITATION_EMAIL_BATCH_SIZE)
+        )
+        pending = result.scalars().all()
+
+        if not pending:
+            return
+
+        sent_count = 0
+        for invitation in pending:
+            try:
+                sent = await send_invitation_email(
+                    to_email=invitation.email, months=invitation.months, token=invitation.token
+                )
+                if sent:
+                    invitation.invite_email_sent_at = datetime.now(timezone.utc)
+                    await db.commit()
+                    sent_count += 1
+                else:
+                    logger.warning("Email de invitacion no enviado (Resend) a %s", invitation.email)
+            except Exception:
+                logger.exception("Fallo enviando email de invitacion pendiente a %s", invitation.email)
+                await db.rollback()
+
+        logger.info("Tanda de invitaciones enviada: %d de %d", sent_count, len(pending))
 
 
 async def run_daily_jobs() -> None:

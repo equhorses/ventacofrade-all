@@ -274,23 +274,24 @@ export default function AdminVendedoresPage() {
           <div className="border-t pt-4 mb-6">
             <p className="text-sm font-medium mb-1">Invitar a toda la lista de espera</p>
             <p className="text-xs text-muted-foreground mb-3">
-              Invita de golpe a todos los emails apuntados en la landing, con 12 meses de acceso
-              gratis cada uno. Si ya invitaste a alguien antes (de esta lista o a mano), se salta
-              automáticamente — puedes darle varias veces si llegan nuevos emails.
+              Reserva el acceso gratis (12 meses) para todos los emails apuntados en la landing
+              ahora mismo. Los emails de invitación no se mandan todos de golpe: salen en tandas
+              pequeñas cada 2 horas, para no parecer spam. Si ya invitaste a alguien antes, se
+              salta automáticamente — puedes darle varias veces si llegan nuevos emails.
             </p>
             <Button
               type="button"
               variant="outline"
               disabled={bulkInviting}
               onClick={async () => {
-                if (!confirm('¿Invitar ya a toda la lista de espera actual? Se enviará un email a cada persona nueva.')) return;
+                if (!confirm('¿Reservar ya el acceso para toda la lista de espera actual? Los emails se irán enviando poco a poco en las próximas horas.')) return;
                 setBulkInviting(true);
                 setBulkResult(null);
                 try {
                   const { data } = await client.admin.bulkInviteWaitlist(12);
                   setBulkResult(data);
                   await loadInvitations();
-                  toast.success(`${data.invited} personas invitadas`);
+                  toast.success(`${data.invited} personas reservadas — sus emails saldrán poco a poco`);
                 } catch (err) {
                   console.error('Error en la invitación masiva:', err);
                   toast.error('No se pudo completar la invitación masiva');
@@ -300,11 +301,11 @@ export default function AdminVendedoresPage() {
               }}
             >
               <Rocket className="h-4 w-4 mr-1" />
-              {bulkInviting ? 'Invitando...' : 'Invitar a toda la lista de espera'}
+              {bulkInviting ? 'Reservando...' : 'Invitar a toda la lista de espera'}
             </Button>
             {bulkResult && (
               <p className="text-sm text-muted-foreground mt-2">
-                {bulkResult.invited} invitados nuevos, {bulkResult.skipped_already_invited} ya estaban invitados
+                {bulkResult.invited} reservados nuevos (sus emails saldrán en tandas), {bulkResult.skipped_already_invited} ya estaban invitados
                 {bulkResult.failed_emails.length > 0 && `, ${bulkResult.failed_emails.length} fallaron: ${bulkResult.failed_emails.join(', ')}`}
               </p>
             )}

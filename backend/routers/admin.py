@@ -1178,6 +1178,10 @@ async def create_invitation(
     await db.refresh(invitation)
 
     sent = await send_invitation_email(to_email=normalized_email, months=invitation.months, token=invitation.token)
+    if sent:
+        invitation.invite_email_sent_at = datetime.now(timezone.utc)
+        await db.commit()
+        await db.refresh(invitation)
     if not sent:
         logger.warning("Invitacion creada pero el email no se pudo enviar a %s", normalized_email)
 
@@ -1204,10 +1208,15 @@ async def bulk_invite_waitlist(
     current_user: UserResponse = Depends(require_roles("admin", "marketing")),
     db: AsyncSession = Depends(get_db),
 ):
-    """Invite every email currently on the waitlist in one go, with N months
-    of free access each (default 12). Anyone who already has an invitation
-    (from this or a previous run) is skipped, so this is safe to run more
-    than once — e.g. to pick up new signups from a later batch."""
+    """Reserve a free-access invitation for every email currently on the
+    waitlist, in one go — this fixes exactly who's 'in' as of right now.
+    Anyone who already has an invitation (from this or a previous run) is
+    skipped, so this is safe to run more than once.
+
+    The actual invitation EMAILS are not sent here — they go out gradually,
+    in small batches every couple of hours, via
+    services.scheduled_jobs.send_pending_invitation_emails, so a big waitlist
+    doesn't look like a spam blast to Gmail/Outlook."""
     waitlist_result = await db.execute(select(Waitlist))
     waitlist_emails = [w.email.strip().lower() for w in waitlist_result.scalars().all()]
 
@@ -1231,20 +1240,15 @@ async def bulk_invite_waitlist(
             )
             db.add(invitation)
             await db.commit()
-            await db.refresh(invitation)
-
-            sent = await send_invitation_email(to_email=email, months=invitation.months, token=invitation.token)
-            if not sent:
-                logger.warning("Invitacion de lista de espera creada pero el email no se pudo enviar a %s", email)
             invited_count += 1
         except Exception:
-            logger.exception("Fallo invitando a %s desde la lista de espera", email)
+            logger.exception("Fallo reservando invitacion para %s desde la lista de espera", email)
             await db.rollback()
             failed_emails.append(email)
 
     await log_admin_action(
         db, current_user.id, current_user.email, "bulk_invite_waitlist",
-        details=f"invited={invited_count} skipped={len(already_invited)} failed={len(failed_emails)} months={months}",
+        details=f"reservadas={invited_count} saltadas={len(already_invited)} fallidas={len(failed_emails)} meses={months}",
     )
 
     return BulkInviteResult(

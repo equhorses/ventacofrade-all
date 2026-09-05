@@ -16,6 +16,11 @@ class Invitation(Base):
     redeemed_by_user_id = Column(String, nullable=True)
     redeemed_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=datetime.now)
+    # When the actual "you're invited" email was sent — separate from
+    # created_at so bulk invites can be created all at once (fixing who's
+    # in) while the emails themselves go out gradually in batches, see
+    # services.scheduled_jobs.send_pending_invitation_emails.
+    invite_email_sent_at = Column(DateTime(timezone=True), nullable=True)
 
     # 'sorteo_instagram' marks invitations created for raffle winners (as opposed
     # to regular admin-granted free access). Everything below only applies to those.
