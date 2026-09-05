@@ -295,6 +295,12 @@ export const client = {
     async deleteInvitation(invitationId: number) {
       await http.delete(`${baseUrl()}/api/v1/admin/invitations/${invitationId}`);
     },
+    async bulkInviteWaitlist(months: number = 12) {
+      const response = await http.post(`${baseUrl()}/api/v1/admin/invitations/bulk-from-waitlist`, null, {
+        params: { months },
+      });
+      return { data: response.data as { invited: number; skipped_already_invited: number; failed_emails: string[] } };
+    },
     async getPlatformSettings() {
       const response = await http.get(`${baseUrl()}/api/v1/admin/platform-settings`);
       return { data: response.data as { launch_at: string | null } };

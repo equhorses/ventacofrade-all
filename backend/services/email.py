@@ -225,22 +225,25 @@ async def send_invitation_email(to_email: str, months: int, token: str) -> bool:
     duration_text = "1 mes" if months == 1 else f"{months} meses"
 
     html_content = f"""
-    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
-      <h2 style="color: #6d28d9;">¡Te invitamos a VentaCofrade!</h2>
-      <p>Hemos reservado un hueco especial para ti antes de nuestro lanzamiento oficial.</p>
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; background:#faf9fb; padding: 24px; border-radius: 12px;">
+      <div style="text-align:center; margin-bottom: 12px;">
+        <img src="https://ventacofrade.com/logo-circle-email.png" alt="VentaCofrade" width="72" height="72" />
+      </div>
+      <h2 style="color: #6d28d9; text-align:center; margin-bottom: 4px;">Entra en Venta Cofrade</h2>
+      <p style="text-align:center; color:#52525b; margin-top:0;">Hemos reservado un hueco especial para ti antes de nuestro lanzamiento oficial.</p>
       <p>Como invitado, puedes publicar tus artículos cofrades <strong>totalmente gratis
       durante {duration_text}</strong>, sin necesidad de suscripción.</p>
-      <p style="margin-top: 24px;">
+      <p style="text-align:center; margin-top: 24px;">
         <a href="{access_url}" style="background-color:#6d28d9;color:#fff;
-        padding:10px 20px;border-radius:6px;text-decoration:none;">Entrar a VentaCofrade</a>
+        padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block;">Entrar a VentaCofrade</a>
       </p>
-      <p style="margin-top: 16px; color: #444; font-size: 14px;">
-        Entra con tu cuenta de Google usando este mismo correo ({to_email}) y completa tu perfil
-        de vendedor: el acceso gratuito se activará automáticamente.
+      <p style="margin-top: 20px; color: #444; font-size: 14px;">
+        Regístrate con este mismo correo ({to_email}) y una contraseña, y completa tu perfil
+        de vendedor: el acceso gratuito se activará automáticamente en cuanto publiques tu primer anuncio.
       </p>
-      <p style="margin-top: 24px; color: #666; font-size: 13px;">
+      <p style="margin-top: 24px; color: #666; font-size: 13px; border-top: 1px solid #e4e4e7; padding-top: 16px;">
         Si tienes cualquier duda, escríbenos a
-        <a href="mailto:contacto@ventacofrade.com">contacto@ventacofrade.com</a>.
+        <a href="mailto:contacto@ventacofrade.com" style="color:#6d28d9;">contacto@ventacofrade.com</a>.
       </p>
     </div>
     """

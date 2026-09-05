@@ -39,6 +39,7 @@ from services.user import purge_user_completely
 logger = logging.getLogger(__name__)
 
 RAFFLE_SOURCE = "sorteo_instagram"
+WAITLIST_LAUNCH_SOURCE = "lista_espera_lanzamiento"
 PUBLISH_DEADLINE_DAYS = 15
 REMINDER_BEFORE_DEADLINE_DAYS = 3
 RENEWAL_REMINDER_DAYS_BEFORE = 7
@@ -54,16 +55,16 @@ async def _has_published_real_listing(db, user_id: str, since: datetime) -> bool
 
 
 async def check_raffle_deadlines() -> None:
-    """For every activated, unrevoked raffle invitation: send a reminder a few
-    days before the 15-day publish deadline, and revoke the prize if the
-    deadline passes with no real listing published."""
+    """For every activated, unrevoked raffle OR waitlist-launch invitation:
+    send a reminder a few days before the 15-day publish deadline, and revoke
+    the free access if the deadline passes with no real listing published."""
     if not db_manager.async_session_maker:
         await db_manager.ensure_initialized()
     async with db_manager.async_session_maker() as db:
         now = datetime.now(timezone.utc)
         result = await db.execute(
             select(Invitation).where(
-                Invitation.source == RAFFLE_SOURCE,
+                Invitation.source.in_([RAFFLE_SOURCE, WAITLIST_LAUNCH_SOURCE]),
                 Invitation.status == "redeemed",
                 Invitation.activated_at.isnot(None),
                 Invitation.revoked_at.is_(None),

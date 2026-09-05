@@ -30,6 +30,8 @@ export default function AdminVendedoresPage() {
   const [inviteMonths, setInviteMonths] = useState(3);
   const [isRaffleWinner, setIsRaffleWinner] = useState(false);
   const [sendingInvite, setSendingInvite] = useState(false);
+  const [bulkInviting, setBulkInviting] = useState(false);
+  const [bulkResult, setBulkResult] = useState<{ invited: number; skipped_already_invited: number; failed_emails: string[] } | null>(null);
 
   const [launchAt, setLaunchAt] = useState<string | null>(null);
   const [launchAtInput, setLaunchAtInput] = useState('');
@@ -268,6 +270,45 @@ export default function AdminVendedoresPage() {
               Es ganador del sorteo de Instagram
             </label>
           </form>
+
+          <div className="border-t pt-4 mb-6">
+            <p className="text-sm font-medium mb-1">Invitar a toda la lista de espera</p>
+            <p className="text-xs text-muted-foreground mb-3">
+              Invita de golpe a todos los emails apuntados en la landing, con 12 meses de acceso
+              gratis cada uno. Si ya invitaste a alguien antes (de esta lista o a mano), se salta
+              automáticamente — puedes darle varias veces si llegan nuevos emails.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={bulkInviting}
+              onClick={async () => {
+                if (!confirm('¿Invitar ya a toda la lista de espera actual? Se enviará un email a cada persona nueva.')) return;
+                setBulkInviting(true);
+                setBulkResult(null);
+                try {
+                  const { data } = await client.admin.bulkInviteWaitlist(12);
+                  setBulkResult(data);
+                  await loadInvitations();
+                  toast.success(`${data.invited} personas invitadas`);
+                } catch (err) {
+                  console.error('Error en la invitación masiva:', err);
+                  toast.error('No se pudo completar la invitación masiva');
+                } finally {
+                  setBulkInviting(false);
+                }
+              }}
+            >
+              <Rocket className="h-4 w-4 mr-1" />
+              {bulkInviting ? 'Invitando...' : 'Invitar a toda la lista de espera'}
+            </Button>
+            {bulkResult && (
+              <p className="text-sm text-muted-foreground mt-2">
+                {bulkResult.invited} invitados nuevos, {bulkResult.skipped_already_invited} ya estaban invitados
+                {bulkResult.failed_emails.length > 0 && `, ${bulkResult.failed_emails.length} fallaron: ${bulkResult.failed_emails.join(', ')}`}
+              </p>
+            )}
+          </div>
 
           <Table>
             <TableHeader>

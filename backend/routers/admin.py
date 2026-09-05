@@ -1189,7 +1189,69 @@ async def create_invitation(
     return invitation
 
 
-@router.delete("/invitations/{invitation_id}")
+WAITLIST_LAUNCH_SOURCE = "lista_espera_lanzamiento"
+
+
+class BulkInviteResult(BaseModel):
+    invited: int
+    skipped_already_invited: int
+    failed_emails: List[str]
+
+
+@router.post("/invitations/bulk-from-waitlist", response_model=BulkInviteResult, status_code=201)
+async def bulk_invite_waitlist(
+    months: int = 12,
+    current_user: UserResponse = Depends(require_roles("admin", "marketing")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Invite every email currently on the waitlist in one go, with N months
+    of free access each (default 12). Anyone who already has an invitation
+    (from this or a previous run) is skipped, so this is safe to run more
+    than once — e.g. to pick up new signups from a later batch."""
+    waitlist_result = await db.execute(select(Waitlist))
+    waitlist_emails = [w.email.strip().lower() for w in waitlist_result.scalars().all()]
+
+    existing_result = await db.execute(select(Invitation.email))
+    already_invited = {e.strip().lower() for (e,) in existing_result.all()}
+
+    to_invite = [e for e in waitlist_emails if e not in already_invited]
+
+    invited_count = 0
+    failed_emails: List[str] = []
+
+    for email in to_invite:
+        try:
+            invitation = Invitation(
+                email=email,
+                token=secrets.token_urlsafe(24),
+                months=max(1, months),
+                status="pending",
+                invited_by=current_user.id,
+                source=WAITLIST_LAUNCH_SOURCE,
+            )
+            db.add(invitation)
+            await db.commit()
+            await db.refresh(invitation)
+
+            sent = await send_invitation_email(to_email=email, months=invitation.months, token=invitation.token)
+            if not sent:
+                logger.warning("Invitacion de lista de espera creada pero el email no se pudo enviar a %s", email)
+            invited_count += 1
+        except Exception:
+            logger.exception("Fallo invitando a %s desde la lista de espera", email)
+            await db.rollback()
+            failed_emails.append(email)
+
+    await log_admin_action(
+        db, current_user.id, current_user.email, "bulk_invite_waitlist",
+        details=f"invited={invited_count} skipped={len(already_invited)} failed={len(failed_emails)} months={months}",
+    )
+
+    return BulkInviteResult(
+        invited=invited_count,
+        skipped_already_invited=len(waitlist_emails) - len(to_invite),
+        failed_emails=failed_emails,
+    )
 async def delete_invitation(
     invitation_id: int,
     current_user: UserResponse = Depends(require_roles("admin", "marketing")),
