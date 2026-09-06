@@ -1256,6 +1256,9 @@ async def bulk_invite_waitlist(
         skipped_already_invited=len(waitlist_emails) - len(to_invite),
         failed_emails=failed_emails,
     )
+
+
+@router.delete("/invitations/{invitation_id}")
 async def delete_invitation(
     invitation_id: int,
     current_user: UserResponse = Depends(require_roles("admin", "marketing")),
