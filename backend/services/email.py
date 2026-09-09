@@ -270,6 +270,54 @@ async def send_invitation_email(to_email: str, months: int, token: str) -> bool:
         return False
 
 
+async def send_nudge_not_published_email(to_email: str) -> bool:
+    """Sent to someone who registered with their waitlist invitation but
+    hasn't published anything yet — the easier group to convert, since
+    they've already crossed the hardest step (creating an account)."""
+    html_content = """
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+      <h2 style="color: #6d28d9;">Te falta un solo paso</h2>
+      <p>Ya tienes tu cuenta creada en VentaCofrade y tu año de acceso gratis
+      activo — solo te falta publicar tu primer anuncio para empezar a vender.</p>
+      <p>Se hace en menos de 2 minutos: sube una foto, pon un precio, y listo.</p>
+      <p style="margin-top: 24px;">
+        <a href="https://www.ventacofrade.com/cuenta/publicar" style="background-color:#6d28d9;
+        color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;">Publicar mi primer anuncio</a>
+      </p>
+      <p style="margin-top: 24px; color: #666; font-size: 13px;">
+        ¿Dudas? Escríbenos a <a href="mailto:contacto@ventacofrade.com">contacto@ventacofrade.com</a>.
+      </p>
+    </div>
+    """
+    return await _send_via_resend(
+        to_email, "Te falta un solo paso para empezar a vender en VentaCofrade", html_content,
+        "recordatorio: registrado sin publicar",
+    )
+
+
+async def send_nudge_never_logged_in_email(to_email: str) -> bool:
+    """Sent to someone who was invited from the waitlist but never even
+    registered — a shorter, more urgent nudge than the one above."""
+    html_content = """
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+      <h2 style="color: #6d28d9;">Tu acceso gratis sigue esperándote</h2>
+      <p>Hace unos días te invitamos a VentaCofrade con <strong>1 año de acceso
+      gratis</strong> para publicar sin suscripción — pero aún no lo has activado.</p>
+      <p style="margin-top: 24px;">
+        <a href="https://www.ventacofrade.com/login" style="background-color:#6d28d9;
+        color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;">Activar mi acceso gratis</a>
+      </p>
+      <p style="margin-top: 24px; color: #666; font-size: 13px;">
+        ¿Dudas? Escríbenos a <a href="mailto:contacto@ventacofrade.com">contacto@ventacofrade.com</a>.
+      </p>
+    </div>
+    """
+    return await _send_via_resend(
+        to_email, "Tu año de acceso gratis en VentaCofrade sigue esperándote", html_content,
+        "recordatorio: nunca inicio sesion",
+    )
+
+
 async def _send_via_resend(to_email: str, subject: str, html_content: str, log_label: str) -> bool:
     """Shared sender for the emails below — keeps the Resend call in one place."""
     api_key = getattr(settings, "resend_api_key", None)

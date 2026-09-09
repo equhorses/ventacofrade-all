@@ -27,7 +27,7 @@ from models.ad_slot_configs import AdSlotConfig
 from models.ad_bookings import AdBooking
 from services.house_ad_bookings import AdBookingsService
 from routers.house_ads import KNOWN_SLOTS
-from services.email import send_invitation_email
+from services.email import send_invitation_email, send_nudge_not_published_email, send_nudge_never_logged_in_email
 from services.audit import log_admin_action
 
 logger = logging.getLogger(__name__)
@@ -1254,6 +1254,81 @@ async def bulk_invite_waitlist(
     return BulkInviteResult(
         invited=invited_count,
         skipped_already_invited=len(waitlist_emails) - len(to_invite),
+        failed_emails=failed_emails,
+    )
+
+
+class NudgeResult(BaseModel):
+    not_published_emailed: int
+    never_logged_in_emailed: int
+    failed_emails: List[str]
+
+
+@router.post("/invitations/nudge-waitlist", response_model=NudgeResult, status_code=201)
+async def nudge_waitlist(
+    current_user: UserResponse = Depends(require_roles("admin", "marketing")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Recordatorio de re-enganche para la lista de espera invitada. Dos
+    grupos, dos mensajes distintos:
+      - Ya se registraron pero no han publicado nada -> recordatorio corto,
+        "te falta un paso" (grupo con más probabilidad de convertir).
+      - Nunca llegaron ni a registrarse -> recordatorio más urgente.
+    Es seguro ejecutar más de una vez — solo manda a quien siga en cada
+    situación en el momento de ejecutarlo, así que si alguien ya publicó o
+    ya se registró desde la última vez, no le vuelve a llegar nada."""
+    invited_result = await db.execute(
+        select(Invitation.email).where(Invitation.source == WAITLIST_LAUNCH_SOURCE)
+    )
+    invited_emails = {e.strip().lower() for (e,) in invited_result.all()}
+
+    users_result = await db.execute(
+        select(User.id, User.email).where(func.lower(User.email).in_(invited_emails))
+    )
+    registered_users = {email.strip().lower(): user_id for user_id, email in users_result.all()}
+
+    published_result = await db.execute(
+        select(Products.user_id).where(Products.user_id.in_(list(registered_users.values())))
+    )
+    published_user_ids = {row[0] for row in published_result.all()}
+
+    not_published_emails = [
+        email for email, user_id in registered_users.items() if user_id not in published_user_ids
+    ]
+    never_logged_in_emails = [email for email in invited_emails if email not in registered_users]
+
+    not_published_count = 0
+    never_logged_in_count = 0
+    failed_emails: List[str] = []
+
+    for email in not_published_emails:
+        try:
+            if await send_nudge_not_published_email(email):
+                not_published_count += 1
+            else:
+                failed_emails.append(email)
+        except Exception:
+            logger.exception("Fallo mandando recordatorio (registrado sin publicar) a %s", email)
+            failed_emails.append(email)
+
+    for email in never_logged_in_emails:
+        try:
+            if await send_nudge_never_logged_in_email(email):
+                never_logged_in_count += 1
+            else:
+                failed_emails.append(email)
+        except Exception:
+            logger.exception("Fallo mandando recordatorio (nunca inicio sesion) a %s", email)
+            failed_emails.append(email)
+
+    await log_admin_action(
+        db, current_user.id, current_user.email, "nudge_waitlist",
+        details=f"registrados_sin_publicar={not_published_count} nunca_entraron={never_logged_in_count} fallidos={len(failed_emails)}",
+    )
+
+    return NudgeResult(
+        not_published_emailed=not_published_count,
+        never_logged_in_emailed=never_logged_in_count,
         failed_emails=failed_emails,
     )
 

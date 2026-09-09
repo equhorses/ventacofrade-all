@@ -301,6 +301,10 @@ export const client = {
       });
       return { data: response.data as { invited: number; skipped_already_invited: number; failed_emails: string[] } };
     },
+    async nudgeWaitlist() {
+      const response = await http.post(`${baseUrl()}/api/v1/admin/invitations/nudge-waitlist`);
+      return { data: response.data as { not_published_emailed: number; never_logged_in_emailed: number; failed_emails: string[] } };
+    },
     async getPlatformSettings() {
       const response = await http.get(`${baseUrl()}/api/v1/admin/platform-settings`);
       return { data: response.data as { launch_at: string | null } };

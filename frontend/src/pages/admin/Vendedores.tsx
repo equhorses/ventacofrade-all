@@ -32,6 +32,8 @@ export default function AdminVendedoresPage() {
   const [sendingInvite, setSendingInvite] = useState(false);
   const [bulkInviting, setBulkInviting] = useState(false);
   const [bulkResult, setBulkResult] = useState<{ invited: number; skipped_already_invited: number; failed_emails: string[] } | null>(null);
+  const [nudging, setNudging] = useState(false);
+  const [nudgeResult, setNudgeResult] = useState<{ not_published_emailed: number; never_logged_in_emailed: number; failed_emails: string[] } | null>(null);
 
   const [launchAt, setLaunchAt] = useState<string | null>(null);
   const [launchAtInput, setLaunchAtInput] = useState('');
@@ -307,6 +309,44 @@ export default function AdminVendedoresPage() {
               <p className="text-sm text-muted-foreground mt-2">
                 {bulkResult.invited} reservados nuevos (sus emails saldrán en tandas), {bulkResult.skipped_already_invited} ya estaban invitados
                 {bulkResult.failed_emails.length > 0 && `, ${bulkResult.failed_emails.length} fallaron: ${bulkResult.failed_emails.join(', ')}`}
+              </p>
+            )}
+          </div>
+
+          <div className="border-t pt-4 mb-6">
+            <p className="text-sm font-medium mb-1">Recordatorio a la lista de espera invitada</p>
+            <p className="text-xs text-muted-foreground mb-3">
+              Manda dos recordatorios distintos: a quien ya se registró pero no ha publicado nada
+              ("te falta un paso"), y a quien nunca llegó a registrarse (recordatorio más directo).
+              Seguro de repetir — solo escribe a quien siga en cada situación en ese momento.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={nudging}
+              onClick={async () => {
+                if (!confirm('¿Mandar ya los recordatorios a toda la lista de espera invitada que aún no ha publicado?')) return;
+                setNudging(true);
+                setNudgeResult(null);
+                try {
+                  const { data } = await client.admin.nudgeWaitlist();
+                  setNudgeResult(data);
+                  toast.success('Recordatorios enviados');
+                } catch (err) {
+                  console.error('Error mandando recordatorios:', err);
+                  toast.error('No se pudo completar el envío de recordatorios');
+                } finally {
+                  setNudging(false);
+                }
+              }}
+            >
+              <Mail className="h-4 w-4 mr-1" />
+              {nudging ? 'Enviando...' : 'Mandar recordatorios'}
+            </Button>
+            {nudgeResult && (
+              <p className="text-sm text-muted-foreground mt-2">
+                {nudgeResult.not_published_emailed} recordatorios a registrados sin publicar, {nudgeResult.never_logged_in_emailed} a quienes nunca entraron
+                {nudgeResult.failed_emails.length > 0 && `, ${nudgeResult.failed_emails.length} fallaron: ${nudgeResult.failed_emails.join(', ')}`}
               </p>
             )}
           </div>
