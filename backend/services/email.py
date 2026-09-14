@@ -318,6 +318,131 @@ async def send_nudge_never_logged_in_email(to_email: str) -> bool:
     )
 
 
+async def send_launch_campaign_catalog_email(to_email: str, name: str | None, individual_deadline) -> bool:
+    """Campaign email #1 — to people who already redeemed their waitlist
+    invitation (registered + set up their shop). Encourages them to publish
+    now, ahead of the official opening, using their OWN real 15-day deadline
+    (which already started ticking at registration, NOT at the official
+    opening date) rather than a blanket date that wouldn't be accurate for
+    everyone."""
+    greeting = f"Hola {name}," if name else "Hola,"
+    deadline_str = individual_deadline.strftime("%d/%m/%Y")
+    html_content = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+      <h2 style="color: #6d28d9;">Faltan pocos días para abrir</h2>
+      <p>{greeting}</p>
+      <p>El 1 de octubre abrimos VentaCofrade al público. Como Fundador, tu acceso
+      gratis de 12 meses se mantiene si publicas al menos un artículo real antes del
+      <strong>{deadline_str}</strong>.</p>
+      <p>La forma más fácil de no tener prisa esos días: sube tu primer artículo
+      ahora, con calma, y así el 1 de octubre ya estará visible desde el minuto uno
+      — con más posibilidades de ser de los primeros que vea la gente.</p>
+      <p style="background:#f3f0fb; padding:12px 16px; border-radius:8px; color:#4c1d95; font-size:13px;">
+        Aunque no llegaras a publicar a tiempo, tu insignia de Fundador es tuya para
+        siempre — solo el acceso gratis pasaría a nuestro plan Free.
+      </p>
+      <p style="margin-top: 24px;">
+        <a href="https://www.ventacofrade.com/cuenta/publicar" style="background-color:#6d28d9;
+        color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;">Publicar mi primer artículo</a>
+      </p>
+      <p style="margin-top: 24px; color: #666; font-size: 13px;">
+        Cualquier duda, respóndenos a este email o escribe a
+        <a href="mailto:contacto@ventacofrade.com">contacto@ventacofrade.com</a>.
+      </p>
+    </div>
+    """
+    return await _send_via_resend(
+        to_email, "Faltan pocos días para abrir — deja tu catálogo listo", html_content,
+        "campaña lanzamiento: recordatorio a registrados",
+    )
+
+
+async def send_launch_campaign_activation_email(to_email: str, token: str) -> bool:
+    """Campaign email #2 — to people who were invited from the waitlist but
+    never registered. Soft marketing deadline (25/09), not enforced by the
+    system — framed as urgency, not a hard technical cutoff."""
+    access_url = f"https://www.ventacofrade.com/login?invite={token}"
+    html_content = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+      <h2 style="color: #6d28d9;">Tu acceso de Fundador caduca el 25 de septiembre</h2>
+      <p>Hola,</p>
+      <p>Sigues teniendo pendiente activar tu acceso gratuito de 12 meses como
+      Fundador de VentaCofrade — pero solo está reservado hasta el 25 de septiembre.
+      Pasada esa fecha, no podemos garantizar tu plaza.</p>
+      <p>Activar tu cuenta te lleva 2 minutos:</p>
+      <p style="margin-top: 24px;">
+        <a href="{access_url}" style="background-color:#6d28d9;
+        color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;">Activar mi acceso gratis</a>
+      </p>
+      <p style="margin-top: 24px; color: #666; font-size: 13px;">
+        Si tienes alguna duda sobre cómo funciona, respóndenos a este email o escribe a
+        <a href="mailto:contacto@ventacofrade.com">contacto@ventacofrade.com</a>.
+      </p>
+    </div>
+    """
+    return await _send_via_resend(
+        to_email, "Tu acceso de Fundador caduca el 25 de septiembre", html_content,
+        "campaña lanzamiento: recordatorio a pendientes",
+    )
+
+
+async def send_finish_shop_reminder_email(to_email: str, deadline) -> bool:
+    """To someone who created their account from a waitlist invitation but
+    hasn't finished setting up their shop yet — a few days before their
+    18-day window (15 + 3 days' grace) to do so runs out."""
+    deadline_str = deadline.strftime("%d/%m/%Y")
+    html_content = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+      <h2 style="color: #6d28d9;">Termina de montar tu tienda</h2>
+      <p>Hola,</p>
+      <p>Ya tienes tu cuenta creada en VentaCofrade, pero para conservar tu
+      <strong>año de acceso gratis como Fundador</strong> necesitas terminar de
+      montar tu tienda antes del <strong>{deadline_str}</strong>.</p>
+      <p>Se hace en un par de minutos: completa tu perfil de vendedor y estará listo.</p>
+      <p style="margin-top: 24px;">
+        <a href="https://www.ventacofrade.com/cuenta/publicar" style="background-color:#6d28d9;
+        color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;">Terminar mi tienda</a>
+      </p>
+      <p style="margin-top: 24px; color: #666; font-size: 13px;">
+        Cualquier duda, respóndenos a este email o escribe a
+        <a href="mailto:contacto@ventacofrade.com">contacto@ventacofrade.com</a>.
+      </p>
+    </div>
+    """
+    return await _send_via_resend(
+        to_email, "Termina de montar tu tienda antes de perder tu acceso gratis", html_content,
+        "campaña lanzamiento: recordatorio terminar tienda",
+    )
+
+
+async def send_signup_expired_email(to_email: str) -> bool:
+    """To someone whose 18-day window to finish setting up their shop
+    passed without doing so — their waitlist invitation is now expired."""
+    html_content = """
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+      <h2 style="color: #6d28d9;">Tu acceso gratis de Fundador ha caducado</h2>
+      <p>Hola,</p>
+      <p>El plazo para terminar de montar tu tienda y activar tu año de acceso
+      gratis como Fundador ha pasado, así que tu invitación especial ya no está
+      disponible.</p>
+      <p>Tu cuenta sigue activa con normalidad — puedes seguir usando VentaCofrade
+      con nuestro plan Free en cualquier momento.</p>
+      <p style="margin-top: 24px;">
+        <a href="https://www.ventacofrade.com/cuenta/publicar" style="background-color:#6d28d9;
+        color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;">Ir a mi cuenta</a>
+      </p>
+      <p style="margin-top: 24px; color: #666; font-size: 13px;">
+        Cualquier duda, respóndenos a este email o escribe a
+        <a href="mailto:contacto@ventacofrade.com">contacto@ventacofrade.com</a>.
+      </p>
+    </div>
+    """
+    return await _send_via_resend(
+        to_email, "Tu acceso gratis de Fundador ha caducado", html_content,
+        "campaña lanzamiento: invitacion expirada",
+    )
+
+
 async def _send_via_resend(to_email: str, subject: str, html_content: str, log_label: str) -> bool:
     """Shared sender for the emails below — keeps the Resend call in one place."""
     api_key = getattr(settings, "resend_api_key", None)

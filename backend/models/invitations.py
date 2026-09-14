@@ -33,3 +33,12 @@ class Invitation(Base):
     deadline_reminder_sent_at = Column(DateTime(timezone=True), nullable=True)
     # When we revoked the prize because the 15-day publish deadline passed unused.
     revoked_at = Column(DateTime(timezone=True), nullable=True)
+    # One-off "abrimos el 1 de octubre" campaign reminders — separate from
+    # the deadline reminder above, and from each other since they target
+    # two different segments (redeemed vs still-pending invitations).
+    catalog_reminder_sent_at = Column(DateTime(timezone=True), nullable=True)
+    activation_reminder_sent_at = Column(DateTime(timezone=True), nullable=True)
+    # Reminder for the NEW "cuenta creada pero tienda sin terminar" deadline
+    # (account_created_at + 18 días). Separate from deadline_reminder_sent_at
+    # above, which is for the later "tienda hecha pero sin publicar" phase.
+    signup_deadline_reminder_sent_at = Column(DateTime(timezone=True), nullable=True)

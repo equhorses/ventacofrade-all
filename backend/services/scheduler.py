@@ -11,7 +11,12 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
-from services.scheduled_jobs import run_daily_jobs, send_pending_invitation_emails
+from services.scheduled_jobs import (
+    run_daily_jobs,
+    send_pending_invitation_emails,
+    send_launch_campaign_emails,
+    check_signup_deadlines,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,10 +35,18 @@ def start_scheduler() -> None:
     _scheduler.add_job(
         send_pending_invitation_emails, IntervalTrigger(hours=2), id="invitation_email_batches", replace_existing=True
     )
+    # Campaña de recordatorio pre-lanzamiento (catálogo + activación), misma cadencia de 2 horas.
+    _scheduler.add_job(
+        send_launch_campaign_emails, IntervalTrigger(hours=2), id="launch_campaign_batches", replace_existing=True
+    )
+    # Plazo de 18 días (cuenta creada -> tienda terminada): recordatorio y expiración.
+    _scheduler.add_job(
+        check_signup_deadlines, IntervalTrigger(hours=2), id="signup_deadline_checks", replace_existing=True
+    )
     _scheduler.start()
     logger.info(
         "Scheduler iniciado: trabajos diarios (sorteo + renovaciones + lanzamiento + purga de cuentas) a las 08:00 UTC, "
-        "y envio de invitaciones pendientes en tandas cada 2 horas"
+        "y envio de invitaciones/campana/plazo de registro en tandas cada 2 horas"
     )
 
 

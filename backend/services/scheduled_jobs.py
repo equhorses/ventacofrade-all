@@ -21,6 +21,7 @@ from sqlalchemy import select, func
 
 from core.database import db_manager
 from models.invitations import Invitation
+from models.auth import User
 from models.seller_profiles import Seller_profiles
 from models.products import Products
 from models.renewal_reminders import RenewalReminderSent
@@ -31,6 +32,8 @@ from services.email import (
     send_subscription_renewal_reminder_email,
     send_launch_announcement_email,
     send_invitation_email,
+    send_launch_campaign_catalog_email,
+    send_launch_campaign_activation_email,
 )
 from services.audit import log_admin_action
 from services.house_ad_bookings import AdBookingsService
@@ -291,6 +294,132 @@ async def send_pending_invitation_emails() -> None:
                 await db.rollback()
 
         logger.info("Tanda de invitaciones enviada: %d de %d", sent_count, len(pending))
+
+
+CAMPAIGN_EMAIL_BATCH_SIZE = 20
+
+
+async def send_launch_campaign_emails() -> None:
+    """One-off pre-launch campaign, in two segments, both trickled out in
+    small batches (same rhythm as the invitation emails above) so this
+    doesn't look like a spam blast either:
+
+      - Redeemed waitlist invitations (already registered, shop set up):
+        reminder to publish, using their OWN real 15-day deadline (it
+        started at registration, not at the official launch date).
+      - Pending waitlist invitations (never registered): a softer,
+        marketing-only deadline nudge — no automatic consequence if they
+        activate after that date.
+
+    Safe to leave running indefinitely: once everyone in a segment has been
+    emailed, that half of the query returns nothing and it's a no-op.
+    """
+    if not db_manager.async_session_maker:
+        await db_manager.ensure_initialized()
+    async with db_manager.async_session_maker() as db:
+        redeemed_result = await db.execute(
+            select(Invitation, User.name)
+            .join(User, User.id == Invitation.redeemed_by_user_id)
+            .where(
+                Invitation.source == WAITLIST_LAUNCH_SOURCE,
+                Invitation.status == "redeemed",
+                Invitation.catalog_reminder_sent_at.is_(None),
+                Invitation.activated_at.isnot(None),
+            )
+            .order_by(Invitation.redeemed_at.asc())
+            .limit(CAMPAIGN_EMAIL_BATCH_SIZE)
+        )
+        for invitation, user_name in redeemed_result.all():
+            try:
+                deadline = invitation.activated_at + timedelta(days=PUBLISH_DEADLINE_DAYS)
+                sent = await send_launch_campaign_catalog_email(
+                    to_email=invitation.email, name=user_name, individual_deadline=deadline
+                )
+                if sent:
+                    invitation.catalog_reminder_sent_at = datetime.now(timezone.utc)
+                    await db.commit()
+                else:
+                    logger.warning("Email de campana (catalogo) no enviado a %s", invitation.email)
+            except Exception:
+                logger.exception("Fallo enviando email de campana (catalogo) a %s", invitation.email)
+                await db.rollback()
+
+        pending_result = await db.execute(
+            select(Invitation)
+            .where(
+                Invitation.source == WAITLIST_LAUNCH_SOURCE,
+                Invitation.status == "pending",
+                Invitation.activation_reminder_sent_at.is_(None),
+                ~func.lower(Invitation.email).in_(select(func.lower(User.email))),
+            )
+            .order_by(Invitation.created_at.asc())
+            .limit(CAMPAIGN_EMAIL_BATCH_SIZE)
+        )
+        for invitation in pending_result.scalars().all():
+            try:
+                sent = await send_launch_campaign_activation_email(to_email=invitation.email, token=invitation.token)
+                if sent:
+                    invitation.activation_reminder_sent_at = datetime.now(timezone.utc)
+                    await db.commit()
+                else:
+                    logger.warning("Email de campana (activacion) no enviado a %s", invitation.email)
+            except Exception:
+                logger.exception("Fallo enviando email de campana (activacion) a %s", invitation.email)
+                await db.rollback()
+
+
+SIGNUP_DEADLINE_DAYS = 18  # 15 días normales + 3 de margen para esta primera tanda
+
+
+async def check_signup_deadlines() -> None:
+    """For waitlist invitations where the person already created an account
+    but hasn't finished their shop yet: remind them a few days before their
+    18-day window closes, and expire the invitation for good if it passes.
+    Runs on the same 2-hour cycle as the rest of the launch campaign."""
+    if not db_manager.async_session_maker:
+        await db_manager.ensure_initialized()
+    async with db_manager.async_session_maker() as db:
+        now = datetime.now(timezone.utc)
+        result = await db.execute(
+            select(Invitation, User.created_at)
+            .join(User, func.lower(User.email) == func.lower(Invitation.email))
+            .where(
+                Invitation.source == WAITLIST_LAUNCH_SOURCE,
+                Invitation.status == "pending",
+                Invitation.revoked_at.is_(None),
+            )
+        )
+        rows = result.all()
+
+        for invitation, account_created_at in rows:
+            if account_created_at.tzinfo is None:
+                account_created_at = account_created_at.replace(tzinfo=timezone.utc)
+            deadline = account_created_at + timedelta(days=SIGNUP_DEADLINE_DAYS)
+            reminder_at = deadline - timedelta(days=REMINDER_BEFORE_DEADLINE_DAYS)
+
+            try:
+                if now >= deadline:
+                    invitation.revoked_at = now
+                    await db.commit()
+                    sent = await send_signup_expired_email(to_email=invitation.email)
+                    if not sent:
+                        logger.warning("No se pudo enviar email de invitacion expirada a %s", invitation.email)
+                    await log_admin_action(
+                        db, None, "system", "expire_waitlist_invitation",
+                        target=invitation.email, details="18 dias sin terminar la tienda",
+                    )
+                    logger.info("Invitacion de lista de espera expirada para %s", invitation.email)
+
+                elif now >= reminder_at and invitation.signup_deadline_reminder_sent_at is None:
+                    sent = await send_finish_shop_reminder_email(to_email=invitation.email, deadline=deadline)
+                    if sent:
+                        invitation.signup_deadline_reminder_sent_at = now
+                        await db.commit()
+                    else:
+                        logger.warning("No se pudo enviar recordatorio de tienda a %s", invitation.email)
+            except Exception:
+                logger.exception("Error comprobando plazo de registro para invitacion %s", invitation.id)
+                await db.rollback()
 
 
 async def run_daily_jobs() -> None:

@@ -366,7 +366,12 @@ export default function AdminVendedoresPage() {
               {invitations.map((inv) => (
                 <TableRow key={inv.id}>
                   <TableCell>{inv.email}</TableCell>
-                  <TableCell>{inv.months}</TableCell>
+                  <TableCell>
+                    {inv.months}
+                    {inv.status !== 'redeemed' && (
+                      <span className="text-xs text-muted-foreground ml-1">(pendiente)</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     {inv.source === 'sorteo_instagram' ? (
                       <Badge className="bg-purple-100 text-purple-700 flex items-center gap-1 w-fit">
