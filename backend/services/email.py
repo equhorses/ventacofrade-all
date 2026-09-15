@@ -386,6 +386,37 @@ async def send_launch_campaign_activation_email(to_email: str, token: str) -> bo
     )
 
 
+async def send_signup_early_checkin_email(to_email: str, deadline) -> bool:
+    """A softer, earlier check-in than send_finish_shop_reminder_email —
+    sent as a one-off manual nudge, well before the 3-day-out automatic
+    reminder, so people get two distinct touchpoints instead of one."""
+    deadline_str = deadline.strftime("%d/%m/%Y")
+    html_content = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+      <h2 style="color: #6d28d9;">¿Cómo va tu tienda?</h2>
+      <p>Hola,</p>
+      <p>Vimos que ya tienes tu cuenta creada en VentaCofrade — genial. Te
+      escribimos solo para recordarte que, para conservar tu <strong>año de
+      acceso gratis como Fundador</strong>, tienes hasta el <strong>{deadline_str}</strong>
+      para terminar de montar tu tienda.</p>
+      <p>Todavía te queda tiempo de sobra, pero si te has quedado atascado en
+      algún paso o tienes dudas, responde a este email y te ayudamos encantados.</p>
+      <p style="margin-top: 24px;">
+        <a href="https://www.ventacofrade.com/cuenta/publicar" style="background-color:#6d28d9;
+        color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;">Continuar con mi tienda</a>
+      </p>
+      <p style="margin-top: 24px; color: #666; font-size: 13px;">
+        Cualquier duda, respóndenos a este email o escribe a
+        <a href="mailto:contacto@ventacofrade.com">contacto@ventacofrade.com</a>.
+      </p>
+    </div>
+    """
+    return await _send_via_resend(
+        to_email, "¿Cómo va tu tienda en VentaCofrade?", html_content,
+        "campaña lanzamiento: aviso previo suave",
+    )
+
+
 async def send_finish_shop_reminder_email(to_email: str, deadline) -> bool:
     """To someone who created their account from a waitlist invitation but
     hasn't finished setting up their shop yet — a few days before their

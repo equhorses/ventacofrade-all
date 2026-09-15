@@ -305,6 +305,10 @@ export const client = {
       const response = await http.post(`${baseUrl()}/api/v1/admin/invitations/nudge-waitlist`);
       return { data: response.data as { not_published_emailed: number; never_logged_in_emailed: number; failed_emails: string[] } };
     },
+    async sendEarlySignupCheckin() {
+      const response = await http.post(`${baseUrl()}/api/v1/admin/invitations/send-early-signup-checkin`);
+      return { data: response.data as { emailed: number; failed_emails: string[] } };
+    },
     async getPlatformSettings() {
       const response = await http.get(`${baseUrl()}/api/v1/admin/platform-settings`);
       return { data: response.data as { launch_at: string | null } };

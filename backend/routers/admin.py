@@ -27,7 +27,12 @@ from models.ad_slot_configs import AdSlotConfig
 from models.ad_bookings import AdBooking
 from services.house_ad_bookings import AdBookingsService
 from routers.house_ads import KNOWN_SLOTS
-from services.email import send_invitation_email, send_nudge_not_published_email, send_nudge_never_logged_in_email
+from services.email import (
+    send_invitation_email,
+    send_nudge_not_published_email,
+    send_nudge_never_logged_in_email,
+    send_signup_early_checkin_email,
+)
 from services.audit import log_admin_action
 
 logger = logging.getLogger(__name__)
@@ -1331,6 +1336,53 @@ async def nudge_waitlist(
         never_logged_in_emailed=never_logged_in_count,
         failed_emails=failed_emails,
     )
+
+
+class EarlyCheckinResult(BaseModel):
+    emailed: int
+    failed_emails: List[str]
+
+
+@router.post("/invitations/send-early-signup-checkin", response_model=EarlyCheckinResult, status_code=201)
+async def send_early_signup_checkin(
+    current_user: UserResponse = Depends(require_roles("admin", "marketing")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Aviso puntual, manual, mandado una sola vez a quien ya tiene cuenta
+    pero no ha terminado su tienda — un primer toque suave, complementario
+    al recordatorio automático de 3 días antes del plazo (que sigue
+    funcionando igual, este envío no lo toca ni lo sustituye)."""
+    result = await db.execute(
+        select(Invitation, User.created_at)
+        .join(User, func.lower(User.email) == func.lower(Invitation.email))
+        .where(
+            Invitation.source == WAITLIST_LAUNCH_SOURCE,
+            Invitation.status == "pending",
+            Invitation.revoked_at.is_(None),
+        )
+    )
+    rows = result.all()
+
+    emailed_count = 0
+    failed_emails: List[str] = []
+
+    for invitation, account_created_at in rows:
+        try:
+            deadline = account_created_at + timedelta(days=18)
+            if await send_signup_early_checkin_email(to_email=invitation.email, deadline=deadline):
+                emailed_count += 1
+            else:
+                failed_emails.append(invitation.email)
+        except Exception:
+            logger.exception("Fallo mandando aviso previo a %s", invitation.email)
+            failed_emails.append(invitation.email)
+
+    await log_admin_action(
+        db, current_user.id, current_user.email, "send_early_signup_checkin",
+        details=f"enviados={emailed_count} fallidos={len(failed_emails)}",
+    )
+
+    return EarlyCheckinResult(emailed=emailed_count, failed_emails=failed_emails)
 
 
 @router.delete("/invitations/{invitation_id}")

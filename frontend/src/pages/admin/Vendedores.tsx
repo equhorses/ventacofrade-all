@@ -34,6 +34,8 @@ export default function AdminVendedoresPage() {
   const [bulkResult, setBulkResult] = useState<{ invited: number; skipped_already_invited: number; failed_emails: string[] } | null>(null);
   const [nudging, setNudging] = useState(false);
   const [nudgeResult, setNudgeResult] = useState<{ not_published_emailed: number; never_logged_in_emailed: number; failed_emails: string[] } | null>(null);
+  const [earlyCheckinSending, setEarlyCheckinSending] = useState(false);
+  const [earlyCheckinResult, setEarlyCheckinResult] = useState<{ emailed: number; failed_emails: string[] } | null>(null);
 
   const [launchAt, setLaunchAt] = useState<string | null>(null);
   const [launchAtInput, setLaunchAtInput] = useState('');
@@ -347,6 +349,44 @@ export default function AdminVendedoresPage() {
               <p className="text-sm text-muted-foreground mt-2">
                 {nudgeResult.not_published_emailed} recordatorios a registrados sin publicar, {nudgeResult.never_logged_in_emailed} a quienes nunca entraron
                 {nudgeResult.failed_emails.length > 0 && `, ${nudgeResult.failed_emails.length} fallaron: ${nudgeResult.failed_emails.join(', ')}`}
+              </p>
+            )}
+          </div>
+
+          <div className="border-t pt-4 mb-6">
+            <p className="text-sm font-medium mb-1">Aviso previo (hoy) a quien tiene cuenta sin tienda</p>
+            <p className="text-xs text-muted-foreground mb-3">
+              Un primer toque suave, distinto y complementario al recordatorio automático de 3 días
+              antes del plazo — ese sigue funcionando igual, esto no lo sustituye. Pensado para
+              mandar una sola vez.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={earlyCheckinSending}
+              onClick={async () => {
+                if (!confirm('¿Mandar ya el aviso previo a quien tiene cuenta pero no ha terminado su tienda?')) return;
+                setEarlyCheckinSending(true);
+                setEarlyCheckinResult(null);
+                try {
+                  const { data } = await client.admin.sendEarlySignupCheckin();
+                  setEarlyCheckinResult(data);
+                  toast.success('Aviso previo enviado');
+                } catch (err) {
+                  console.error('Error mandando aviso previo:', err);
+                  toast.error('No se pudo completar el envío');
+                } finally {
+                  setEarlyCheckinSending(false);
+                }
+              }}
+            >
+              <Mail className="h-4 w-4 mr-1" />
+              {earlyCheckinSending ? 'Enviando...' : 'Mandar aviso previo'}
+            </Button>
+            {earlyCheckinResult && (
+              <p className="text-sm text-muted-foreground mt-2">
+                {earlyCheckinResult.emailed} avisos enviados
+                {earlyCheckinResult.failed_emails.length > 0 && `, ${earlyCheckinResult.failed_emails.length} fallaron: ${earlyCheckinResult.failed_emails.join(', ')}`}
               </p>
             )}
           </div>
