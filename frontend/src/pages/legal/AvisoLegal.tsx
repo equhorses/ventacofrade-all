@@ -99,9 +99,12 @@ export default function AvisoLegal() {
           están protegidos por la normativa de propiedad intelectual e industrial. Queda prohibida
           su reproducción, distribución o comunicación pública sin autorización expresa, salvo en
           los casos permitidos por la ley. El contenido subido por las personas usuarias
-          (fotografías y descripciones de sus anuncios) es propiedad de quien lo publica, quien
-          concede a VentaCofrade una licencia no exclusiva para mostrarlo en la Plataforma con el
-          único fin de prestar el servicio.
+          (fotografías y descripciones de sus anuncios) pasa a ser propiedad de VentaCofrade desde
+          el momento de su publicación, sin perjuicio de los derechos morales que, conforme a la
+          normativa de propiedad intelectual, correspondan siempre a su autor. VentaCofrade podrá
+          usar dicho contenido con fines publicitarios y promocionales, en la Plataforma y fuera de
+          ella (incluyendo redes sociales y campañas de publicidad), además de para la prestación
+          del propio servicio.
         </p>
 
         <h2 className="text-xl font-semibold mt-6 mb-2">8. Enlaces a terceros</h2>
