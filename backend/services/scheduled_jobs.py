@@ -34,6 +34,8 @@ from services.email import (
     send_invitation_email,
     send_launch_campaign_catalog_email,
     send_launch_campaign_activation_email,
+    send_finish_shop_reminder_email,
+    send_signup_expired_email,
 )
 from services.audit import log_admin_action
 from services.house_ad_bookings import AdBookingsService
