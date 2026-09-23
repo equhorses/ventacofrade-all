@@ -187,15 +187,15 @@ function getBlogRoute(slug: string) {
 
 function getSiteDomainUrl() {
   const configuredUrl = import.meta.env.VITE_SITE_URL?.trim();
-  return configuredUrl ? configuredUrl.replace(/\/+$/, '') : undefined;
+  return (configuredUrl || 'https://www.ventacofrade.com').replace(/\/+$/, '');
 }
 
 function getSiteName() {
-  return import.meta.env.VITE_APP_TITLE?.trim() || 'Atoms';
+  return import.meta.env.VITE_APP_TITLE?.trim() || 'VentaCofrade';
 }
 
 function getTwitterSiteHandle() {
-  return import.meta.env.VITE_TWITTER_SITE?.trim() || '@atoms';
+  return import.meta.env.VITE_TWITTER_SITE?.trim() || undefined;
 }
 
 function getTwitterCreatorHandle() {
@@ -271,7 +271,7 @@ function getPostSeoMeta(post?: BlogPost | null): SeoMeta {
     };
   }
 
-  const title = `${post.title} | Blog`;
+  const title = `${post.title} | VentaCofrade`;
   const description = post.description;
   const url =
     frontmatterString(post.frontmatter, 'og_url') ??
