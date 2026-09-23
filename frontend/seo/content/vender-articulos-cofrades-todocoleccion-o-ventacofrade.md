@@ -1,6 +1,6 @@
 ---
-title: Dónde vender artículos cofrades de segunda mano, todocoleccion o VentaCofrade
-description: Comparamos de forma objetiva todocoleccion y VentaCofrade para vender túnicas, orfebrería, bordados y enseres cofrades, con comisiones, público y tipo de plataforma.
+title: Dónde vender artículos religiosos y cofrades, todocoleccion o VentaCofrade
+description: Comparamos todocoleccion y VentaCofrade para vender túnicas, orfebrería, joyería religiosa, antigüedades y enseres cofrades, con comisiones, público y especialización.
 date: 2026-09-23
 tags:
   - vender
@@ -8,40 +8,46 @@ tags:
   - guías
 ---
 
-Si tienes enseres cofrades que ya no usas, lo normal es pensar primero en las grandes plataformas de segunda mano y coleccionismo. todocoleccion es una de las más conocidas en España, y VentaCofrade es un marketplace especializado solo en artículos cofrades. Te contamos en qué se diferencian para que elijas la que mejor encaja con lo que vendes.
+Si tienes piezas religiosas o cofrades para vender, desde una túnica de nazareno hasta orfebrería antigua o joyería religiosa, seguramente hayas pensado en todocoleccion, una de las plataformas de coleccionismo más conocidas de España. VentaCofrade es un marketplace especializado en todo lo religioso y cofrade. Te contamos en qué se diferencian para que elijas con datos.
 
 ## todocoleccion: la gran plataforma generalista de coleccionismo
 
-todocoleccion lleva más de 25 años funcionando y reúne más de 2.500 categorías: antigüedades, arte, libros, juguetes y mucho más. Sus puntos fuertes son:
+todocoleccion lleva más de 25 años funcionando y reúne más de 2.500 categorías: monedas, sellos, libros, juguetes, antigüedades, arte y mucho más. Ofrece subastas además de venta a precio fijo, y servicios propios de pago con tarjeta y de envío.
 
-- **Mucho público**, acostumbrado a comprar coleccionismo y antigüedades.
-- **Subastas**, además de venta a precio fijo.
-- **Servicios propios** de pago con tarjeta y de envío con tarifas negociadas.
+**Cuánto cuesta vender.** En la modalidad a comisión, según sus tarifas publicadas, cobra un porcentaje del precio de venta: 8,75% para lotes de hasta 300 €, 7% entre 301 € y 500 €, 5,5% entre 501 € y 1.000 € y 4,5% por encima de 1.000 €, con el IVA aparte. También ofrece una modalidad de tienda con cuota mensual fija y comisiones reducidas. Consulta siempre sus [tarifas vigentes](https://www.todocoleccion.net/ayuda/vender), porque pueden cambiar.
 
-**Cuánto cuesta vender.** En la modalidad a comisión, según sus tarifas publicadas, cobra un porcentaje del precio de venta que va del 8,75% para lotes de hasta 300 € al 4,5% para lotes de más de 1.000 €, con el IVA aparte. También ofrece una modalidad de tienda con cuota mensual fija y comisiones reducidas. Consulta siempre sus [tarifas vigentes](https://www.todocoleccion.net/ayuda/vender), porque pueden cambiar.
+## VentaCofrade: todo lo religioso y cofrade, en un solo sitio
 
-**Ejemplo:** si vendes una túnica por 150 € en la modalidad a comisión, la comisión sería de unos 13,13 € más IVA.
+VentaCofrade está especializado en artículos religiosos y cofrades de cualquier tipo y valor: túnicas y enseres, orfebrería, bordados, imaginería, antigüedades religiosas, joyería y medallas.
 
-## VentaCofrade: un marketplace solo para el mundo cofrade
-
-VentaCofrade está pensado exclusivamente para artículos cofrades: túnicas de nazareno, orfebrería, bordados, cirios, imágenes y enseres. Sus diferencias principales son:
-
-- **Publicar y comprar es gratis**, sin comisión por venta. Las funciones premium son opcionales.
-- **Público especializado:** quien entra busca precisamente artículos cofrades, así que tu anuncio no compite con miles de artículos de otras categorías.
+- **Sin comisión por venta.** Publicar y comprar es gratis; las funciones premium son opcionales.
+- **Público especializado.** Quien entra busca precisamente piezas religiosas y cofrades, y sabe valorarlas. Tu anuncio no compite con miles de artículos de otras categorías.
 - **Contacto directo** entre comprador y vendedor a través de la mensajería de la plataforma.
 
-## ¿Cuál te conviene?
+## Lo que cuesta vender en cada una
+
+La diferencia de coste crece con el valor de la pieza:
+
+| Precio de venta | Comisión en todocoleccion (a comisión) | Comisión en VentaCofrade |
+|---|---|---|
+| Túnica de 150 € | 13,13 € + IVA | 0 € |
+| Pieza de orfebrería de 450 € | 31,50 € + IVA | 0 € |
+| Joya religiosa antigua de 800 € | 44,00 € + IVA | 0 € |
+| Imagen o antigüedad de 2.000 € | 90,00 € + IVA | 0 € |
+
+## Comparativa rápida
 
 | | todocoleccion | VentaCofrade |
 |---|---|---|
-| Tipo de plataforma | Generalista de coleccionismo | Especializada en artículos cofrades |
-| Coste por venta (modalidad a comisión) | Del 8,75% al 4,5% + IVA según precio | Sin comisión |
-| Subastas | Sí | No |
-| Público | Coleccionistas de todo tipo | Cofrades y hermandades |
+| Especialización | Generalista (más de 2.500 categorías) | Solo religioso y cofrade |
+| Comisión por venta | Del 8,75% al 4,5% + IVA según precio | Sin comisión |
+| Formato de venta | Precio fijo y subastas | Precio fijo |
+| Público | Coleccionistas de todo tipo | Cofrades, hermandades y coleccionistas de arte religioso |
 
-- **Si vendes una pieza de alto valor** con interés para coleccionistas de antigüedades en general, las subastas de una plataforma grande pueden ayudarte a encontrar comprador.
-- **Si vendes una túnica, enseres o artículos cofrades del día a día,** te interesa llegar directamente a cofrades que buscan exactamente eso, sin pagar comisión.
+## Entonces, ¿dónde vendo?
 
-Nada te impide usar las dos. Lo importante es que el anuncio sea claro: fotos con buena luz, medidas exactas y qué incluye el precio. Te lo explicamos en nuestra guía [cómo vender túnicas y enseres cofrades](/blog/vender-enseres-cofrades-segunda-mano/).
+Si lo que vendes es religioso o cofrade, da igual que sea una túnica o una pieza antigua de orfebrería: en VentaCofrade llega directamente a quien busca exactamente eso y no pagas comisión por la venta. Si además quieres subastar la pieza, puedes usar las dos plataformas a la vez.
+
+Sea cual sea el sitio, lo importante es un buen anuncio: fotos con buena luz, medidas, materiales, estado y, si lo conoces, taller o época. Te lo explicamos en nuestra guía [cómo vender túnicas y enseres cofrades](/blog/vender-enseres-cofrades-segunda-mano/).
 
 *Datos de todocoleccion consultados en su web en septiembre de 2026. todocoleccion es una marca de su respectivo titular; VentaCofrade no tiene relación con ella.*
