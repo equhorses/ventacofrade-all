@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import BlogShell from '@/components/blog/BlogShell';
 
 type BlogArticleLayoutProps = {
   title: string;
@@ -11,33 +11,28 @@ const BlogArticleLayout = ({
   description,
   children,
 }: BlogArticleLayoutProps) => (
-  <main className="min-h-screen bg-slate-50 text-slate-900">
-    <div className="mx-auto max-w-4xl px-6 pt-8">
-      <Link
-        to="/blog/"
-        className="text-sm text-slate-500 underline-offset-4 hover:text-slate-900 hover:underline"
-      >
-        Back to blog
-      </Link>
-    </div>
-    <article className="mx-auto max-w-3xl px-6 py-12">
-      <header className="border-b border-slate-200 pb-10">
-        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-sky-700">
-          Blog Article
-        </p>
-        <h1 className="mt-4 font-serif text-4xl leading-tight text-slate-950 sm:text-5xl">
-          {title}
-        </h1>
-        {description ? (
-          <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
-            {description}
+  <BlogShell>
+    <main>
+      <div className="bg-primary text-primary-foreground">
+        <div className="mx-auto max-w-3xl px-6 pt-8 pb-12">
+          <a
+            href="/blog/"
+            className="text-sm text-primary-foreground/70 underline-offset-4 hover:text-primary-foreground hover:underline"
+          >
+            ← Todas las guías
+          </a>
+          <p className="mt-6 text-xs font-semibold uppercase tracking-[0.28em] text-secondary">
+            Guía cofrade
           </p>
-        ) : null}
-      </header>
-
-      <div className="mt-10">{children}</div>
-    </article>
-  </main>
+          <h1 className="mt-3 text-3xl sm:text-4xl font-bold leading-tight">{title}</h1>
+          {description ? (
+            <p className="mt-4 text-lg leading-8 text-primary-foreground/80">{description}</p>
+          ) : null}
+        </div>
+      </div>
+      <article className="mx-auto max-w-3xl px-6 py-12">{children}</article>
+    </main>
+  </BlogShell>
 );
 
 export default BlogArticleLayout;

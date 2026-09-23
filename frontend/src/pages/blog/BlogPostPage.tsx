@@ -150,9 +150,9 @@ const BlogPostPage = () => {
         <div className="space-y-6 max-w-md">
           <div className="space-y-4">
             <h1 className="text-7xl font-bold text-gray-300">404</h1>
-            <h2 className="text-2xl font-bold text-gray-800">Page Not Found</h2>
+            <h2 className="text-2xl font-bold text-gray-800">Guía no encontrada</h2>
             <p className="text-base text-muted-foreground">
-              Sorry, the blog post you are looking for does not exist or has been removed.
+              La guía que buscas no existe o se ha retirado.
             </p>
           </div>
         </div>
