@@ -164,21 +164,25 @@ async def send_launch_announcement_email(to_email: str) -> bool:
         return False
 
     html_content = """
-    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
-      <h2 style="color: #6d28d9;">¡Ya hemos abierto!</h2>
-      <p>Han pasado semanas de espera y por fin es el día: <strong>VentaCofrade ya está abierto</strong>.</p>
-      <p>
-        Fuiste de los primeros en apuntarte, y eso significa algo para nosotros. Si te registras
-        con este mismo email, tu perfil llevará la insignia <strong>Fundador</strong>, visible
-        para siempre, como agradecimiento por haber confiado en el proyecto desde el principio.
-      </p>
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; color: #222;">
+      <h2 style="color: #6d28d9;">Ya puedes publicar en VentaCofrade</h2>
+      <p>Hola,</p>
+      <p><strong>VentaCofrade ya está abierto.</strong> Desde hoy puedes publicar tus artículos
+      cofrades y religiosos: túnicas, orfebrería, bordados, medallas, imágenes… lo que tengas guardado.</p>
+      <p>El 1 de octubre lanzamos la campaña al público. Los anuncios que se publiquen estos días
+      serán los primeros que vean todos los visitantes.</p>
+      <p>Como te apuntaste a la lista de espera, si te registras con este mismo email tu perfil llevará
+      la insignia <strong>Fundador</strong>, visible para siempre.</p>
       <p style="margin: 24px 0;">
-        <a href="https://www.ventacofrade.com" style="background:#6d28d9;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;">
-          Entrar en VentaCofrade
+        <a href="https://www.ventacofrade.com/vender" style="background:#6d28d9;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;">
+          Publicar mi anuncio gratis
         </a>
       </p>
-      <p style="margin-top: 24px; color: #666; font-size: 13px;">
-        Si tienes cualquier duda, escríbenos a
+      <p>Publicar y comprar es gratis, sin comisiones.</p>
+      <p>Un saludo,<br>Daniel, de VentaCofrade</p>
+      <p style="margin-top: 32px; color: #888; font-size: 12px;">
+        Recibes este email porque te apuntaste a la lista de espera de VentaCofrade.
+        Si no quieres recibir más emails, escríbenos a
         <a href="mailto:contacto@ventacofrade.com">contacto@ventacofrade.com</a>.
       </p>
     </div>
@@ -187,7 +191,7 @@ async def send_launch_announcement_email(to_email: str) -> bool:
     payload = {
         "from": from_email,
         "to": [to_email],
-        "subject": "¡VentaCofrade ya está abierto! 🎉",
+        "subject": "Ya puedes publicar en VentaCofrade (gratis)",
         "html": html_content,
     }
 
