@@ -31,6 +31,7 @@ import AdminAnunciosPage from './pages/admin/Anuncios';
 import AdminMensajesPage from './pages/admin/Mensajes';
 import AdminSeguridadPage from './pages/admin/Seguridad';
 import AdminAuditoriaPage from './pages/admin/Auditoria';
+import AdminPlataformasPage from './pages/admin/Plataformas';
 import ProtectedAdminRoute from './components/ProtectedAdminRoute';
 import { AuthProvider } from './contexts/AuthContext';
 import ComingSoonGate from './components/ComingSoonGate';
@@ -139,6 +140,14 @@ const AppRoutes = () => (
       element={
         <ProtectedAdminRoute requireSuperAdmin>
           <AdminEquipoPage />
+        </ProtectedAdminRoute>
+      }
+    />
+    <Route
+      path="/admin/plataformas"
+      element={
+        <ProtectedAdminRoute requireSuperAdmin>
+          <AdminPlataformasPage />
         </ProtectedAdminRoute>
       }
     />

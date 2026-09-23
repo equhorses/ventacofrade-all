@@ -15,6 +15,7 @@ const TABS: { to: string; label: string; allowedRoles?: string[] }[] = [
   { to: '/admin/seguridad', label: 'Seguridad', allowedRoles: ['seguridad'] },
   { to: '/admin/auditoria', label: 'Auditoría', allowedRoles: [] }, // super admin only
   { to: '/admin/equipo', label: 'Equipo', allowedRoles: [] }, // super admin only
+  { to: '/admin/plataformas', label: 'Plataformas', allowedRoles: [] }, // super admin only
 ];
 
 const UNREAD_POLL_MS = 30000;
