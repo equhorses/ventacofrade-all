@@ -83,11 +83,19 @@ async def lifespan(app: FastAPI):
     # MODULE_SHUTDOWN_END
 
 
+# La documentación interactiva (/docs, /redoc, /openapi.json) queda desactivada
+# por defecto para no exponer públicamente la lista de endpoints. Para verla
+# temporalmente, añade ENABLE_API_DOCS=true en las variables de Railway.
+_docs_enabled = os.getenv("ENABLE_API_DOCS", "false").strip().lower() == "true"
+
 app = FastAPI(
-    title="FastAPI Modular Template",
-    description="A best-practice FastAPI template with modular architecture",
+    title="VentaCofrade API",
+    description="API de VentaCofrade",
     version="1.0.0",
     lifespan=lifespan,
+    docs_url="/docs" if _docs_enabled else None,
+    redoc_url="/redoc" if _docs_enabled else None,
+    openapi_url="/openapi.json" if _docs_enabled else None,
 )
 
 
