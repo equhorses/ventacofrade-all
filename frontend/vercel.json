@@ -1,5 +1,31 @@
 {
   "rewrites": [
+    {
+      "source": "/sitemap-productos.xml",
+      "destination": "https://api.ventacofrade.com/seo/sitemap-productos.xml"
+    },
+    {
+      "source": "/producto/:id",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|google-inspectiontool|bingbot|duckduckbot|yandex|baiduspider|applebot|gptbot|oai-searchbot|chatgpt-user|claudebot|claude-searchbot|claude-user|perplexitybot|facebookexternalhit|facebot|twitterbot|linkedinbot|whatsapp|telegrambot|slackbot|discordbot).*"
+        }
+      ],
+      "destination": "https://api.ventacofrade.com/seo/producto/:id"
+    },
+    {
+      "source": "/explorar",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|google-inspectiontool|bingbot|duckduckbot|yandex|baiduspider|applebot|gptbot|oai-searchbot|chatgpt-user|claudebot|claude-searchbot|claude-user|perplexitybot|facebookexternalhit|facebot|twitterbot|linkedinbot|whatsapp|telegrambot|slackbot|discordbot).*"
+        }
+      ],
+      "destination": "https://api.ventacofrade.com/seo/explorar"
+    },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
