@@ -85,6 +85,9 @@ class Seller_profilesResponse(BaseModel):
     instagram: Optional[str] = None
     facebook: Optional[str] = None
     vacation_mode: Optional[bool] = None
+    shop_slug: Optional[str] = None
+    shop_logo_url: Optional[str] = None
+    shop_cover_url: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -119,6 +122,23 @@ class Seller_profilesBatchUpdateRequest(BaseModel):
 class Seller_profilesBatchDeleteRequest(BaseModel):
     """Batch delete request"""
     ids: List[int]
+
+
+# Campos que solo cambia el sistema (Stripe, valoraciones, admin): nunca desde
+# las peticiones del propio usuario. Sin esto, cualquiera podría ponerse
+# subscription_status="active" y tener un plan de pago gratis.
+PROTECTED_FIELDS = {
+    "is_active",
+    "subscription_status",
+    "subscription_end_date",
+    "activation_paid",
+    "rating",
+    "total_sales",
+}
+
+
+def _user_editable(values: dict) -> dict:
+    return {k: v for k, v in values.items() if k not in PROTECTED_FIELDS}
 
 
 # ---------- Routes ----------
@@ -234,7 +254,7 @@ async def create_seller_profiles(
     
     service = Seller_profilesService(db)
     try:
-        result = await service.create(data.model_dump(), user_id=str(current_user.id))
+        result = await service.create(_user_editable(data.model_dump()), user_id=str(current_user.id))
         if not result:
             raise HTTPException(status_code=400, detail="Failed to create seller_profiles")
 
@@ -314,7 +334,7 @@ async def create_seller_profiless_batch(
     
     try:
         for item_data in request.items:
-            result = await service.create(item_data.model_dump(), user_id=str(current_user.id))
+            result = await service.create(_user_editable(item_data.model_dump()), user_id=str(current_user.id))
             if result:
                 results.append(result)
         
@@ -341,7 +361,7 @@ async def update_seller_profiless_batch(
     try:
         for item in request.items:
             # Only include non-None values for partial updates
-            update_dict = {k: v for k, v in item.updates.model_dump().items() if v is not None}
+            update_dict = _user_editable({k: v for k, v in item.updates.model_dump().items() if v is not None})
             result = await service.update(item.id, update_dict, user_id=str(current_user.id))
             if result:
                 results.append(result)
@@ -367,7 +387,7 @@ async def update_seller_profiles(
     service = Seller_profilesService(db)
     try:
         # Only include non-None values for partial updates
-        update_dict = {k: v for k, v in data.model_dump().items() if v is not None}
+        update_dict = _user_editable({k: v for k, v in data.model_dump().items() if v is not None})
         result = await service.update(id, update_dict, user_id=str(current_user.id))
         if not result:
             logger.warning(f"Seller_profiles with id {id} not found for update")

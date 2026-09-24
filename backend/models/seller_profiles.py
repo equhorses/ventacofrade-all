@@ -1,6 +1,6 @@
 from core.database import Base
 from datetime import datetime
-from sqlalchemy import Boolean, Column, DateTime, Float, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, Float, Integer, String, Text
 
 
 class Seller_profiles(Base):
@@ -42,5 +42,10 @@ class Seller_profiles(Base):
     last_manual_bump_at = Column(DateTime(timezone=True), nullable=True)
     # Mes (AAAA-MM) del último informe mensual enviado, para no duplicarlo.
     last_report_month = Column(String(7), nullable=True)
+    # Tienda propia (plan Profesional): /tienda/<shop_slug> con logo, portada y descripción larga.
+    shop_slug = Column(String(50), nullable=True, unique=True, index=True)
+    shop_logo_url = Column(String(500), nullable=True)
+    shop_cover_url = Column(String(500), nullable=True)
+    shop_long_description = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), default=datetime.now)
     updated_at = Column(DateTime(timezone=True), default=datetime.now, onupdate=datetime.now)

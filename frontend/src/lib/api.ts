@@ -107,6 +107,79 @@ export interface SellerProductStats {
   contacts?: number;
 }
 
+export interface ShopSettings {
+  can_use: boolean;
+  tier: SellerTier;
+  has_profile: boolean;
+  shop_slug: string | null;
+  shop_logo_url: string | null;
+  shop_cover_url: string | null;
+  shop_long_description: string | null;
+  suggested_slug: string | null;
+  long_description_max: number;
+}
+
+export interface PublicShop {
+  active: boolean;
+  seller_id?: number;
+  seller?: {
+    id: number;
+    user_id: string;
+    shop_name: string;
+    shop_slug: string;
+    shop_description?: string | null;
+    shop_long_description?: string | null;
+    shop_logo_url?: string | null;
+    shop_cover_url?: string | null;
+    province: string;
+    city?: string | null;
+    is_founder: boolean;
+    whatsapp?: string | null;
+    website?: string | null;
+    instagram?: string | null;
+    facebook?: string | null;
+    tier: SellerTier;
+    member_since?: string | null;
+  };
+  products?: {
+    id: number;
+    title: string;
+    price: number;
+    images?: string | null;
+    category_id: number;
+    condition: string;
+    is_featured: boolean;
+    seller_tier: SellerTier;
+  }[];
+}
+
+export interface BulkRowData {
+  title: string;
+  price: number | null;
+  category_id: number | null;
+  category_name: string | null;
+  condition: string | null;
+  location_province: string | null;
+  location_city: string | null;
+  description: string | null;
+  photos: string[];
+}
+
+export interface BulkPreview {
+  total: number;
+  valid: number;
+  invalid: number;
+  rows: { row: number; data: BulkRowData; errors: string[] }[];
+  local_photos: string[];
+  max_rows: number;
+}
+
+export interface BulkConfirmResult {
+  created: number;
+  vacation_mode: boolean;
+  results: { row: number; ok: boolean; errors?: string[]; warnings?: string[]; product_id?: number }[];
+}
+
 export const client = {
   auth: {
     async me() {
@@ -188,7 +261,7 @@ export const client = {
      * short-lived presigned URL obtained from our backend, and returns the
      * public URL where the image will be accessible.
      */
-    async uploadImage(file: File, folder: 'products' | 'avatars' | 'ads'): Promise<string> {
+    async uploadImage(file: File, folder: 'products' | 'avatars' | 'ads' | 'shops'): Promise<string> {
       const presignResponse = await http.post(`${baseUrl()}/api/v1/storage/presigned-upload`, {
         filename: file.name,
         content_type: file.type,
@@ -244,6 +317,61 @@ export const client = {
     },
     async stats(): Promise<{ data: { tier: SellerTier; items: SellerProductStats[] } }> {
       const response = await http.get(`${baseUrl()}/api/v1/seller-plans/stats`);
+      return { data: response.data };
+    },
+  },
+  shops: {
+    async mine(): Promise<{ data: ShopSettings }> {
+      const response = await http.get(`${baseUrl()}/api/v1/shops/me`);
+      return { data: response.data };
+    },
+    async checkSlug(slug: string) {
+      const response = await http.get(`${baseUrl()}/api/v1/shops/check-slug`, { params: { slug } });
+      return { data: response.data as { slug: string; available: boolean; reason: string | null } };
+    },
+    async update(data: {
+      shop_slug: string;
+      shop_logo_url?: string | null;
+      shop_cover_url?: string | null;
+      shop_long_description?: string | null;
+    }): Promise<{ data: ShopSettings }> {
+      const response = await http.put(`${baseUrl()}/api/v1/shops/me`, data);
+      return { data: response.data };
+    },
+    async publicBySlug(slug: string): Promise<{ data: PublicShop }> {
+      const response = await http.get(`${baseUrl()}/api/v1/shops/public/${encodeURIComponent(slug)}`);
+      return { data: response.data };
+    },
+  },
+  bulkImport: {
+    async downloadTemplate(format: 'xlsx' | 'csv') {
+      const response = await http.get(`${baseUrl()}/api/v1/bulk-import/template`, {
+        params: { format },
+        responseType: 'blob',
+      });
+      const url = URL.createObjectURL(response.data as Blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `plantilla-ventacofrade.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    },
+    async preview(file: File): Promise<{ data: BulkPreview }> {
+      const form = new FormData();
+      form.append('file', file);
+      const response = await http.post(`${baseUrl()}/api/v1/bulk-import/preview`, form);
+      return { data: response.data };
+    },
+    async confirm(
+      rows: ({ row: number } & Omit<BulkRowData, 'category_name'>)[],
+      photoUrls: Record<string, string>,
+    ): Promise<{ data: BulkConfirmResult }> {
+      const response = await http.post(`${baseUrl()}/api/v1/bulk-import/confirm`, {
+        rows,
+        photo_urls: photoUrls,
+      });
       return { data: response.data };
     },
   },

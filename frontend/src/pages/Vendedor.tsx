@@ -7,7 +7,7 @@ import Layout from '@/components/Layout';
 import SellerBadge from '@/components/SellerBadge';
 import SellerContactLinks from '@/components/SellerContactLinks';
 import { client } from '@/lib/api';
-import { Store, Star, MapPin, Sparkles } from 'lucide-react';
+import { Store, Star, MapPin, Sparkles, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Review } from '@/lib/api';
@@ -26,6 +26,7 @@ interface SellerProfile {
   website?: string;
   instagram?: string;
   facebook?: string;
+  shop_slug?: string | null;
 }
 
 interface Product {
@@ -180,6 +181,16 @@ export default function VendedorPage() {
             {seller.shop_description && (
               <p className="text-sm text-muted-foreground mt-2">{seller.shop_description}</p>
             )}
+            {seller.shop_slug &&
+              (products[0]?.seller_tier === 'profesional' ||
+                (seller.subscription_status === 'active' && seller.plan === 'profesional')) && (
+                <Link
+                  to={`/tienda/${seller.shop_slug}`}
+                  className="inline-flex items-center gap-1 text-sm font-medium text-primary mt-2 hover:underline"
+                >
+                  Visitar su tienda <ExternalLink className="h-3.5 w-3.5" />
+                </Link>
+              )}
           </div>
         </div>
 

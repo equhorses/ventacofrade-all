@@ -8,6 +8,7 @@ import Producto from './pages/Producto';
 import RedProfesionalPage from './pages/RedProfesional';
 import ProfesionalDetallePage from './pages/ProfesionalDetalle';
 import VendedorPage from './pages/Vendedor';
+import TiendaPage from './pages/Tienda';
 import Vender from './pages/Vender';
 import Publicar from './pages/Publicar';
 import Documentacion from './pages/Documentacion';
@@ -22,6 +23,8 @@ import ConversacionPage from './pages/cuenta/Conversacion';
 import FavoritosPage from './pages/cuenta/Favoritos';
 import SuscripcionPage from './pages/cuenta/Suscripcion';
 import PerfilProfesionalPage from './pages/cuenta/PerfilProfesional';
+import MiTiendaPage from './pages/cuenta/MiTienda';
+import SubidaMasivaPage from './pages/cuenta/SubidaMasiva';
 import AdminVendedoresPage from './pages/admin/Vendedores';
 import AdminPublicidadPage from './pages/admin/Publicidad';
 import AdminEquipoPage from './pages/admin/Equipo';
@@ -52,6 +55,7 @@ const AppRoutes = () => (
     <Route path="/red-profesional" element={<RedProfesionalPage />} />
     <Route path="/profesional/:id" element={<ProfesionalDetallePage />} />
     <Route path="/vendedor/:id" element={<VendedorPage />} />
+    <Route path="/tienda/:slug" element={<TiendaPage />} />
     <Route path="/vender" element={<Vender />} />
     <Route path="/publicar" element={<Publicar />} />
     <Route path="/documentacion" element={<Documentacion />} />
@@ -70,6 +74,8 @@ const AppRoutes = () => (
     <Route path="/cuenta/mensajes/:productId/:otherUserId" element={<ConversacionPage />} />
     <Route path="/cuenta/favoritos" element={<FavoritosPage />} />
     <Route path="/cuenta/suscripcion" element={<SuscripcionPage />} />
+    <Route path="/cuenta/tienda" element={<MiTiendaPage />} />
+    <Route path="/cuenta/subida-masiva" element={<SubidaMasivaPage />} />
     <Route path="/cuenta/perfil-profesional" element={<PerfilProfesionalPage />} />
     <Route
       path="/admin"
