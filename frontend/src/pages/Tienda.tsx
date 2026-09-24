@@ -122,10 +122,11 @@ export default function TiendaPage() {
               )}
             </h1>
             <div className="flex items-center gap-3 mt-1 flex-wrap text-sm text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <MapPin className="h-3.5 w-3.5" /> {seller.city ? `${seller.city}, ` : ''}
-                {seller.province}
-              </span>
+              {(seller.city || seller.province) && (
+                <span className="flex items-center gap-1">
+                  <MapPin className="h-3.5 w-3.5" /> {[seller.city, seller.province].filter(Boolean).join(', ')}
+                </span>
+              )}
               <Link to={`/vendedor/${seller.id}`} className="flex items-center gap-1 hover:text-foreground">
                 <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
                 {rating.count > 0 ? `${rating.avg.toFixed(1)} (${rating.count} valoraciones)` : 'Ver valoraciones'}

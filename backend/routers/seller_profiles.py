@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
 from services.seller_profiles import Seller_profilesService
+from models.seller_profiles import Seller_profiles as Seller_profiles_model
 from dependencies.auth import get_current_user
 from schemas.auth import UserResponse
 from models.invitations import Invitation
@@ -310,13 +311,6 @@ async def create_seller_profiles(
                 await db.commit()
                 await db.refresh(result)
 
-        # La cuenta de super admin (equipo VentaCofrade) tiene todas las ventajas de serie.
-        if current_user.role == "admin":
-            from services.seller_plans import STAFF_ACCESS_UNTIL
-            result.free_access_until = STAFF_ACCESS_UNTIL
-            await db.commit()
-            await db.refresh(result)
-
         logger.info(f"Seller_profiles created successfully with id: {result.id}")
         return result
     except ValueError as e:
@@ -461,3 +455,24 @@ async def delete_seller_profiles(
     except Exception as e:
         logger.error(f"Error deleting seller_profiles {id}: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+async def ensure_seller_profile(db: AsyncSession, current_user: UserResponse):
+    """Devuelve el perfil de vendedor del usuario y, si no tiene, se lo crea con datos básicos.
+
+    Igual que al publicar el primer anuncio: nadie tiene que rellenar un formulario antes
+    de usar su tienda, su suscripción o la importación. Luego puede completarlo en Mi perfil.
+    """
+    existing = await db.execute(
+        select(Seller_profiles_model).where(Seller_profiles_model.user_id == str(current_user.id)).limit(1)
+    )
+    profile = existing.scalar_one_or_none()
+    if profile:
+        return profile
+    default_name = (current_user.name or (current_user.email or "").split("@")[0] or "Vendedor").strip()
+    profile = await create_seller_profiles(
+        Seller_profilesData(shop_name=default_name[:200], province=""),
+        current_user=current_user,
+        db=db,
+    )
+    logger.info("Perfil de vendedor creado automáticamente para user_id=%s", current_user.id)
+    return profile

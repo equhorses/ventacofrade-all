@@ -155,6 +155,7 @@ export interface PublicShop {
 
 export interface CatalogImportStatus {
   can_use: boolean;
+  is_admin?: boolean;
   website: string | null;
   province: string | null;
   city: string | null;
@@ -298,6 +299,10 @@ export const client = {
     },
   },
   sellerPlans: {
+    async ensureProfile() {
+      const response = await http.post(`${baseUrl()}/api/v1/seller-plans/ensure-profile`, {});
+      return { data: response.data as { id: number } };
+    },
     async me(): Promise<{ data: SellerPlanSummary }> {
       const response = await http.get(`${baseUrl()}/api/v1/seller-plans/me`);
       return { data: response.data };

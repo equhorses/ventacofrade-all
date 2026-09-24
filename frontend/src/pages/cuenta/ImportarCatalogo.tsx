@@ -265,7 +265,7 @@ export default function ImportarCatalogoPage() {
     );
   }
 
-  if (!status.website) {
+  if (!status.website && !status.is_admin) {
     return (
       <AccountLayout title="Importar catálogo">
         <Card>

@@ -18,6 +18,7 @@ from schemas.auth import UserResponse
 from pydantic import BaseModel
 
 from services.seller_plans import (
+    ADMIN_ROLE,
     MANUAL_BUMP_INTERVAL,
     VACATION_TIERS,
     next_manual_bump_at,
@@ -40,14 +41,24 @@ async def _profile(db: AsyncSession, user_id: str):
     return result.scalar_one_or_none()
 
 
+@router.post("/ensure-profile")
+async def ensure_profile(current_user: UserResponse = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Crea el perfil de vendedor si aún no existe (p. ej. al entrar en Suscripción)."""
+    from routers.seller_profiles import ensure_seller_profile
+
+    profile = await ensure_seller_profile(db, current_user)
+    return {"id": profile.id}
+
+
 @router.get("/me")
 async def my_plan(current_user: UserResponse = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     now = datetime.now(timezone.utc)
     profile = await _profile(db, str(current_user.id))
-    tier = seller_tier(profile, now)
+    tier = seller_tier(profile, now, current_user.role)
     total = INCLUDED_FEATURES_PER_MONTH.get(tier, 0)
     used = await included_features_used(db, str(current_user.id), now) if total else 0
-    next_bump = next_manual_bump_at(profile, tier)
+    is_admin = current_user.role == ADMIN_ROLE
+    next_bump = None if is_admin else next_manual_bump_at(profile, tier)
     return {
         "vacation_mode": bool(profile.vacation_mode) if profile else False,
         "can_use_vacation": tier in VACATION_TIERS,
@@ -57,7 +68,7 @@ async def my_plan(current_user: UserResponse = Depends(get_current_user), db: As
         "tier": tier,
         "included_features_total": total,
         "included_features_used": min(used, total),
-        "included_features_left": max(total - used, 0),
+        "included_features_left": total if is_admin else max(total - used, 0),
         "included_feature_days": INCLUDED_FEATURE_DAYS,
         "resets_at": next_month_start(now).isoformat(),
     }
@@ -72,7 +83,7 @@ async def use_included_feature(
     """Destaca un anuncio 7 días usando uno de los destacados incluidos en el plan."""
     now = datetime.now(timezone.utc)
     user_id = str(current_user.id)
-    tier = seller_tier(await _profile(db, user_id), now)
+    tier = seller_tier(await _profile(db, user_id), now, current_user.role)
     total = INCLUDED_FEATURES_PER_MONTH.get(tier, 0)
     if not total:
         raise HTTPException(status_code=403, detail="Tu plan no incluye destacados. Puedes destacar el anuncio pagando.")
@@ -85,8 +96,9 @@ async def use_included_feature(
     if (product.status or "active") != "active":
         raise HTTPException(status_code=400, detail="Solo se pueden destacar anuncios activos.")
 
+    is_admin = current_user.role == ADMIN_ROLE
     used = await included_features_used(db, user_id, now)
-    if used >= total:
+    if used >= total and not is_admin:
         raise HTTPException(
             status_code=403,
             detail="Ya has usado todos los destacados incluidos este mes. Puedes destacar el anuncio pagando.",
@@ -107,7 +119,7 @@ async def use_included_feature(
     return {
         "product_id": product.id,
         "featured_until": product.featured_until.isoformat(),
-        "included_features_left": max(total - used - 1, 0),
+        "included_features_left": total if is_admin else max(total - used - 1, 0),
     }
 
 
@@ -115,7 +127,7 @@ async def use_included_feature(
 async def my_stats(current_user: UserResponse = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Estadísticas por anuncio según el plan: Básico ve visitas y favoritos; Profesional, además, contactos."""
     user_id = str(current_user.id)
-    tier = seller_tier(await _profile(db, user_id))
+    tier = seller_tier(await _profile(db, user_id), role=current_user.role)
     if tier == TIER_FREE:
         return {"tier": tier, "items": []}
 
@@ -155,9 +167,11 @@ async def set_vacation_mode(
     db: AsyncSession = Depends(get_db),
 ):
     """Pausa (o reactiva) de golpe todos los anuncios activos del vendedor."""
+    from routers.seller_profiles import ensure_seller_profile
+
     user_id = str(current_user.id)
-    profile = await _profile(db, user_id)
-    tier = seller_tier(profile)
+    profile = await ensure_seller_profile(db, current_user)
+    tier = seller_tier(profile, role=current_user.role)
     # Desactivarlo siempre está permitido (por ejemplo, si el plan caducó estando de vacaciones).
     if not profile or (payload.enabled and tier not in VACATION_TIERS):
         raise HTTPException(status_code=403, detail="El modo vacaciones está disponible con los planes Básico y Profesional.")
@@ -190,9 +204,11 @@ async def bump_product(
 ):
     """Renueva un anuncio: vuelve arriba como recién publicado."""
     now = datetime.now(timezone.utc)
+    from routers.seller_profiles import ensure_seller_profile
+
     user_id = str(current_user.id)
-    profile = await _profile(db, user_id)
-    tier = seller_tier(profile, now)
+    profile = await ensure_seller_profile(db, current_user)
+    tier = seller_tier(profile, now, current_user.role)
     if tier not in MANUAL_BUMP_INTERVAL:
         raise HTTPException(status_code=403, detail="Renovar anuncios está disponible con los planes Básico y Profesional.")
 
@@ -205,7 +221,7 @@ async def bump_product(
         raise HTTPException(status_code=400, detail="Solo se pueden renovar anuncios activos.")
 
     next_bump = next_manual_bump_at(profile, tier)
-    if next_bump:
+    if next_bump and current_user.role != ADMIN_ROLE:
         raise HTTPException(
             status_code=403,
             detail=f"Podrás volver a renovar un anuncio a partir del {next_bump.strftime('%d/%m/%Y')}.",

@@ -42,19 +42,24 @@ async def _profile(db: AsyncSession, user_id: str) -> Optional[Seller_profiles]:
     return result.scalar_one_or_none()
 
 
-async def _require_pro(db: AsyncSession, user_id: str) -> Seller_profiles:
-    profile = await _profile(db, user_id)
-    if not profile or seller_tier(profile) != TIER_PRO:
+async def _require_pro(db: AsyncSession, current_user: UserResponse) -> Seller_profiles:
+    from routers.seller_profiles import ensure_seller_profile
+
+    profile = await ensure_seller_profile(db, current_user)
+    if seller_tier(profile, role=current_user.role) != TIER_PRO:
         raise HTTPException(status_code=403, detail="Importar tu catálogo está incluido en el plan Profesional.")
     return profile
 
 
 @router.get("/status")
 async def status(current_user: UserResponse = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    profile = await _profile(db, str(current_user.id))
+    from routers.seller_profiles import ensure_seller_profile
+
+    profile = await ensure_seller_profile(db, current_user)
     return {
-        "can_use": bool(profile) and seller_tier(profile) == TIER_PRO,
+        "can_use": seller_tier(profile, role=current_user.role) == TIER_PRO,
         "website": profile.website if profile else None,
+        "is_admin": current_user.role == "admin",
         "province": profile.province if profile else None,
         "city": profile.city if profile else None,
         "max_items": ci.MAX_ITEMS,
@@ -73,10 +78,11 @@ async def fetch_catalog(
     db: AsyncSession = Depends(get_db),
 ):
     user_id = str(current_user.id)
-    profile = await _require_pro(db, user_id)
+    profile = await _require_pro(db, current_user)
     if not payload.confirm_owner:
         raise HTTPException(status_code=400, detail="Confirma que el catálogo es tuyo.")
-    if not profile.website:
+    is_admin = current_user.role == "admin"
+    if not profile.website and not is_admin:
         raise HTTPException(status_code=400, detail="Primero añade tu página web en Mi perfil.")
     try:
         url = ci.normalize_url(payload.url)
@@ -84,7 +90,7 @@ async def fetch_catalog(
             raise ci.ImportErrorForUser(
                 "No se puede importar desde redes sociales ni otras plataformas de venta. Usa tu propia web."
             )
-        if not ci.same_site(url, profile.website):
+        if not is_admin and not ci.same_site(url, profile.website):
             raise ci.ImportErrorForUser(
                 "Solo puedes importar desde la web que tienes en tu perfil. Si es otra, cámbiala primero en Mi perfil."
             )
@@ -130,7 +136,7 @@ async def publish(
     db: AsyncSession = Depends(get_db),
 ):
     user_id = str(current_user.id)
-    profile = await _require_pro(db, user_id)
+    profile = await _require_pro(db, current_user)
     if len(payload.items) > PUBLISH_BATCH_MAX:
         raise HTTPException(status_code=400, detail=f"Máximo {PUBLISH_BATCH_MAX} anuncios por tanda.")
     if payload.location_province not in PROVINCES:

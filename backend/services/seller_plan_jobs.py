@@ -22,6 +22,7 @@ from services.seller_plans import (
     INCLUDED_FEATURES_PER_MONTH,
     TIER_FREE,
     TIER_PRO,
+    admin_user_ids,
     month_start,
     seller_tier,
 )
@@ -45,7 +46,8 @@ async def auto_bump_pro_listings(now: Optional[datetime] = None) -> int:
     bumped = 0
     async with await _session() as db:
         profiles = (await db.execute(select(Seller_profiles))).scalars().all()
-        pro_users = [p.user_id for p in profiles if seller_tier(p, now) == TIER_PRO]
+        admins = await admin_user_ids(db)
+        pro_users = [p.user_id for p in profiles if p.user_id in admins or seller_tier(p, now) == TIER_PRO]
         if not pro_users:
             return 0
         products = (
@@ -80,8 +82,9 @@ async def send_monthly_reports(now: Optional[datetime] = None) -> int:
     sent = 0
     async with await _session() as db:
         profiles = (await db.execute(select(Seller_profiles))).scalars().all()
+        admins = await admin_user_ids(db)
         for profile in profiles:
-            tier = seller_tier(profile, now)
+            tier = TIER_PRO if profile.user_id in admins else seller_tier(profile, now)
             if tier == TIER_FREE or profile.last_report_month == report_key:
                 continue
             user = (await db.execute(select(User).where(User.id == profile.user_id))).scalar_one_or_none()

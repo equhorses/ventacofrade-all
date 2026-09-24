@@ -13,9 +13,10 @@ sorteo) recibe las ventajas de COMPLIMENTARY_TIER mientras le dure.
 from datetime import datetime, timedelta, timezone
 from typing import Iterable, Optional
 
-from sqlalchemy import and_, case, func, select
+from sqlalchemy import and_, case, exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from models.auth import User
 from models.feature_purchases import FeaturePurchases
 from models.seller_profiles import Seller_profiles
 
@@ -27,9 +28,9 @@ TIER_PRO = "profesional"
 # todas las ventajas del Profesional (tienda propia, subida masiva, 9 destacados, etc.).
 COMPLIMENTARY_TIER = TIER_PRO
 
-# La cuenta de super admin (rol "admin", la del equipo de VentaCofrade) tiene todas
-# las ventajas siempre: se le pone acceso gratuito hasta esta fecha al crear su perfil.
-STAFF_ACCESS_UNTIL = datetime(2099, 12, 31, tzinfo=timezone.utc)
+# La cuenta de super admin (rol "admin", la del equipo de VentaCofrade) tiene siempre
+# todas las ventajas del Profesional, sin depender de suscripción, perfil ni fechas.
+ADMIN_ROLE = "admin"
 
 # Destacados de 7 días incluidos cada mes natural.
 INCLUDED_FEATURES_PER_MONTH = {TIER_BASIC: 4, TIER_PRO: 9}
@@ -52,7 +53,12 @@ def _aware(value: Optional[datetime]) -> Optional[datetime]:
     return value
 
 
-def seller_tier(profile: Optional[Seller_profiles], now: Optional[datetime] = None) -> str:
+def seller_tier(
+    profile: Optional[Seller_profiles], now: Optional[datetime] = None, role: Optional[str] = None
+) -> str:
+    """Plan efectivo del vendedor. Pasa role (el del usuario) siempre que lo tengas a mano."""
+    if role == ADMIN_ROLE:
+        return TIER_PRO
     if not profile:
         return TIER_FREE
     now = now or datetime.now(timezone.utc)
@@ -82,7 +88,26 @@ def tier_rank_expression(user_id_column, now: datetime):
         .limit(1)
         .scalar_subquery()
     )
-    return func.coalesce(rank, free_rank)
+    is_admin = exists().where(User.id == user_id_column, User.role == ADMIN_ROLE)
+    return case((is_admin, pro_rank), else_=func.coalesce(rank, free_rank))
+
+
+async def admin_user_ids(db: AsyncSession, user_ids: Optional[Iterable[str]] = None) -> set[str]:
+    """Ids de las cuentas de super admin (opcionalmente, solo entre user_ids)."""
+    query = select(User.id).where(User.role == ADMIN_ROLE)
+    if user_ids is not None:
+        ids = {uid for uid in user_ids if uid}
+        if not ids:
+            return set()
+        query = query.where(User.id.in_(ids))
+    return set((await db.execute(query)).scalars().all())
+
+
+async def tier_for_user(db: AsyncSession, user_id: str, profile: Optional[Seller_profiles] = None) -> str:
+    """Plan efectivo de un usuario cuando no tienes su rol a mano (p. ej. páginas públicas)."""
+    if user_id in await admin_user_ids(db, [user_id]):
+        return TIER_PRO
+    return seller_tier(profile)
 
 
 async def tiers_for_users(db: AsyncSession, user_ids: Iterable[str]) -> dict[str, str]:
@@ -94,6 +119,8 @@ async def tiers_for_users(db: AsyncSession, user_ids: Iterable[str]) -> dict[str
     tiers = {uid: TIER_FREE for uid in ids}
     for profile in result.scalars().all():
         tiers[profile.user_id] = seller_tier(profile, now)
+    for uid in await admin_user_ids(db, ids):
+        tiers[uid] = TIER_PRO
     return tiers
 
 

@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { client } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 import { Check, Zap, Crown, CreditCard, ShieldCheck, AlertTriangle } from 'lucide-react';
 
 interface SellerProfile {
@@ -49,10 +50,17 @@ export default function SuscripcionPage() {
   const [actionLoading, setActionLoading] = useState<'cancel' | 'resume' | 'basico' | 'profesional' | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAdminAccount = user?.role === 'admin';
 
   const loadProfile = async () => {
     try {
-      const res = await client.entities.seller_profiles.mine({ limit: 1 });
+      let res = await client.entities.seller_profiles.mine({ limit: 1 });
+      if (!res?.data?.items?.[0]) {
+        // Sin perfil de vendedor todavía: se crea solo, como al publicar el primer anuncio.
+        await client.sellerPlans.ensureProfile();
+        res = await client.entities.seller_profiles.mine({ limit: 1 });
+      }
       setSellerProfile(res?.data?.items?.[0] || null);
     } catch (err) {
       console.error('Error loading seller profile:', err);
@@ -188,7 +196,9 @@ export default function SuscripcionPage() {
                   </p>
                 </div>
               </div>
-              {sellerProfile ? (
+              {isAdminAccount ? (
+                <Badge className="bg-primary text-primary-foreground">Administración · todo incluido</Badge>
+              ) : sellerProfile ? (
                 <Badge className={statusLabels[sellerProfile.subscription_status || 'inactive'].className}>
                   {statusLabels[sellerProfile.subscription_status || 'inactive'].label}
                 </Badge>
@@ -218,14 +228,11 @@ export default function SuscripcionPage() {
               </div>
             )}
 
-            {!sellerProfile && (
-              <div className="mt-5 pt-5 border-t border-border">
-                <Link to="/cuenta/perfil">
-                  <Button variant="ghost" className="cursor-pointer gap-1.5">
-                    Completar datos de vendedor primero
-                  </Button>
-                </Link>
-              </div>
+            {isAdminAccount && (
+              <p className="mt-5 pt-5 border-t border-border text-sm text-muted-foreground">
+                Esta es una cuenta de administración: tiene todas las ventajas del plan Profesional sin límites
+                y sin suscripción.
+              </p>
             )}
 
             {isActive && (

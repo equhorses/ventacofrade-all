@@ -24,7 +24,7 @@ from dependencies.auth import get_current_user
 from models.products import Products
 from models.seller_profiles import Seller_profiles
 from schemas.auth import UserResponse
-from services.seller_plans import TIER_PRO, seller_tier
+from services.seller_plans import TIER_PRO, seller_tier, tier_for_user
 from services.shops import LONG_DESCRIPTION_MAX, slug_error, slugify
 from services.storage import StorageNotConfiguredError, StorageService
 
@@ -63,8 +63,10 @@ def _settings_payload(profile: Optional[Seller_profiles], tier: str) -> dict:
 
 @router.get("/me")
 async def my_shop(current_user: UserResponse = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    profile = await _my_profile(db, str(current_user.id))
-    return _settings_payload(profile, seller_tier(profile))
+    from routers.seller_profiles import ensure_seller_profile
+
+    profile = await ensure_seller_profile(db, current_user)
+    return _settings_payload(profile, seller_tier(profile, role=current_user.role))
 
 
 @router.get("/check-slug")
@@ -110,10 +112,10 @@ async def update_my_shop(
     current_user: UserResponse = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    profile = await _my_profile(db, str(current_user.id))
-    if not profile:
-        raise HTTPException(status_code=400, detail="Primero completa tus datos de vendedor en Mi perfil.")
-    tier = seller_tier(profile)
+    from routers.seller_profiles import ensure_seller_profile
+
+    profile = await ensure_seller_profile(db, current_user)
+    tier = seller_tier(profile, role=current_user.role)
     if tier != TIER_PRO:
         raise HTTPException(status_code=403, detail=PRO_ONLY)
 
@@ -150,7 +152,7 @@ async def public_shop(slug: str, db: AsyncSession = Depends(get_db)):
     if not profile:
         raise HTTPException(status_code=404, detail="Tienda no encontrada.")
 
-    tier = seller_tier(profile)
+    tier = await tier_for_user(db, profile.user_id, profile)
     if tier != TIER_PRO:
         # La dirección sigue siendo suya, pero la página vuelve a ser el perfil normal.
         return {"active": False, "seller_id": profile.id}
