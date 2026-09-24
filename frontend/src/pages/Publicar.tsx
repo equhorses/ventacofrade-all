@@ -36,6 +36,9 @@ export default function PublicarPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [publishedProductId, setPublishedProductId] = useState<number | null>(null);
+  // true si el vendedor no tiene perfil o lo tiene sin completar (sin descripción ni teléfono).
+  // Tras publicar se le recuerda completarlo.
+  const [profileIncomplete, setProfileIncomplete] = useState(false);
   const [featurePrices, setFeaturePrices] = useState<Record<string, number>>({});
   const [featuringDays, setFeaturingDays] = useState<number | null>(null);
 
@@ -52,6 +55,16 @@ export default function PublicarPage() {
   useEffect(() => {
     checkAuth();
     loadCategories();
+  }, []);
+
+  useEffect(() => {
+    client.entities.seller_profiles
+      .mine({ limit: 1 })
+      .then((res) => {
+        const profile = res?.data?.items?.[0] as { shop_description?: string; phone?: string } | undefined;
+        setProfileIncomplete(!profile || (!profile.shop_description && !profile.phone));
+      })
+      .catch(() => setProfileIncomplete(false));
   }, []);
 
   // Si se llega desde una tarjeta de categoría (/publicar?categoria=slug), preselecciona la categoría.
@@ -165,6 +178,11 @@ export default function PublicarPage() {
         },
       });
       toast.success('¡Anuncio publicado con éxito!');
+      if (profileIncomplete) {
+        toast.info('Recuerda completar tu perfil de vendedor para generar más confianza a los compradores.', {
+          duration: 8000,
+        });
+      }
       const newId = (created as { id?: number })?.id;
       if (newId) {
         setPublishedProductId(newId);
@@ -233,6 +251,22 @@ export default function PublicarPage() {
             <CardContent className="pt-6 text-center">
               <CheckCircle2 className="h-14 w-14 mx-auto text-green-600 mb-4" />
               <h2 className="text-2xl font-bold mb-2">¡Anuncio publicado!</h2>
+              {profileIncomplete && (
+                <div className="mb-6 rounded-lg border border-secondary/50 bg-secondary/10 p-4 text-left">
+                  <p className="font-semibold text-foreground">Recuerda completar tu perfil de vendedor</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Añade una descripción, tu teléfono y tu ciudad. Los compradores confían más en vendedores con el
+                    perfil completo.
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="mt-3 cursor-pointer"
+                    onClick={() => navigate('/cuenta/perfil')}
+                  >
+                    Completar mi perfil
+                  </Button>
+                </div>
+              )}
               <p className="text-muted-foreground mb-6">
                 Ya está visible en VentaCofrade. Si quieres que se vea antes que los demás, puedes
                 destacarlo ahora:

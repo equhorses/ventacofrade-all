@@ -240,38 +240,31 @@ async def create_products(
     seller_profile = await seller_service.get_by_field("user_id", str(current_user.id))
 
     if not seller_profile:
-        raise HTTPException(
-            status_code=400,
-            detail="Completa primero tu perfil de vendedor antes de publicar un anuncio.",
+        # Primer anuncio sin perfil de vendedor: se crea uno básico automáticamente
+        # para no bloquear la publicación. Se reutiliza la misma lógica que el alta
+        # manual (canje de invitaciones e insignia Fundador). El usuario puede
+        # completarlo después desde su cuenta.
+        from routers.seller_profiles import Seller_profilesData, create_seller_profiles
+
+        default_name = (current_user.name or (current_user.email or "").split("@")[0] or "Vendedor").strip()
+        seller_profile = await create_seller_profiles(
+            Seller_profilesData(
+                shop_name=default_name[:200],
+                province=data.location_province,
+                city=data.location_city,
+            ),
+            current_user=current_user,
+            db=db,
         )
+        logger.info(f"Perfil de vendedor creado automáticamente para user_id={current_user.id}")
 
-    has_active_subscription = seller_profile.subscription_status == "active"
-    has_used_free_listing = bool(seller_profile.free_listing_used)
-
-    now = datetime.now(timezone.utc)
-    free_access_until = seller_profile.free_access_until
-    if free_access_until and free_access_until.tzinfo is None:
-        free_access_until = free_access_until.replace(tzinfo=timezone.utc)
-    has_complimentary_access = bool(free_access_until and free_access_until > now)
-
-    if not has_active_subscription and not has_complimentary_access and has_used_free_listing:
-        raise HTTPException(
-            status_code=403,
-            detail="Ya has usado tu publicación gratuita. Activa un plan para seguir publicando anuncios.",
-        )
+    # Publicar anuncios es gratis e ilimitado para todos los vendedores.
 
     service = ProductsService(db)
     try:
         result = await service.create(data.model_dump(), user_id=str(current_user.id))
         if not result:
             raise HTTPException(status_code=400, detail="Failed to create products")
-
-        if not has_active_subscription and not has_complimentary_access and not has_used_free_listing:
-            await seller_service.update(
-                seller_profile.id,
-                {"free_listing_used": True},
-                user_id=str(current_user.id),
-            )
 
         logger.info(f"Products created successfully with id: {result.id}")
         return result
