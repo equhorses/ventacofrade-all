@@ -153,27 +153,24 @@ export interface PublicShop {
   }[];
 }
 
-export interface AIListingsStatus {
+export interface CatalogImportStatus {
   can_use: boolean;
-  ai_configured: boolean;
-  daily_limit: number;
-  used_today: number;
-  left_today: number;
-  max_per_batch: number;
-  max_photos_per_item: number;
+  website: string | null;
   province: string | null;
   city: string | null;
+  max_items: number;
 }
 
-export interface AIProposedItem {
-  images: string[];
+export interface CatalogItem {
   title: string;
-  description: string;
-  category_id: number | null;
-  condition: string;
+  description: string | null;
+  price: number | null;
+  images: string[];
+  source_url: string;
+  already_published: boolean;
 }
 
-export interface AIPublishItem {
+export interface CatalogPublishItem {
   title: string;
   description?: string;
   price: number;
@@ -345,18 +342,23 @@ export const client = {
       return { data: response.data };
     },
   },
-  aiListings: {
-    async status(): Promise<{ data: AIListingsStatus }> {
-      const response = await http.get(`${baseUrl()}/api/v1/ai-listings/status`);
+  catalogImport: {
+    async status(): Promise<{ data: CatalogImportStatus }> {
+      const response = await http.get(`${baseUrl()}/api/v1/catalog-import/status`);
       return { data: response.data };
     },
-    async analyze(imageUrls: string[]) {
-      const response = await http.post(`${baseUrl()}/api/v1/ai-listings/analyze`, { image_urls: imageUrls });
-      return { data: response.data as { items: AIProposedItem[]; left_today: number } };
+    async fetch(url: string, confirmOwner: boolean) {
+      const response = await http.post(`${baseUrl()}/api/v1/catalog-import/fetch`, {
+        url,
+        confirm_owner: confirmOwner,
+      });
+      return { data: response.data as { source: 'shopify' | 'woocommerce' | 'web'; items: CatalogItem[] } };
     },
-    async publish(data: { location_province: string; location_city?: string; items: AIPublishItem[] }) {
-      const response = await http.post(`${baseUrl()}/api/v1/ai-listings/publish`, data);
-      return { data: response.data as { created: number; product_ids: number[]; vacation_mode: boolean } };
+    async publish(data: { location_province: string; location_city?: string; items: CatalogPublishItem[] }) {
+      const response = await http.post(`${baseUrl()}/api/v1/catalog-import/publish`, data);
+      return {
+        data: response.data as { created: number; without_photos: number; vacation_mode: boolean; product_ids: number[] },
+      };
     },
   },
   payments: {

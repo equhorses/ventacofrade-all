@@ -107,3 +107,16 @@ class StorageService:
     def is_own_url(self, url: str) -> bool:
         """True si la URL apunta a nuestro propio bucket público."""
         return bool(url) and url.startswith(f"{self.public_url}/")
+
+    def put_bytes(self, data: bytes, content_type: str, folder: str, user_id: str) -> str:
+        """Sube bytes ya validados al bucket y devuelve su URL pública (lo usa la importación de catálogo)."""
+        if folder not in ALLOWED_FOLDERS:
+            raise ValueError(f"Invalid folder '{folder}'.")
+        if content_type not in ALLOWED_CONTENT_TYPES:
+            raise ValueError("Only image uploads are allowed (JPEG, PNG, WEBP, GIF).")
+        extension = mimetypes.guess_extension(content_type) or ""
+        if extension == ".jpe":
+            extension = ".jpg"
+        key = f"{folder}/{user_id}/{uuid.uuid4().hex}{extension}"
+        self.client.put_object(Bucket=self.bucket_name, Key=key, Body=data, ContentType=content_type)
+        return f"{self.public_url}/{key}"

@@ -24,7 +24,7 @@ import FavoritosPage from './pages/cuenta/Favoritos';
 import SuscripcionPage from './pages/cuenta/Suscripcion';
 import PerfilProfesionalPage from './pages/cuenta/PerfilProfesional';
 import MiTiendaPage from './pages/cuenta/MiTienda';
-import SubidaMasivaPage from './pages/cuenta/SubidaMasiva';
+import ImportarCatalogoPage from './pages/cuenta/ImportarCatalogo';
 import AdminVendedoresPage from './pages/admin/Vendedores';
 import AdminPublicidadPage from './pages/admin/Publicidad';
 import AdminEquipoPage from './pages/admin/Equipo';
@@ -75,7 +75,8 @@ const AppRoutes = () => (
     <Route path="/cuenta/favoritos" element={<FavoritosPage />} />
     <Route path="/cuenta/suscripcion" element={<SuscripcionPage />} />
     <Route path="/cuenta/tienda" element={<MiTiendaPage />} />
-    <Route path="/cuenta/subida-masiva" element={<SubidaMasivaPage />} />
+    <Route path="/cuenta/importar" element={<ImportarCatalogoPage />} />
+    <Route path="/cuenta/subida-masiva" element={<Navigate to="/cuenta/importar" replace />} />
     <Route path="/cuenta/perfil-profesional" element={<PerfilProfesionalPage />} />
     <Route
       path="/admin"
