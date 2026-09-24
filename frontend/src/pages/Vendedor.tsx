@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import Layout from '@/components/Layout';
 import SellerBadge from '@/components/SellerBadge';
+import SellerContactLinks from '@/components/SellerContactLinks';
 import { client } from '@/lib/api';
 import { Store, Star, MapPin, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
@@ -21,6 +22,10 @@ interface SellerProfile {
   plan?: string | null;
   subscription_status?: string | null;
   is_founder?: boolean;
+  whatsapp?: string;
+  website?: string;
+  instagram?: string;
+  facebook?: string;
 }
 
 interface Product {
@@ -162,6 +167,15 @@ export default function VendedorPage() {
                 {avgRating > 0 ? avgRating.toFixed(1) : 'Sin valoraciones'}
                 {reviews.length > 0 && ` (${reviews.length})`}
               </span>
+            </div>
+            <div className="mt-3">
+              <SellerContactLinks
+                contact={seller}
+                tier={
+                  products[0]?.seller_tier ||
+                  (seller.subscription_status === 'active' ? (seller.plan === 'profesional' ? 'profesional' : 'basico') : null)
+                }
+              />
             </div>
             {seller.shop_description && (
               <p className="text-sm text-muted-foreground mt-2">{seller.shop_description}</p>

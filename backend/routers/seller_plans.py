@@ -15,7 +15,12 @@ from models.messages import Messages
 from models.products import Products
 from models.seller_profiles import Seller_profiles
 from schemas.auth import UserResponse
+from pydantic import BaseModel
+
 from services.seller_plans import (
+    MANUAL_BUMP_INTERVAL,
+    VACATION_TIERS,
+    next_manual_bump_at,
     INCLUDED_FEATURE_DAYS,
     INCLUDED_FEATURES_PER_MONTH,
     TIER_FREE,
@@ -38,10 +43,17 @@ async def _profile(db: AsyncSession, user_id: str):
 @router.get("/me")
 async def my_plan(current_user: UserResponse = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     now = datetime.now(timezone.utc)
-    tier = seller_tier(await _profile(db, str(current_user.id)), now)
+    profile = await _profile(db, str(current_user.id))
+    tier = seller_tier(profile, now)
     total = INCLUDED_FEATURES_PER_MONTH.get(tier, 0)
     used = await included_features_used(db, str(current_user.id), now) if total else 0
+    next_bump = next_manual_bump_at(profile, tier)
     return {
+        "vacation_mode": bool(profile.vacation_mode) if profile else False,
+        "can_use_vacation": tier in VACATION_TIERS,
+        "can_bump": tier in MANUAL_BUMP_INTERVAL,
+        "next_bump_at": next_bump.isoformat() if next_bump else None,
+        "auto_bump": tier == TIER_PRO,
         "tier": tier,
         "included_features_total": total,
         "included_features_used": min(used, total),
@@ -130,3 +142,77 @@ async def my_stats(current_user: UserResponse = Depends(get_current_user), db: A
             item["contacts"] = int(messages.get(p.id, 0))  # compradores distintos que han escrito
         items.append(item)
     return {"tier": tier, "items": items}
+
+
+class VacationRequest(BaseModel):
+    enabled: bool
+
+
+@router.post("/vacation")
+async def set_vacation_mode(
+    payload: VacationRequest,
+    current_user: UserResponse = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Pausa (o reactiva) de golpe todos los anuncios activos del vendedor."""
+    user_id = str(current_user.id)
+    profile = await _profile(db, user_id)
+    tier = seller_tier(profile)
+    # Desactivarlo siempre está permitido (por ejemplo, si el plan caducó estando de vacaciones).
+    if not profile or (payload.enabled and tier not in VACATION_TIERS):
+        raise HTTPException(status_code=403, detail="El modo vacaciones está disponible con los planes Básico y Profesional.")
+
+    products = (await db.execute(select(Products).where(Products.user_id == user_id))).scalars().all()
+    changed = 0
+    if payload.enabled:
+        for p in products:
+            if (p.status or "active") == "active":
+                p.status = "paused"
+                p.paused_by_vacation = True
+                changed += 1
+    else:
+        # Solo se reactivan los que pausó el modo vacaciones, no los que el vendedor pausó a mano.
+        for p in products:
+            if p.paused_by_vacation:
+                p.status = "active"
+                p.paused_by_vacation = False
+                changed += 1
+    profile.vacation_mode = payload.enabled
+    await db.commit()
+    return {"vacation_mode": payload.enabled, "products_changed": changed}
+
+
+@router.post("/bump/{product_id}")
+async def bump_product(
+    product_id: int,
+    current_user: UserResponse = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Sube un anuncio para que vuelva arriba como recién publicado."""
+    now = datetime.now(timezone.utc)
+    user_id = str(current_user.id)
+    profile = await _profile(db, user_id)
+    tier = seller_tier(profile, now)
+    if tier not in MANUAL_BUMP_INTERVAL:
+        raise HTTPException(status_code=403, detail="Subir anuncios está disponible con los planes Básico y Profesional.")
+
+    product = (await db.execute(select(Products).where(Products.id == product_id))).scalar_one_or_none()
+    if not product:
+        raise HTTPException(status_code=404, detail="Anuncio no encontrado.")
+    if product.user_id != user_id:
+        raise HTTPException(status_code=403, detail="Este anuncio no te pertenece.")
+    if (product.status or "active") != "active":
+        raise HTTPException(status_code=400, detail="Solo se pueden subir anuncios activos.")
+
+    next_bump = next_manual_bump_at(profile, tier)
+    if next_bump:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Podrás volver a subir un anuncio a partir del {next_bump.strftime('%d/%m/%Y %H:%M')} (hora UTC).",
+        )
+
+    product.bumped_at = now
+    profile.last_manual_bump_at = now
+    await db.commit()
+    next_bump = next_manual_bump_at(profile, tier)
+    return {"product_id": product.id, "bumped_at": now.isoformat(), "next_bump_at": next_bump.isoformat() if next_bump else None}

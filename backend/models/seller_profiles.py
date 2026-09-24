@@ -31,5 +31,16 @@ class Seller_profiles(Base):
     # routers/seller_profiles.py::create_seller_profiles), y da derecho a la
     # insignia pública "Fundador".
     is_founder = Column(Boolean, nullable=True, default=False, server_default='false')
+    # Contacto directo (visible con plan Profesional).
+    whatsapp = Column(String(20), nullable=True)
+    website = Column(String(300), nullable=True)
+    instagram = Column(String(300), nullable=True)
+    facebook = Column(String(300), nullable=True)
+    # Modo vacaciones: anuncios pausados temporalmente.
+    vacation_mode = Column(Boolean, nullable=True, default=False, server_default='false')
+    # Última vez que el vendedor subió un anuncio a mano (límite por plan).
+    last_manual_bump_at = Column(DateTime(timezone=True), nullable=True)
+    # Mes (AAAA-MM) del último informe mensual enviado, para no duplicarlo.
+    last_report_month = Column(String(7), nullable=True)
     created_at = Column(DateTime(timezone=True), default=datetime.now)
     updated_at = Column(DateTime(timezone=True), default=datetime.now, onupdate=datetime.now)

@@ -38,6 +38,10 @@ interface SellerProfile {
   province: string;
   city?: string;
   phone?: string;
+  whatsapp?: string;
+  website?: string;
+  instagram?: string;
+  facebook?: string;
   is_active?: boolean;
   subscription_status?: string;
 }
@@ -61,6 +65,10 @@ export default function PerfilPage() {
   const [province, setProvince] = useState('');
   const [city, setCity] = useState('');
   const [phone, setPhone] = useState('');
+  const [whatsapp, setWhatsapp] = useState('');
+  const [website, setWebsite] = useState('');
+  const [instagram, setInstagram] = useState('');
+  const [facebook, setFacebook] = useState('');
 
   useEffect(() => {
     const loadSellerProfile = async () => {
@@ -74,6 +82,10 @@ export default function PerfilPage() {
           setProvince(profile.province || '');
           setCity(profile.city || '');
           setPhone(profile.phone || '');
+          setWhatsapp(profile.whatsapp || '');
+          setWebsite(profile.website || '');
+          setInstagram(profile.instagram || '');
+          setFacebook(profile.facebook || '');
         }
       } catch (err) {
         console.error('Error loading seller profile:', err);
@@ -145,6 +157,10 @@ export default function PerfilPage() {
         province,
         city: city.trim() || undefined,
         phone: phone.trim() || undefined,
+        whatsapp: whatsapp.trim() || undefined,
+        website: website.trim() || undefined,
+        instagram: instagram.trim() || undefined,
+        facebook: facebook.trim() || undefined,
       };
       if (sellerProfile) {
         await client.entities.seller_profiles.update({ id: sellerProfile.id, data });
@@ -309,6 +325,33 @@ export default function PerfilPage() {
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="600 000 000"
                   />
+                </div>
+                <div className="space-y-3 rounded-lg border border-border p-4">
+                  <div>
+                    <p className="font-medium text-sm text-foreground">Contacto directo</p>
+                    <p className="text-xs text-muted-foreground">
+                      Se muestra en tu perfil y en tus anuncios con el plan Profesional, para que los compradores te
+                      contacten por su canal habitual.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label htmlFor="whatsapp">WhatsApp</Label>
+                      <Input id="whatsapp" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} placeholder="600 000 000" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="website">Página web</Label>
+                      <Input id="website" value={website} onChange={(e) => setWebsite(e.target.value)} placeholder="www.mitienda.com" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="instagram">Instagram</Label>
+                      <Input id="instagram" value={instagram} onChange={(e) => setInstagram(e.target.value)} placeholder="@mitienda" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="facebook">Facebook</Label>
+                      <Input id="facebook" value={facebook} onChange={(e) => setFacebook(e.target.value)} placeholder="facebook.com/mitienda" />
+                    </div>
+                  </div>
                 </div>
                 <Button type="submit" disabled={savingSeller} className="cursor-pointer">
                   {savingSeller ? 'Guardando…' : 'Guardar datos de vendedor'}

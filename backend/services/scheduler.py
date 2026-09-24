@@ -11,6 +11,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
+from services.seller_plan_jobs import auto_bump_pro_listings, send_monthly_reports
 from services.scheduled_jobs import (
     run_daily_jobs,
     send_pending_invitation_emails,
@@ -42,6 +43,11 @@ def start_scheduler() -> None:
     # Plazo de 18 días (cuenta creada -> tienda terminada): recordatorio y expiración.
     _scheduler.add_job(
         check_signup_deadlines, IntervalTrigger(hours=2), id="signup_deadline_checks", replace_existing=True
+    )
+    # Ventajas de los planes: subida automática semanal (Profesional) y resumen mensual.
+    _scheduler.add_job(auto_bump_pro_listings, CronTrigger(hour=7, minute=0), id="auto_bump_pro", replace_existing=True)
+    _scheduler.add_job(
+        send_monthly_reports, CronTrigger(day=1, hour=9, minute=0), id="monthly_reports", replace_existing=True
     )
     _scheduler.start()
     logger.info(

@@ -78,6 +78,7 @@ class ProductsResponse(BaseModel):
     views_count: Optional[int] = None
     is_featured: Optional[bool] = None
     featured_until: Optional[datetime] = None
+    bumped_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

@@ -21,5 +21,9 @@ class Products(Base):
     views_count = Column(Integer, nullable=True, default=0, server_default='0')
     is_featured = Column(Boolean, nullable=True, default=False, server_default='false')
     featured_until = Column(DateTime(timezone=True), nullable=True)
+    # Fecha en la que el anuncio se "subió" para volver arriba como recién publicado.
+    bumped_at = Column(DateTime(timezone=True), nullable=True)
+    # True si lo pausó el modo vacaciones (para reactivar solo esos al volver).
+    paused_by_vacation = Column(Boolean, nullable=True, default=False, server_default='false')
     created_at = Column(DateTime(timezone=True), default=datetime.now)
     updated_at = Column(DateTime(timezone=True), default=datetime.now, onupdate=datetime.now)

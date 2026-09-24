@@ -7,8 +7,9 @@ import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import Layout from '@/components/Layout';
 import SellerBadge from '@/components/SellerBadge';
+import SellerContactLinks from '@/components/SellerContactLinks';
 import { client } from '@/lib/api';
-import { MapPin, Heart, Share2, MessageCircle, Eye, ArrowLeft, Church, User, Star, BadgeCheck } from 'lucide-react';
+import { MapPin, Heart, Share2, MessageCircle, Eye, ArrowLeft, Church, User, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Review } from '@/lib/api';
@@ -19,6 +20,10 @@ interface SellerProfile {
   rating?: number;
   plan?: string | null;
   subscription_status?: string | null;
+  whatsapp?: string;
+  website?: string;
+  instagram?: string;
+  facebook?: string;
 }
 
 interface Product {
@@ -333,10 +338,8 @@ export default function ProductoPage() {
                   <div className="flex items-center justify-between">
                     <Link to={`/vendedor/${seller.id}`} className="font-medium text-sm hover:text-primary cursor-pointer flex items-center gap-1">
                       {seller.shop_name}
-                      {seller.plan === 'profesional' && seller.subscription_status === 'active' && (
-                        <BadgeCheck className="h-4 w-4 text-primary shrink-0" aria-label="Vendedor verificado" />
-                      )}
                     </Link>
+                    <SellerBadge tier={product.seller_tier} />
                     <div className="flex items-center gap-1">
                       <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
                       <span className="text-sm font-medium">
@@ -347,6 +350,8 @@ export default function ProductoPage() {
                       )}
                     </div>
                   </div>
+
+                  <SellerContactLinks contact={seller} tier={product.seller_tier} />
 
                   {reviews.length > 0 && (
                     <div className="space-y-3 max-h-52 overflow-y-auto">

@@ -93,6 +93,11 @@ export interface SellerPlanSummary {
   included_features_left: number;
   included_feature_days: number;
   resets_at: string;
+  vacation_mode: boolean;
+  can_use_vacation: boolean;
+  can_bump: boolean;
+  next_bump_at: string | null;
+  auto_bump: boolean;
 }
 
 export interface SellerProductStats {
@@ -228,6 +233,14 @@ export const client = {
     async featureWithIncluded(productId: number) {
       const response = await http.post(`${baseUrl()}/api/v1/seller-plans/feature/${productId}`, {});
       return { data: response.data as { product_id: number; featured_until: string; included_features_left: number } };
+    },
+    async setVacation(enabled: boolean) {
+      const response = await http.post(`${baseUrl()}/api/v1/seller-plans/vacation`, { enabled });
+      return { data: response.data as { vacation_mode: boolean; products_changed: number } };
+    },
+    async bump(productId: number) {
+      const response = await http.post(`${baseUrl()}/api/v1/seller-plans/bump/${productId}`, {});
+      return { data: response.data as { product_id: number; bumped_at: string; next_bump_at: string | null } };
     },
     async stats(): Promise<{ data: { tier: SellerTier; items: SellerProductStats[] } }> {
       const response = await http.get(`${baseUrl()}/api/v1/seller-plans/stats`);

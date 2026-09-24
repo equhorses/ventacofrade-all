@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { client, type SellerPlanSummary, type SellerProductStats } from '@/lib/api';
-import { Church, Plus, Eye, Trash2, Sparkles, Heart, MessageCircle, Crown } from 'lucide-react';
+import { Church, Plus, Eye, Trash2, Sparkles, Heart, MessageCircle, Crown, ArrowUp, Palmtree } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,6 +39,8 @@ export default function MisAnunciosPage() {
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [plan, setPlan] = useState<SellerPlanSummary | null>(null);
   const [stats, setStats] = useState<Record<number, SellerProductStats>>({});
+  const [busyVacation, setBusyVacation] = useState(false);
+  const [bumpingId, setBumpingId] = useState<number | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
@@ -122,6 +124,40 @@ export default function MisAnunciosPage() {
     }
   };
 
+  const errorMessage = (err: unknown, fallback: string) =>
+    (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || fallback;
+
+  const handleVacation = async (enabled: boolean) => {
+    if (enabled && !confirm('Se pausarán todos tus anuncios activos hasta que desactives el modo vacaciones. ¿Continuar?')) return;
+    setBusyVacation(true);
+    try {
+      const { data } = await client.sellerPlans.setVacation(enabled);
+      toast.success(
+        enabled
+          ? `Modo vacaciones activado: ${data.products_changed} anuncios pausados.`
+          : `Modo vacaciones desactivado: ${data.products_changed} anuncios reactivados.`,
+      );
+      await load();
+    } catch (err) {
+      toast.error(errorMessage(err, 'No se pudo cambiar el modo vacaciones.'));
+    } finally {
+      setBusyVacation(false);
+    }
+  };
+
+  const handleBump = async (productId: number) => {
+    setBumpingId(productId);
+    try {
+      await client.sellerPlans.bump(productId);
+      toast.success('Anuncio subido: vuelve a aparecer arriba como recién publicado.');
+      await load();
+    } catch (err) {
+      toast.error(errorMessage(err, 'No se pudo subir el anuncio.'));
+    } finally {
+      setBumpingId(null);
+    }
+  };
+
   const handleDelete = async (id: number) => {
     if (!confirm('¿Seguro que quieres eliminar este anuncio? Esta acción no se puede deshacer.')) return;
     setDeletingId(id);
@@ -160,11 +196,23 @@ export default function MisAnunciosPage() {
                     incluyen destacados cada mes.
                   </p>
                 </div>
-                <Link to="/cuenta/suscripcion" className="shrink-0">
-                  <Button size="sm" className="gap-1 cursor-pointer">
-                    <Crown className="h-4 w-4" /> Ver planes
-                  </Button>
-                </Link>
+                <div className="flex gap-2 shrink-0">
+                  {plan.vacation_mode && (
+                    <Button
+                      size="sm"
+                      className="gap-1 cursor-pointer"
+                      disabled={busyVacation}
+                      onClick={() => handleVacation(false)}
+                    >
+                      <Palmtree className="h-4 w-4" /> Volver de vacaciones
+                    </Button>
+                  )}
+                  <Link to="/cuenta/suscripcion">
+                    <Button size="sm" className="gap-1 cursor-pointer">
+                      <Crown className="h-4 w-4" /> Ver planes
+                    </Button>
+                  </Link>
+                </div>
               </>
             ) : (
               <>
@@ -177,7 +225,31 @@ export default function MisAnunciosPage() {
                     {plan.included_features_total} disponibles ({plan.included_feature_days} días cada uno). Se renuevan
                     el {new Date(plan.resets_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}.
                   </p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {plan.auto_bump
+                      ? 'Tus anuncios se suben solos cada semana y además puedes subir uno al día.'
+                      : 'Puedes subir un anuncio a la semana para que vuelva arriba.'}
+                    {plan.next_bump_at &&
+                      ` Próxima subida disponible: ${new Date(plan.next_bump_at).toLocaleString('es-ES', {
+                        day: 'numeric',
+                        month: 'long',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}.`}
+                  </p>
                 </div>
+                {plan.can_use_vacation && (
+                  <Button
+                    size="sm"
+                    variant={plan.vacation_mode ? 'default' : 'outline'}
+                    className="gap-1 cursor-pointer shrink-0"
+                    disabled={busyVacation}
+                    onClick={() => handleVacation(!plan.vacation_mode)}
+                  >
+                    <Palmtree className="h-4 w-4" />
+                    {plan.vacation_mode ? 'Volver de vacaciones' : 'Modo vacaciones'}
+                  </Button>
+                )}
               </>
             )}
           </CardContent>
@@ -293,6 +365,18 @@ export default function MisAnunciosPage() {
                         ))}
                       </DropdownMenuContent>
                     </DropdownMenu>
+                    {plan?.can_bump && (product.status || 'active') === 'active' && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="cursor-pointer"
+                        title={plan.next_bump_at ? 'Aún no puedes subir otro anuncio' : 'Subir anuncio (vuelve arriba)'}
+                        disabled={bumpingId === product.id || Boolean(plan.next_bump_at)}
+                        onClick={() => handleBump(product.id)}
+                      >
+                        <ArrowUp className="h-4 w-4" />
+                      </Button>
+                    )}
                     <Link to={`/producto/${product.id}`}>
                       <Button variant="ghost" size="icon" className="cursor-pointer" title="Ver anuncio">
                         <Eye className="h-4 w-4" />

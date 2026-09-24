@@ -31,6 +31,10 @@ class Seller_profilesData(BaseModel):
     province: str
     city: str = None
     phone: str = None
+    whatsapp: str = None
+    website: str = None
+    instagram: str = None
+    facebook: str = None
     is_active: bool = None
     subscription_status: str = None
     subscription_end_date: Optional[datetime] = None
@@ -46,6 +50,10 @@ class Seller_profilesUpdateData(BaseModel):
     province: Optional[str] = None
     city: Optional[str] = None
     phone: Optional[str] = None
+    whatsapp: Optional[str] = None
+    website: Optional[str] = None
+    instagram: Optional[str] = None
+    facebook: Optional[str] = None
     is_active: Optional[bool] = None
     subscription_status: Optional[str] = None
     subscription_end_date: Optional[datetime] = None
@@ -72,6 +80,11 @@ class Seller_profilesResponse(BaseModel):
     rating: Optional[float] = None
     total_sales: Optional[int] = None
     is_founder: Optional[bool] = None
+    whatsapp: Optional[str] = None
+    website: Optional[str] = None
+    instagram: Optional[str] = None
+    facebook: Optional[str] = None
+    vacation_mode: Optional[bool] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

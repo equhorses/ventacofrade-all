@@ -2,6 +2,7 @@ import logging
 from typing import Optional
 
 import httpx
+from html import escape as html_escape
 from core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -74,8 +75,9 @@ async def send_subscription_confirmation_email(to_email: str, plan: str, name: O
     html_content = f"""
     <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
       <h2 style="color: #6d28d9;">¡Tu plan {plan_label} ya está activo, {display_name}!</h2>
-      <p>Hemos confirmado tu pago y tu tienda de vendedor en VentaCofrade ya está activada.</p>
-      <p>Ya puedes publicar tus anuncios y empezar a vender.</p>
+      <p>Hemos confirmado tu pago y ya tienes activas las ventajas de tu plan en VentaCofrade:
+      tus anuncios aparecen antes en los listados, llevan tu insignia e incluyen destacados cada mes.</p>
+      <p>Puedes usar tus destacados incluidos desde "Mis anuncios".</p>
       <p style="margin-top: 24px;">
         <a href="https://ventacofrade.com/cuenta/suscripcion" style="background-color:#6d28d9;color:#fff;
         padding:10px 20px;border-radius:6px;text-decoration:none;">Ver mi suscripción</a>
@@ -598,3 +600,76 @@ async def send_subscription_renewal_reminder_email(to_email: str, plan: str, ren
         to_email, "Tu suscripción a VentaCofrade se renueva en 7 días", html_content,
         "recordatorio de renovacion",
     )
+
+
+async def send_monthly_report_email(
+    to_email: str,
+    name: Optional[str],
+    plan: str,
+    month_label: str,
+    active_listings: int,
+    total_views: int,
+    new_favorites: int,
+    new_contacts: Optional[int],
+    included_features: int,
+    top_listing: Optional[tuple[str, int]] = None,
+) -> bool:
+    """Informe mensual para vendedores con plan. Nunca lanza excepciones."""
+    api_key = getattr(settings, "resend_api_key", None)
+    from_email = getattr(settings, "resend_from_email", None)
+    if not api_key or not from_email:
+        logger.warning("Resend no configurado; informe mensual omitido")
+        return False
+
+    display_name = name or to_email.split("@", 1)[0]
+    plan_label = "Profesional" if plan == "profesional" else "Básico"
+    rows = [
+        ("Anuncios activos", active_listings),
+        ("Visitas acumuladas de tus anuncios", total_views),
+        (f"Nuevos favoritos en {month_label}", new_favorites),
+    ]
+    if new_contacts is not None:
+        rows.append((f"Compradores que te escribieron en {month_label}", new_contacts))
+    rows_html = "".join(
+        f'<tr><td style="padding:6px 0;color:#444;">{label}</td>'
+        f'<td style="padding:6px 0;text-align:right;font-weight:bold;color:#6d28d9;">{value}</td></tr>'
+        for label, value in rows
+    )
+    top_html = ""
+    if top_listing:
+        top_html = f"<p>Tu anuncio más visto: <strong>{html_escape(top_listing[0])}</strong> ({top_listing[1]} visitas).</p>"
+
+    html_content = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; color: #222;">
+      <h2 style="color: #6d28d9;">Tu resumen de {month_label}</h2>
+      <p>Hola, {html_escape(display_name)}. Así han ido tus anuncios en VentaCofrade:</p>
+      <table style="width:100%;border-collapse:collapse;margin:16px 0;">{rows_html}</table>
+      {top_html}
+      <p>Este mes tienes <strong>{included_features} destacados incluidos</strong> en tu plan {plan_label}.
+      Úsalos desde "Mis anuncios" para que tus artículos salgan los primeros.</p>
+      <p style="margin: 24px 0;">
+        <a href="https://www.ventacofrade.com/cuenta/anuncios" style="background:#6d28d9;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;">
+          Ver mis anuncios
+        </a>
+      </p>
+      <p style="margin-top: 32px; color: #888; font-size: 12px;">
+        Recibes este resumen porque tienes un plan de vendedor en VentaCofrade.
+        Si no quieres recibirlo, escríbenos a <a href="mailto:contacto@ventacofrade.com">contacto@ventacofrade.com</a>.
+      </p>
+    </div>
+    """
+    payload = {
+        "from": from_email,
+        "to": [to_email],
+        "subject": f"Tu resumen de {month_label} en VentaCofrade",
+        "html": html_content,
+    }
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(RESEND_API_URL, headers={"Authorization": f"Bearer {api_key}"}, json=payload)
+            response.raise_for_status()
+        logger.info("Informe mensual enviado a %s", to_email)
+        return True
+    except httpx.HTTPError as exc:
+        logger.error("Fallo al enviar informe mensual a %s: %s", to_email, exc)
+        return False

@@ -96,6 +96,11 @@ class ProductsService:
 
                 order_clauses.append(tier_rank_expression(Products.user_id, datetime.now(timezone.utc)))
 
+            if boost_featured and sort in (None, "-created_at"):
+                # Un anuncio "subido" cuenta como recién publicado.
+                order_clauses.append(func.coalesce(Products.bumped_at, Products.created_at).desc())
+                sort = None
+
             if sort:
                 if sort.startswith('-'):
                     field_name = sort[1:]

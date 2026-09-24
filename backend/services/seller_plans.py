@@ -10,7 +10,7 @@ Quien tiene acceso gratuito vigente (fundadores con pase y ganadores del
 sorteo) recibe las ventajas de COMPLIMENTARY_TIER mientras le dure.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Iterable, Optional
 
 from sqlalchemy import and_, case, func, select
@@ -31,6 +31,14 @@ INCLUDED_FEATURES_PER_MONTH = {TIER_BASIC: 4, TIER_PRO: 9}
 INCLUDED_FEATURE_DAYS = 7
 
 TIER_RANK = {TIER_PRO: 0, TIER_BASIC: 1, TIER_FREE: 2}
+
+# "Subir" anuncios a mano: cada cuánto puede hacerlo el vendedor según su plan.
+MANUAL_BUMP_INTERVAL = {TIER_BASIC: timedelta(days=7), TIER_PRO: timedelta(days=1)}
+# Profesional: además, sus anuncios se suben solos cuando llevan una semana sin subir.
+AUTO_BUMP_AFTER = timedelta(days=7)
+
+# Planes que pueden usar el modo vacaciones.
+VACATION_TIERS = {TIER_BASIC, TIER_PRO}
 
 
 def _aware(value: Optional[datetime]) -> Optional[datetime]:
@@ -103,3 +111,13 @@ async def included_features_used(db: AsyncSession, user_id: str, now: datetime) 
         )
     )
     return int(result.scalar() or 0)
+
+
+def next_manual_bump_at(profile: Optional[Seller_profiles], tier: str) -> Optional[datetime]:
+    """Cuándo puede volver a subir un anuncio a mano (None = ya puede, o su plan no lo permite)."""
+    interval = MANUAL_BUMP_INTERVAL.get(tier)
+    last = _aware(profile.last_manual_bump_at) if profile else None
+    if not interval or not last:
+        return None
+    available = last + interval
+    return available if available > datetime.now(timezone.utc) else None
