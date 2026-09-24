@@ -2,164 +2,332 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import AccountLayout from '@/components/AccountLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
-import { client, type BulkConfirmResult, type BulkPreview, type SellerTier } from '@/lib/api';
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Crown,
-  Download,
-  FileSpreadsheet,
-  ImagePlus,
-  Loader2,
-  Upload,
-  XCircle,
-} from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { client, type AIListingsStatus } from '@/lib/api';
+import { CheckCircle2, Crown, ImagePlus, Loader2, MoveRight, Scissors, Sparkles, Star, Trash2, X } from 'lucide-react';
 
-const BATCH = 20;
-const MAX_PHOTO_MB = 5;
+// Subida con IA: el vendedor sube fotos, la IA las agrupa por artículo y propone
+// título, descripción, categoría y estado. El precio lo pone siempre el vendedor.
+
+const PROVINCES = [
+  'Sevilla', 'Málaga', 'Cádiz', 'Córdoba', 'Granada', 'Huelva', 'Jaén', 'Almería',
+  'Madrid', 'Barcelona', 'Valencia', 'Murcia', 'Otra',
+];
+const MAX_FILE_MB = 5;
+const UPLOAD_CONCURRENCY = 4;
+const DRAFT_KEY = 'vc_ai_upload_draft';
+
+interface Category {
+  id: number;
+  name: string;
+}
+
+interface DraftItem {
+  key: string;
+  images: string[];
+  title: string;
+  description: string;
+  category_id: string;
+  condition: string;
+  price: string;
+}
+
+type Phase = 'select' | 'working' | 'review' | 'done';
+
+const newKey = () => Math.random().toString(36).slice(2, 10);
 
 function errorDetail(err: unknown, fallback: string) {
   return (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || fallback;
 }
 
-const isUrl = (t: string) => /^https?:\/\//i.test(t);
-const fileKey = (t: string) => t.split(/[\\/]/).pop()!.trim().toLowerCase();
+function parsePrice(value: string): number | null {
+  let t = value.replace(/\s|€/g, '');
+  if (t.includes(',') && t.includes('.')) {
+    // El último separador es el decimal: 1.234,50 o 1,234.50
+    t = t.lastIndexOf(',') > t.lastIndexOf('.') ? t.replace(/\./g, '').replace(',', '.') : t.replace(/,/g, '');
+  } else if (t.includes(',')) {
+    t = t.replace(',', '.');
+  } else if (/^\d{1,3}(\.\d{3})+$/.test(t)) {
+    t = t.replace(/\./g, ''); // 1.500 = mil quinientos
+  }
+  const n = Number(t);
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null;
+}
+
+function missingFields(item: DraftItem): string[] {
+  const missing = [];
+  if (item.title.trim().length < 3) missing.push('título');
+  if (!parsePrice(item.price)) missing.push('precio');
+  if (!item.category_id) missing.push('categoría');
+  if (!item.condition) missing.push('estado');
+  return missing;
+}
 
 export default function SubidaMasivaPage() {
-  const [tier, setTier] = useState<SellerTier | null>(null);
-  const [sheet, setSheet] = useState<File | null>(null);
-  const [photos, setPhotos] = useState<Record<string, File>>({});
-  const [preview, setPreview] = useState<BulkPreview | null>(null);
-  const [checking, setChecking] = useState(false);
-  const [running, setRunning] = useState(false);
+  const [status, setStatus] = useState<AIListingsStatus | null>(null);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [phase, setPhase] = useState<Phase>('select');
+  const [files, setFiles] = useState<File[]>([]);
+  const [uploadedUrls, setUploadedUrls] = useState<string[]>([]);
   const [progress, setProgress] = useState({ label: '', value: 0 });
-  const [result, setResult] = useState<BulkConfirmResult | null>(null);
-  const sheetInput = useRef<HTMLInputElement>(null);
-  const photoInput = useRef<HTMLInputElement>(null);
+  const [items, setItems] = useState<DraftItem[]>([]);
+  const [province, setProvince] = useState('');
+  const [city, setCity] = useState('');
+  const [selected, setSelected] = useState<string[]>([]);
+  const [showErrors, setShowErrors] = useState(false);
+  const [created, setCreated] = useState<{ count: number; vacation: boolean } | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  const previews = useMemo(() => files.map((f) => URL.createObjectURL(f)), [files]);
+  useEffect(() => () => previews.forEach((u) => URL.revokeObjectURL(u)), [previews]);
 
   useEffect(() => {
-    client.sellerPlans
-      .me()
-      .then(({ data }) => setTier(data.tier))
-      .catch(() => setTier('gratis'));
+    Promise.all([client.aiListings.status(), client.entities.categories.query({ sort: 'order_index', limit: 50 })])
+      .then(([s, c]) => {
+        setStatus(s.data);
+        setCategories(c?.data?.items || []);
+        // Recupera un borrador a medias (por si se cerró la página).
+        try {
+          const draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+          if (draft?.items?.length) {
+            setItems(draft.items);
+            setProvince(draft.province || s.data.province || '');
+            setCity(draft.city || '');
+            setPhase('review');
+            toast.info('Hemos recuperado los anuncios que tenías a medias');
+            return;
+          }
+        } catch {
+          // borrador ilegible: se ignora
+        }
+        setProvince(s.data.province && PROVINCES.includes(s.data.province) ? s.data.province : '');
+        setCity(s.data.city || '');
+      })
+      .catch(() => toast.error('No se pudo cargar la subida con IA'));
   }, []);
 
-  const validRows = useMemo(() => preview?.rows.filter((r) => r.errors.length === 0) ?? [], [preview]);
-  const missingPhotos = useMemo(
-    () => (preview?.local_photos ?? []).filter((name) => !photos[name]),
-    [preview, photos],
-  );
+  // Guarda el borrador mientras se revisa.
+  useEffect(() => {
+    try {
+      if (phase === 'review' && items.length) {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({ items, province, city }));
+      }
+    } catch {
+      // sin almacenamiento: no pasa nada
+    }
+  }, [items, province, city, phase]);
 
-  const addPhotos = (files: FileList | null) => {
-    if (!files) return;
-    const next = { ...photos };
+  const clearDraft = () => {
+    try {
+      localStorage.removeItem(DRAFT_KEY);
+    } catch {
+      // nada
+    }
+  };
+
+  const maxPhotos = status ? Math.min(status.max_per_batch, status.left_today) : 0;
+  const perItem = status?.max_photos_per_item ?? 6;
+
+  // ---------- Paso 1: elegir fotos ----------
+  const addFiles = (list: FileList | null) => {
+    if (!list) return;
+    const valid: File[] = [];
     let skipped = 0;
-    Array.from(files).forEach((f) => {
-      if (!f.type.startsWith('image/') || f.size > MAX_PHOTO_MB * 1024 * 1024) {
-        skipped += 1;
-        return;
-      }
-      next[f.name.toLowerCase()] = f;
+    Array.from(list).forEach((f) => {
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(f.type) || f.size > MAX_FILE_MB * 1024 * 1024) skipped++;
+      else valid.push(f);
     });
-    setPhotos(next);
-    if (skipped) toast.warning(`${skipped} archivo(s) ignorados: no son imágenes o pesan más de ${MAX_PHOTO_MB} MB`);
+    const room = maxPhotos - files.length;
+    if (valid.length > room) {
+      toast.warning(`Solo caben ${room} fotos más en esta tanda`);
+      valid.splice(room);
+    }
+    if (skipped) toast.warning(`${skipped} archivo(s) ignorados: solo JPG, PNG o WEBP de hasta ${MAX_FILE_MB} MB`);
+    setFiles((prev) => [...prev, ...valid]);
+    setUploadedUrls([]);
   };
 
-  const check = async (file: File) => {
-    setSheet(file);
-    setPreview(null);
-    setResult(null);
-    setChecking(true);
+  // ---------- Paso 2: subir fotos y analizar con IA ----------
+  const analyze = async () => {
+    if (!files.length) return;
+    setPhase('working');
     try {
-      const { data } = await client.bulkImport.preview(file);
-      setPreview(data);
+      let urls = uploadedUrls;
+      if (urls.length !== files.length) {
+        urls = new Array(files.length);
+        let done = 0;
+        let next = 0;
+        const worker = async () => {
+          while (next < files.length) {
+            const i = next++;
+            urls[i] = await client.storage.uploadImage(files[i], 'products');
+            done++;
+            setProgress({ label: `Subiendo fotos (${done} de ${files.length})`, value: Math.round((done / files.length) * 60) });
+          }
+        };
+        await Promise.all(Array.from({ length: UPLOAD_CONCURRENCY }, worker));
+        setUploadedUrls(urls);
+      }
+      setProgress({ label: 'La IA está mirando tus fotos… (puede tardar hasta un minuto)', value: 70 });
+      const { data } = await client.aiListings.analyze(urls);
+      setItems(
+        data.items.map((it) => ({
+          key: newKey(),
+          images: it.images,
+          title: it.title,
+          description: it.description,
+          category_id: it.category_id ? String(it.category_id) : '',
+          condition: it.condition || 'usado',
+          price: '',
+        })),
+      );
+      setStatus((s) => (s ? { ...s, left_today: data.left_today } : s));
+      setFiles([]);
+      setUploadedUrls([]);
+      setPhase('review');
     } catch (err) {
-      toast.error(errorDetail(err, 'No se pudo leer el archivo'));
-    } finally {
-      setChecking(false);
+      toast.error(errorDetail(err, 'No se pudo completar. Puedes volver a intentarlo.'));
+      setPhase('select');
     }
   };
 
+  // ---------- Paso 3: revisar ----------
+  const update = (key: string, patch: Partial<DraftItem>) =>
+    setItems((prev) => prev.map((it) => (it.key === key ? { ...it, ...patch } : it)));
+
+  const toggleSelect = (url: string) =>
+    setSelected((prev) => (prev.includes(url) ? prev.filter((u) => u !== url) : [...prev, url]));
+
+  const withoutSelected = (list: DraftItem[]) =>
+    list.map((it) => ({ ...it, images: it.images.filter((u) => !selected.includes(u)) }));
+
+  const moveSelectedTo = (targetKey: string) => {
+    const target = items.find((it) => it.key === targetKey);
+    if (!target) return;
+    const incoming = selected.filter((u) => !target.images.includes(u));
+    if (target.images.length + incoming.length > perItem) {
+      toast.error(`Un anuncio puede tener como máximo ${perItem} fotos`);
+      return;
+    }
+    setItems((prev) =>
+      withoutSelected(prev)
+        .map((it) => (it.key === targetKey ? { ...it, images: [...target.images, ...incoming] } : it))
+        .filter((it) => it.images.length > 0),
+    );
+    setSelected([]);
+  };
+
+  const splitSelected = () => {
+    if (selected.length > perItem) {
+      toast.error(`Un anuncio puede tener como máximo ${perItem} fotos`);
+      return;
+    }
+    const origin = items.find((it) => it.images.includes(selected[0]));
+    setItems((prev) => {
+      const rest = withoutSelected(prev).filter((it) => it.images.length > 0);
+      return [
+        ...rest,
+        {
+          key: newKey(),
+          images: selected,
+          title: '',
+          description: '',
+          category_id: origin?.category_id || '',
+          condition: origin?.condition || 'usado',
+          price: '',
+        },
+      ];
+    });
+    setSelected([]);
+  };
+
+  const removeSelected = () => {
+    setItems((prev) => withoutSelected(prev).filter((it) => it.images.length > 0));
+    setSelected([]);
+  };
+
+  const makeCover = (key: string, url: string) =>
+    setItems((prev) =>
+      prev.map((it) => (it.key === key ? { ...it, images: [url, ...it.images.filter((u) => u !== url)] } : it)),
+    );
+
+  const incomplete = items.filter((it) => missingFields(it).length > 0).length;
+
+  // ---------- Paso 4: publicar ----------
   const publish = async () => {
-    if (!preview || validRows.length === 0) return;
-    setRunning(true);
-    setResult(null);
+    if (!province) {
+      toast.error('Elige la provincia');
+      return;
+    }
+    if (incomplete) {
+      setShowErrors(true);
+      toast.error(`Faltan datos en ${incomplete} ${incomplete === 1 ? 'anuncio' : 'anuncios'} (marcados en rojo)`);
+      return;
+    }
+    setPhase('working');
+    setProgress({ label: `Publicando ${items.length} anuncios…`, value: 90 });
     try {
-      // 1) Subir las fotos adjuntadas que usan las filas válidas.
-      const needed = new Set<string>();
-      validRows.forEach((r) => r.data.photos.forEach((t) => !isUrl(t) && photos[fileKey(t)] && needed.add(fileKey(t))));
-      const photoUrls: Record<string, string> = {};
-      const names = Array.from(needed);
-      for (let i = 0; i < names.length; i++) {
-        setProgress({ label: `Subiendo fotos (${i + 1} de ${names.length})`, value: Math.round((i / Math.max(names.length, 1)) * 100) });
-        try {
-          photoUrls[names[i]] = await client.storage.uploadImage(photos[names[i]], 'products');
-        } catch {
-          // Se avisará en el resultado de esa fila ("no has adjuntado la foto").
-        }
-      }
-
-      // 2) Crear los anuncios por tandas.
-      const all: BulkConfirmResult = { created: 0, vacation_mode: false, results: [] };
-      for (let i = 0; i < validRows.length; i += BATCH) {
-        const chunk = validRows.slice(i, i + BATCH);
-        setProgress({
-          label: `Publicando anuncios (${Math.min(i + BATCH, validRows.length)} de ${validRows.length})`,
-          value: Math.round((i / validRows.length) * 100),
-        });
-        const { data } = await client.bulkImport.confirm(
-          chunk.map(({ row, data: d }) => ({
-            row,
-            title: d.title,
-            price: d.price,
-            category_id: d.category_id,
-            condition: d.condition,
-            location_province: d.location_province,
-            location_city: d.location_city,
-            description: d.description,
-            photos: d.photos,
-          })),
-          photoUrls,
-        );
-        all.created += data.created;
-        all.vacation_mode = data.vacation_mode;
-        all.results.push(...data.results);
-      }
-      setProgress({ label: 'Listo', value: 100 });
-      setResult(all);
-      setPreview(null);
-      setSheet(null);
-      setPhotos({});
-      toast.success(`${all.created} anuncios publicados`);
+      const { data } = await client.aiListings.publish({
+        location_province: province,
+        location_city: city.trim() || undefined,
+        items: items.map((it) => ({
+          title: it.title.trim(),
+          description: it.description.trim() || undefined,
+          price: parsePrice(it.price) as number,
+          category_id: Number(it.category_id),
+          condition: it.condition,
+          images: it.images,
+        })),
+      });
+      clearDraft();
+      setItems([]);
+      setCreated({ count: data.created, vacation: data.vacation_mode });
+      setPhase('done');
     } catch (err) {
-      toast.error(errorDetail(err, 'La subida se interrumpió. Revisa «Mis anuncios» antes de repetirla.'));
-    } finally {
-      setRunning(false);
+      toast.error(errorDetail(err, 'No se pudieron publicar. Tus anuncios siguen aquí, inténtalo de nuevo.'));
+      setPhase('review');
     }
   };
 
-  if (tier === null) {
+  const startOver = () => {
+    if (items.length && !window.confirm('¿Descartar los anuncios sin publicar?')) return;
+    clearDraft();
+    setItems([]);
+    setFiles([]);
+    setUploadedUrls([]);
+    setSelected([]);
+    setShowErrors(false);
+    setCreated(null);
+    setPhase('select');
+  };
+
+  // ---------- Pantallas ----------
+  if (!status) {
     return (
-      <AccountLayout title="Subida masiva">
+      <AccountLayout title="Subida con IA">
         <p className="text-muted-foreground">Cargando…</p>
       </AccountLayout>
     );
   }
 
-  if (tier !== 'profesional') {
+  if (!status.can_use) {
     return (
-      <AccountLayout title="Subida masiva" description="Publica todo tu catálogo de una vez">
+      <AccountLayout title="Subida con IA" description="Sube tus fotos y la IA te prepara los anuncios">
         <Card>
           <CardContent className="p-6 space-y-4">
             <div className="flex items-start gap-3">
               <Crown className="h-6 w-6 text-primary shrink-0" />
               <div className="space-y-2">
-                <p className="font-semibold text-foreground">La subida masiva está incluida en el plan Profesional</p>
+                <p className="font-semibold text-foreground">La subida con IA está incluida en el plan Profesional</p>
                 <p className="text-sm text-muted-foreground">
-                  Rellena una hoja de Excel o CSV con tus artículos y sus fotos y publica hasta 200 anuncios de golpe.
+                  Sube de golpe las fotos de todo lo que quieres vender. La IA agrupa las fotos de cada artículo y te
+                  escribe el título y la descripción. Tú solo revisas y pones el precio.
                 </p>
               </div>
             </div>
@@ -172,194 +340,330 @@ export default function SubidaMasivaPage() {
     );
   }
 
-  const withMissing = (photosOfRow: string[]) =>
-    photosOfRow.filter((t) => !isUrl(t) && !photos[fileKey(t)]).length;
-
-  return (
-    <AccountLayout title="Subida masiva" description="Publica hasta 200 anuncios de una vez desde Excel o CSV">
-      <div className="space-y-6">
-        {/* Paso 1 */}
+  if (!status.ai_configured) {
+    return (
+      <AccountLayout title="Subida con IA">
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg">1. Descarga la plantilla</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
-            <p>
-              Una fila por anuncio. Obligatorias: <strong>titulo, precio, categoria, estado y provincia</strong>.
-              Opcionales: ciudad, descripcion y fotos. En el Excel tienes una segunda hoja con las categorías,
-              estados y provincias válidos.
-            </p>
-            <p>
-              En <strong>fotos</strong> pon hasta 6 por anuncio separadas por <code>|</code>: el nombre del archivo
-              (p. ej. <code>caliz1.jpg|caliz2.jpg</code>) y lo adjuntas en el paso 2, o una dirección web que empiece
-              por https://.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={() => client.bulkImport.downloadTemplate('xlsx')} className="cursor-pointer">
-                <Download className="h-4 w-4 mr-1" /> Plantilla Excel
-              </Button>
-              <Button variant="outline" onClick={() => client.bulkImport.downloadTemplate('csv')} className="cursor-pointer">
-                <Download className="h-4 w-4 mr-1" /> Plantilla CSV
-              </Button>
-            </div>
+          <CardContent className="p-6 text-sm text-muted-foreground">
+            La subida con IA estará disponible muy pronto. Mientras tanto puedes publicar tus anuncios uno a uno.
           </CardContent>
         </Card>
+      </AccountLayout>
+    );
+  }
 
-        {/* Paso 2 */}
+  if (phase === 'working') {
+    return (
+      <AccountLayout title="Subida con IA">
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg">2. Sube tu archivo y tus fotos</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-wrap gap-2 items-center">
-              <Button onClick={() => sheetInput.current?.click()} disabled={checking || running} className="cursor-pointer">
-                {checking ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileSpreadsheet className="h-4 w-4 mr-1" />}
-                {sheet ? 'Cambiar archivo' : 'Elegir Excel o CSV'}
-              </Button>
-              <Button variant="outline" onClick={() => photoInput.current?.click()} disabled={running} className="cursor-pointer">
-                <ImagePlus className="h-4 w-4 mr-1" /> Añadir fotos
-              </Button>
-              {sheet && <span className="text-sm text-muted-foreground">{sheet.name}</span>}
-              {Object.keys(photos).length > 0 && (
-                <span className="text-sm text-muted-foreground">· {Object.keys(photos).length} fotos adjuntadas</span>
-              )}
-            </div>
-            <input
-              ref={sheetInput}
-              type="file"
-              accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                e.target.value = '';
-                if (f) check(f);
-              }}
-            />
-            <input
-              ref={photoInput}
-              type="file"
-              multiple
-              accept="image/jpeg,image/png,image/webp"
-              className="hidden"
-              onChange={(e) => {
-                addPhotos(e.target.files);
-                e.target.value = '';
-              }}
-            />
-            {missingPhotos.length > 0 && (
-              <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-                <p className="font-medium flex items-center gap-1">
-                  <AlertTriangle className="h-4 w-4" /> Faltan {missingPhotos.length} fotos que nombra tu archivo
-                </p>
-                <p className="mt-1 break-words">{missingPhotos.slice(0, 15).join(', ')}{missingPhotos.length > 15 ? '…' : ''}</p>
-                <p className="mt-1 text-xs">Puedes añadirlas ahora o publicar igualmente: esos anuncios saldrán sin esas fotos.</p>
-              </div>
-            )}
+          <CardContent className="p-8 space-y-4 text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
+            <p className="text-sm text-muted-foreground">{progress.label}</p>
+            <Progress value={progress.value} />
+            <p className="text-xs text-muted-foreground">No cierres esta página.</p>
           </CardContent>
         </Card>
+      </AccountLayout>
+    );
+  }
 
-        {/* Paso 3 */}
-        {preview && (
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg">3. Revisa y publica</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                {preview.valid} de {preview.total} anuncios listos
-                {preview.invalid > 0 && ` · ${preview.invalid} con errores (no se publicarán; corrígelos y vuelve a subir el archivo)`}
+  if (phase === 'done' && created) {
+    return (
+      <AccountLayout title="Subida con IA">
+        <Card>
+          <CardContent className="p-8 space-y-4 text-center">
+            <CheckCircle2 className="h-10 w-10 text-green-700 mx-auto" />
+            <p className="text-lg font-semibold text-foreground">
+              ¡{created.count} {created.count === 1 ? 'anuncio publicado' : 'anuncios publicados'}!
+            </p>
+            {created.vacation && (
+              <p className="text-sm text-amber-800">
+                Tienes el modo vacaciones activado: se han guardado en pausa y se activarán al desactivarlo.
               </p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="overflow-x-auto border border-border rounded-md max-h-[28rem]">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted sticky top-0">
-                    <tr className="text-left">
-                      <th className="p-2 font-medium">Fila</th>
-                      <th className="p-2 font-medium">Título</th>
-                      <th className="p-2 font-medium">Precio</th>
-                      <th className="p-2 font-medium">Categoría</th>
-                      <th className="p-2 font-medium">Fotos</th>
-                      <th className="p-2 font-medium">Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {preview.rows.map((r) => {
-                      const missing = withMissing(r.data.photos);
-                      return (
-                        <tr key={r.row} className="border-t border-border align-top">
-                          <td className="p-2 text-muted-foreground">{r.row}</td>
-                          <td className="p-2 max-w-[16rem] truncate">{r.data.title || '—'}</td>
-                          <td className="p-2 whitespace-nowrap">{r.data.price != null ? `${r.data.price.toFixed(2)} €` : '—'}</td>
-                          <td className="p-2">{r.data.category_name || '—'}</td>
-                          <td className="p-2 whitespace-nowrap">
-                            {r.data.photos.length - missing}/{r.data.photos.length}
-                          </td>
-                          <td className="p-2">
-                            {r.errors.length === 0 ? (
-                              <span className="flex items-center gap-1 text-green-700">
-                                <CheckCircle2 className="h-4 w-4" /> OK
-                              </span>
-                            ) : (
-                              <div className="text-destructive space-y-0.5">
-                                {r.errors.map((e) => (
-                                  <p key={e} className="flex items-start gap-1">
-                                    <XCircle className="h-4 w-4 shrink-0 mt-0.5" /> {e}
-                                  </p>
-                                ))}
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              {running && (
-                <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">{progress.label}</p>
-                  <Progress value={progress.value} />
-                </div>
-              )}
-
-              <Button onClick={publish} disabled={running || validRows.length === 0} className="cursor-pointer">
-                {running ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Upload className="h-4 w-4 mr-1" />}
-                Publicar {validRows.length} {validRows.length === 1 ? 'anuncio' : 'anuncios'}
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {result && (
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5 text-green-700" /> {result.created} anuncios publicados
-              </CardTitle>
-              {result.vacation_mode && (
-                <p className="text-sm text-amber-800">
-                  Tienes el modo vacaciones activado: los anuncios se han guardado en pausa y se activarán al desactivarlo.
-                </p>
-              )}
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {result.results.some((r) => (r.warnings?.length ?? 0) > 0 || !r.ok) && (
-                <div className="text-sm space-y-1 max-h-60 overflow-y-auto">
-                  {result.results
-                    .filter((r) => (r.warnings?.length ?? 0) > 0 || !r.ok)
-                    .map((r) => (
-                      <p key={r.row} className={r.ok ? 'text-amber-800' : 'text-destructive'}>
-                        Fila {r.row}: {(r.ok ? r.warnings : r.errors)?.join(' ')}
-                      </p>
-                    ))}
-                </div>
-              )}
+            )}
+            <div className="flex justify-center gap-2">
               <Button asChild variant="outline">
                 <Link to="/cuenta/anuncios">Ver mis anuncios</Link>
               </Button>
+              <Button onClick={startOver} className="cursor-pointer">
+                Subir más
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </AccountLayout>
+    );
+  }
+
+  if (phase === 'select') {
+    return (
+      <AccountLayout title="Subida con IA" description="Sube las fotos de todo lo que quieres vender">
+        <div className="space-y-4">
+          <Card>
+            <CardContent className="p-6 space-y-4">
+              <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+                <li>Elige las fotos de todos tus artículos a la vez (varias fotos por artículo si quieres).</li>
+                <li>La IA las agrupa y escribe título, descripción, categoría y estado.</li>
+                <li>Revisas, corriges lo que haga falta y pones los precios.</li>
+                <li>Publicas todo de una vez.</li>
+              </ol>
+              <button
+                type="button"
+                onClick={() => fileInput.current?.click()}
+                disabled={maxPhotos <= 0}
+                className="w-full border-2 border-dashed border-primary/40 rounded-lg p-8 flex flex-col items-center gap-2 text-primary hover:bg-primary/5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ImagePlus className="h-8 w-8" />
+                <span className="font-medium">{files.length ? 'Añadir más fotos' : 'Elegir fotos'}</span>
+                <span className="text-xs text-muted-foreground">
+                  Hasta {maxPhotos} fotos · JPG, PNG o WEBP · máx. {MAX_FILE_MB} MB cada una
+                </span>
+              </button>
+              <input
+                ref={fileInput}
+                type="file"
+                multiple
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={(e) => {
+                  addFiles(e.target.files);
+                  e.target.value = '';
+                }}
+              />
+              {status.left_today < status.max_per_batch && (
+                <p className="text-xs text-muted-foreground">
+                  Hoy te quedan {status.left_today} fotos por analizar (el límite de {status.daily_limit} se renueva cada día).
+                </p>
+              )}
             </CardContent>
           </Card>
-        )}
+
+          {files.length > 0 && (
+            <Card>
+              <CardContent className="p-4 space-y-4">
+                <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-2">
+                  {files.map((f, i) => (
+                    <div key={`${f.name}-${i}`} className="relative aspect-square rounded-md overflow-hidden bg-muted">
+                      <img src={previews[i]} alt="" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFiles((prev) => prev.filter((_, j) => j !== i));
+                          setUploadedUrls([]);
+                        }}
+                        className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-0.5 cursor-pointer"
+                        aria-label="Quitar foto"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <Button onClick={analyze} className="cursor-pointer">
+                  <Sparkles className="h-4 w-4 mr-1" /> Preparar anuncios con IA ({files.length} fotos)
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </AccountLayout>
+    );
+  }
+
+  // phase === 'review'
+  return (
+    <AccountLayout
+      title="Revisa tus anuncios"
+      description="Corrige lo que haga falta y pon el precio de cada artículo. Nada se publica hasta que pulses «Publicar»."
+    >
+      <div className="space-y-4 pb-28">
+        <Card>
+          <CardContent className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label>Provincia (para todos)</Label>
+              <Select value={province} onValueChange={setProvince}>
+                <SelectTrigger className={showErrors && !province ? 'border-destructive' : ''}>
+                  <SelectValue placeholder="Elegir provincia" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PROVINCES.map((p) => (
+                    <SelectItem key={p} value={p}>
+                      {p}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Ciudad (opcional)</Label>
+              <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Ej. Écija" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <p className="text-xs text-muted-foreground">
+          ¿La IA ha juntado o separado mal alguna foto? Tócala para seleccionarla y pulsa «Mover aquí» en el anuncio
+          correcto, o «Separar» para hacer un anuncio nuevo. La estrella marca la foto principal.
+        </p>
+
+        {items.map((it, index) => {
+          const missing = missingFields(it);
+          const hasError = showErrors && missing.length > 0;
+          const canReceive = selected.length > 0 && selected.some((u) => !it.images.includes(u));
+          return (
+            <Card key={it.key} className={hasError ? 'border-destructive' : ''}>
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-semibold text-foreground">Artículo {index + 1}</span>
+                  <div className="flex gap-2">
+                    {canReceive && (
+                      <Button size="sm" onClick={() => moveSelectedTo(it.key)} className="cursor-pointer">
+                        <MoveRight className="h-4 w-4 mr-1" /> Mover aquí
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setItems((prev) => prev.filter((x) => x.key !== it.key));
+                        setSelected((prev) => prev.filter((u) => !it.images.includes(u)));
+                      }}
+                      className="cursor-pointer text-muted-foreground"
+                      aria-label="Descartar artículo"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 flex-wrap">
+                  {it.images.map((url, i) => {
+                    const isSelected = selected.includes(url);
+                    return (
+                      <div
+                        key={url}
+                        onClick={() => toggleSelect(url)}
+                        className={`relative w-20 h-20 sm:w-24 sm:h-24 rounded-md overflow-hidden bg-muted cursor-pointer ring-offset-2 ${
+                          isSelected ? 'ring-2 ring-primary' : ''
+                        }`}
+                      >
+                        <img src={url} alt="" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            makeCover(it.key, url);
+                          }}
+                          className="absolute top-1 left-1 bg-black/50 rounded-full p-1 cursor-pointer"
+                          aria-label="Foto principal"
+                        >
+                          <Star className={`h-3 w-3 ${i === 0 ? 'fill-amber-400 text-amber-400' : 'text-white'}`} />
+                        </button>
+                        {isSelected && (
+                          <span className="absolute inset-0 bg-primary/25 flex items-end justify-end p-1">
+                            <CheckCircle2 className="h-4 w-4 text-white" />
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-[1fr_140px] gap-3">
+                  <div className="space-y-1">
+                    <Label>Título</Label>
+                    <Input value={it.title} maxLength={200} onChange={(e) => update(it.key, { title: e.target.value })} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Precio (€)</Label>
+                    <Input
+                      value={it.price}
+                      inputMode="decimal"
+                      placeholder="0,00"
+                      onChange={(e) => update(it.key, { price: e.target.value })}
+                      className={showErrors && !parsePrice(it.price) ? 'border-destructive' : ''}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label>Categoría</Label>
+                    <Select value={it.category_id} onValueChange={(v) => update(it.key, { category_id: v })}>
+                      <SelectTrigger className={showErrors && !it.category_id ? 'border-destructive' : ''}>
+                        <SelectValue placeholder="Elegir" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((c) => (
+                          <SelectItem key={c.id} value={String(c.id)}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Estado</Label>
+                    <Select value={it.condition} onValueChange={(v) => update(it.key, { condition: v })}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="nuevo">Nuevo</SelectItem>
+                        <SelectItem value="usado">Usado</SelectItem>
+                        <SelectItem value="restaurado">Restaurado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label>Descripción</Label>
+                  <Textarea
+                    value={it.description}
+                    rows={3}
+                    onChange={(e) => update(it.key, { description: e.target.value })}
+                  />
+                </div>
+                {hasError && <p className="text-xs text-destructive">Falta: {missing.join(', ')}</p>}
+              </CardContent>
+            </Card>
+          );
+        })}
+
+        <Button variant="ghost" onClick={startOver} className="cursor-pointer text-muted-foreground">
+          Descartar todo y empezar de nuevo
+        </Button>
+      </div>
+
+      {/* Barra fija inferior */}
+      <div className="fixed bottom-0 inset-x-0 z-40 border-t border-border bg-background/95 backdrop-blur px-4 py-3">
+        <div className="max-w-6xl mx-auto flex flex-wrap items-center gap-2 justify-end">
+          {selected.length > 0 ? (
+            <>
+              <span className="text-sm text-muted-foreground mr-auto">
+                {selected.length} {selected.length === 1 ? 'foto seleccionada' : 'fotos seleccionadas'}
+              </span>
+              <Button size="sm" variant="outline" onClick={splitSelected} className="cursor-pointer">
+                <Scissors className="h-4 w-4 mr-1" /> Separar en anuncio nuevo
+              </Button>
+              <Button size="sm" variant="outline" onClick={removeSelected} className="cursor-pointer">
+                <Trash2 className="h-4 w-4 mr-1" /> Quitar
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setSelected([])} className="cursor-pointer">
+                Cancelar
+              </Button>
+            </>
+          ) : (
+            <>
+              <span className="text-sm text-muted-foreground mr-auto">
+                {items.length} anuncios
+                {incomplete > 0 && ` · ${incomplete} sin completar`}
+              </span>
+              <Button onClick={publish} disabled={!items.length} className="cursor-pointer">
+                Publicar {items.length} {items.length === 1 ? 'anuncio' : 'anuncios'}
+              </Button>
+            </>
+          )}
+        </div>
       </div>
     </AccountLayout>
   );

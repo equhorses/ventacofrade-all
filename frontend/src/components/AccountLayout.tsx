@@ -4,7 +4,7 @@ import Layout from '@/components/Layout';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { client } from '@/lib/api';
-import { User, Package, MessageCircle, Heart, CreditCard, Store, FileSpreadsheet } from 'lucide-react';
+import { User, Package, MessageCircle, Heart, CreditCard, Store, Sparkles } from 'lucide-react';
 
 interface AccountLayoutProps {
   children: ReactNode;
@@ -16,7 +16,7 @@ const navItems = [
   { href: '/cuenta/perfil', label: 'Mi perfil', icon: User },
   { href: '/cuenta/anuncios', label: 'Mis anuncios', icon: Package },
   { href: '/cuenta/tienda', label: 'Mi tienda', icon: Store },
-  { href: '/cuenta/subida-masiva', label: 'Subida masiva', icon: FileSpreadsheet },
+  { href: '/cuenta/subida-masiva', label: 'Subida con IA', icon: Sparkles },
   { href: '/cuenta/mensajes', label: 'Mensajes', icon: MessageCircle },
   { href: '/cuenta/favoritos', label: 'Favoritos', icon: Heart },
   { href: '/cuenta/suscripcion', label: 'Suscripción', icon: CreditCard },

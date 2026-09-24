@@ -47,5 +47,8 @@ class Seller_profiles(Base):
     shop_logo_url = Column(String(500), nullable=True)
     shop_cover_url = Column(String(500), nullable=True)
     shop_long_description = Column(Text, nullable=True)
+    # Subida con IA: fotos analizadas hoy (límite diario para controlar el coste).
+    ai_usage_date = Column(String(10), nullable=True)
+    ai_photos_used = Column(Integer, nullable=True, default=0, server_default='0')
     created_at = Column(DateTime(timezone=True), default=datetime.now)
     updated_at = Column(DateTime(timezone=True), default=datetime.now, onupdate=datetime.now)

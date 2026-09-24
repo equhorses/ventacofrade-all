@@ -153,31 +153,33 @@ export interface PublicShop {
   }[];
 }
 
-export interface BulkRowData {
+export interface AIListingsStatus {
+  can_use: boolean;
+  ai_configured: boolean;
+  daily_limit: number;
+  used_today: number;
+  left_today: number;
+  max_per_batch: number;
+  max_photos_per_item: number;
+  province: string | null;
+  city: string | null;
+}
+
+export interface AIProposedItem {
+  images: string[];
   title: string;
-  price: number | null;
+  description: string;
   category_id: number | null;
-  category_name: string | null;
-  condition: string | null;
-  location_province: string | null;
-  location_city: string | null;
-  description: string | null;
-  photos: string[];
+  condition: string;
 }
 
-export interface BulkPreview {
-  total: number;
-  valid: number;
-  invalid: number;
-  rows: { row: number; data: BulkRowData; errors: string[] }[];
-  local_photos: string[];
-  max_rows: number;
-}
-
-export interface BulkConfirmResult {
-  created: number;
-  vacation_mode: boolean;
-  results: { row: number; ok: boolean; errors?: string[]; warnings?: string[]; product_id?: number }[];
+export interface AIPublishItem {
+  title: string;
+  description?: string;
+  price: number;
+  category_id: number;
+  condition: string;
+  images: string[];
 }
 
 export const client = {
@@ -343,36 +345,18 @@ export const client = {
       return { data: response.data };
     },
   },
-  bulkImport: {
-    async downloadTemplate(format: 'xlsx' | 'csv') {
-      const response = await http.get(`${baseUrl()}/api/v1/bulk-import/template`, {
-        params: { format },
-        responseType: 'blob',
-      });
-      const url = URL.createObjectURL(response.data as Blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `plantilla-ventacofrade.${format}`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    },
-    async preview(file: File): Promise<{ data: BulkPreview }> {
-      const form = new FormData();
-      form.append('file', file);
-      const response = await http.post(`${baseUrl()}/api/v1/bulk-import/preview`, form);
+  aiListings: {
+    async status(): Promise<{ data: AIListingsStatus }> {
+      const response = await http.get(`${baseUrl()}/api/v1/ai-listings/status`);
       return { data: response.data };
     },
-    async confirm(
-      rows: ({ row: number } & Omit<BulkRowData, 'category_name'>)[],
-      photoUrls: Record<string, string>,
-    ): Promise<{ data: BulkConfirmResult }> {
-      const response = await http.post(`${baseUrl()}/api/v1/bulk-import/confirm`, {
-        rows,
-        photo_urls: photoUrls,
-      });
-      return { data: response.data };
+    async analyze(imageUrls: string[]) {
+      const response = await http.post(`${baseUrl()}/api/v1/ai-listings/analyze`, { image_urls: imageUrls });
+      return { data: response.data as { items: AIProposedItem[]; left_today: number } };
+    },
+    async publish(data: { location_province: string; location_city?: string; items: AIPublishItem[] }) {
+      const response = await http.post(`${baseUrl()}/api/v1/ai-listings/publish`, data);
+      return { data: response.data as { created: number; product_ids: number[]; vacation_mode: boolean } };
     },
   },
   payments: {

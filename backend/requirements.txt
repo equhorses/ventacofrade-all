@@ -41,4 +41,6 @@ apscheduler>=3.10.0,<4.0.0
 
 # storage module dependencies (Cloudflare R2, S3-compatible)
 boto3>=1.34.0
-openpyxl>=3.1.0
+-e 
+# zonas horarias (límite diario de la subida con IA en hora de España)
+tzdata

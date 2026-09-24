@@ -121,7 +121,7 @@ export default function VenderPage() {
                     'Insignia "Profesional"',
                     'Estadísticas completas: visitas, favoritos y contactos',
                     'Tienda propia: ventacofrade.com/tienda/tu-nombre, con logo y portada',
-                    'Subida masiva de anuncios desde Excel o CSV, con fotos',
+                    'Subida con IA: subes las fotos y la IA te prepara los anuncios',
                   ].map((feature) => (
                     <li key={feature} className="flex items-start gap-2 text-sm">
                       <Check className="h-4 w-4 text-secondary mt-0.5 shrink-0" />
