@@ -120,9 +120,9 @@ export default function DocumentacionPage() {
                 <p className="text-muted-foreground">Para empezar a vender en VentaCofrade necesitas:</p>
                 <ul className="list-disc pl-5 space-y-2 text-sm text-muted-foreground">
                   <li><strong className="text-foreground">Crear una cuenta:</strong> Regístrate con tu email o cuenta de Google.</li>
-                  <li><strong className="text-foreground">Activar tu tienda:</strong> Pago único de 10€ para verificar tu identidad como vendedor.</li>
-                  <li><strong className="text-foreground">Elegir un plan:</strong> Plan Básico (4,99€/mes) o Profesional (9,99€/mes).</li>
-                  <li><strong className="text-foreground">Completar tu perfil:</strong> Nombre de tienda, ubicación y descripción.</li>
+                  <li><strong className="text-foreground">Publicar tu anuncio:</strong> Es gratis y sin límite de anuncios. Tu perfil de vendedor se crea automáticamente con el primer anuncio.</li>
+                  <li><strong className="text-foreground">Completar tu perfil:</strong> Nombre de tienda, ubicación, descripción y teléfono, para dar más confianza a los compradores.</li>
+                  <li><strong className="text-foreground">Opcional, elegir un plan:</strong> Básico (4,99€/mes) o Profesional (9,99€/mes), más 10€ de activación única, para ganar visibilidad: tus anuncios salen antes, llevan insignia e incluyen destacados cada mes.</li>
                 </ul>
               </CardContent>
             </Card>
@@ -293,7 +293,7 @@ export default function DocumentacionPage() {
               <CardContent className="space-y-3 text-sm text-muted-foreground">
                 <p>VentaCofrade protege a vendedores y compradores:</p>
                 <ul className="list-disc pl-5 space-y-1">
-                  <li><strong className="text-foreground">Verificación de vendedores:</strong> El pago de activación ayuda a filtrar cuentas falsas.</li>
+                  <li><strong className="text-foreground">Perfiles de vendedor:</strong> Cada anuncio está vinculado al perfil público de su vendedor, con sus valoraciones.</li>
                   <li><strong className="text-foreground">Mensajería directa:</strong> Contacta con la otra persona sin salir de la plataforma.</li>
                   <li><strong className="text-foreground">Moderación:</strong> Revisamos anuncios para mantener la calidad del marketplace.</li>
                   <li><strong className="text-foreground">Datos protegidos:</strong> Tu información personal nunca se comparte sin tu consentimiento.</li>
@@ -311,9 +311,9 @@ export default function DocumentacionPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {[
-                  { q: '¿Puedo vender sin ser profesional?', a: 'Sí, cualquier cofrade puede vender artículos. El plan básico es perfecto para particulares.' },
+                  { q: '¿Puedo vender sin ser profesional?', a: 'Sí, cualquiera puede publicar gratis y sin límite de anuncios. Los planes son opcionales y solo dan más visibilidad.' },
                   { q: '¿Cómo se realiza el pago entre comprador y vendedor?', a: 'VentaCofrade facilita el contacto. El pago se acuerda directamente entre las partes (transferencia, efectivo en mano, Bizum, etc.).' },
-                  { q: '¿Puedo cancelar mi suscripción?', a: 'Sí, puedes cancelar en cualquier momento. Tu tienda permanecerá activa hasta el fin del período pagado.' },
+                  { q: '¿Puedo cancelar mi suscripción?', a: 'Sí, en cualquier momento. Mantendrás las ventajas del plan hasta el fin del periodo pagado y tus anuncios seguirán publicados.' },
                   { q: '¿Qué pasa si un comprador no paga?', a: 'Recomendamos acordar el pago antes del envío. Para artículos de alto valor, sugerimos entrega en persona.' },
                   { q: '¿Puedo vender artículos de fuera de Andalucía?', a: 'Sí, el marketplace está abierto a toda España, aunque la mayoría de usuarios están en Andalucía.' },
                 ].map((faq, i) => (
@@ -398,9 +398,9 @@ export default function DocumentacionPage() {
                 <p className="text-muted-foreground">To start selling on VentaCofrade you need:</p>
                 <ul className="list-disc pl-5 space-y-2 text-sm text-muted-foreground">
                   <li><strong className="text-foreground">Create an account:</strong> Register with your email or Google account.</li>
-                  <li><strong className="text-foreground">Activate your shop:</strong> One-time payment of €10 to verify your identity as a seller.</li>
-                  <li><strong className="text-foreground">Choose a plan:</strong> Basic Plan (€4.99/month) or Professional (€9.99/month).</li>
-                  <li><strong className="text-foreground">Complete your profile:</strong> Shop name, location, and description.</li>
+                  <li><strong className="text-foreground">Publish your listing:</strong> It's free, with no limit on listings. Your seller profile is created automatically with your first listing.</li>
+                  <li><strong className="text-foreground">Complete your profile:</strong> Shop name, location, description and phone, to build buyer trust.</li>
+                  <li><strong className="text-foreground">Optional, choose a plan:</strong> Basic (€4.99/month) or Professional (€9.99/month), plus a one-time €10 activation fee, for more visibility: your listings appear first, carry a badge and include monthly featured listings.</li>
                 </ul>
               </CardContent>
             </Card>
@@ -571,7 +571,7 @@ export default function DocumentacionPage() {
               <CardContent className="space-y-3 text-sm text-muted-foreground">
                 <p>VentaCofrade protects both sellers and buyers:</p>
                 <ul className="list-disc pl-5 space-y-1">
-                  <li><strong className="text-foreground">Seller verification:</strong> The activation payment helps filter out fake accounts.</li>
+                  <li><strong className="text-foreground">Seller profiles:</strong> Every listing is linked to its seller's public profile and ratings.</li>
                   <li><strong className="text-foreground">Rating system:</strong> Buyers can rate their experience.</li>
                   <li><strong className="text-foreground">Moderation:</strong> We review listings to maintain marketplace quality.</li>
                   <li><strong className="text-foreground">Data protection:</strong> Your personal information is never shared without your consent.</li>
@@ -589,9 +589,9 @@ export default function DocumentacionPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {[
-                  { q: 'Can I sell without being a professional?', a: 'Yes, any cofrade member can sell items. The basic plan is perfect for individuals.' },
+                  { q: 'Can I sell without being a professional?', a: 'Yes, anyone can publish for free with no limit on listings. Plans are optional and only add visibility.' },
                   { q: 'How is payment handled between buyer and seller?', a: 'VentaCofrade facilitates contact. Payment is agreed directly between parties (bank transfer, cash in person, Bizum, etc.).' },
-                  { q: 'Can I cancel my subscription?', a: 'Yes, you can cancel at any time. Your shop will remain active until the end of the paid period.' },
+                  { q: 'Can I cancel my subscription?', a: 'Yes, at any time. You keep the plan benefits until the end of the paid period and your listings stay published.' },
                   { q: 'What if a buyer doesn\'t pay?', a: 'We recommend agreeing on payment before shipping. For high-value items, we suggest in-person delivery.' },
                   { q: 'Can I sell items from outside Andalusia?', a: 'Yes, the marketplace is open to all of Spain, although most users are in Andalusia.' },
                 ].map((faq, i) => (

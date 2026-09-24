@@ -56,10 +56,12 @@ export default function Terminos() {
 
         <h2 className="text-xl font-semibold mt-6 mb-2">5. Planes de vendedor, tarifas y facturación</h2>
         <p>
-          Para publicar anuncios como persona vendedora es necesario activar un plan de
-          suscripción (Básico o Profesional), sujeto a una cuota de activación única y una cuota
-          mensual recurrente, cuyos importes vigentes se muestran en la sección "Vender" antes de
-          la contratación. Los pagos se procesan de forma segura a través de Stripe; VentaCofrade
+          Publicar anuncios en VentaCofrade es gratuito y sin límite de anuncios. De forma
+          opcional, las personas vendedoras pueden contratar un plan de suscripción (Básico o
+          Profesional) que ofrece ventajas de visibilidad, como una posición preferente de sus
+          anuncios, destacados incluidos cada mes, insignia y estadísticas. Los planes están
+          sujetos a una cuota de activación única y una cuota mensual recurrente, cuyos importes y
+          ventajas vigentes se muestran en la sección "Vender" antes de la contratación. Los pagos se procesan de forma segura a través de Stripe; VentaCofrade
           no almacena los datos de tu tarjeta. La suscripción se renueva automáticamente cada mes
           salvo cancelación previa, que puedes solicitar en cualquier momento desde tu cuenta o
           escribiendo a contacto@ventacofrade.com, surtiendo efecto al final del periodo ya
@@ -190,7 +192,7 @@ export default function Terminos() {
         </p>
 
         <p className="text-xs text-muted-foreground mt-8">
-          Última actualización: agosto de 2026.
+          Última actualización: septiembre de 2026.
         </p>
       </div>
     </Layout>

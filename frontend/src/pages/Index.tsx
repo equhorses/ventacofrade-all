@@ -254,7 +254,7 @@ export default function HomePage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-2xl md:text-3xl font-bold mb-4">¿Tienes artículos cofrades para vender?</h2>
           <p className="text-primary-foreground/80 mb-6 max-w-xl mx-auto">
-            Únete a la comunidad de vendedores cofrades. Activa tu tienda desde 10€ y llega a miles de compradores.
+            Publica gratis todo lo que tengas guardado: sin límite de anuncios y sin comisiones por venta.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link to="/vender">
