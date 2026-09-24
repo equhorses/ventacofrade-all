@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import Layout from '@/components/Layout';
+import SellerBadge from '@/components/SellerBadge';
 import { getPlaceholders, PlaceholderCard } from '@/components/PlaceholderListings';
 import WelcomeModal from '@/components/WelcomeModal';
 import AdSlot from '@/components/AdSlot';
@@ -47,6 +48,7 @@ interface Product {
   images: string;
   is_featured: boolean;
   views_count: number;
+  seller_tier?: string;
 }
 
 const iconMap: Record<string, React.ReactNode> = {
@@ -294,6 +296,7 @@ function ProductCard({ product }: { product: Product }) {
           </Badge>
         </div>
         <CardContent className="p-4">
+          <SellerBadge tier={product.seller_tier} className="mb-2" />
           <h3 className="font-semibold text-foreground line-clamp-2 mb-2 group-hover:text-primary transition-colors">
             {product.title}
           </h3>

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Layout from '@/components/Layout';
+import SellerBadge from '@/components/SellerBadge';
 import AdSlot from '@/components/AdSlot';
 import { client } from '@/lib/api';
 import { Search, MapPin, Church, SlidersHorizontal } from 'lucide-react';
@@ -24,6 +25,7 @@ interface Product {
   status: string;
   is_featured: boolean;
   views_count: number;
+  seller_tier?: string;
 }
 
 interface Category {
@@ -260,6 +262,7 @@ export default function ExplorarPage() {
                     </Badge>
                   </div>
                   <CardContent className="p-4">
+                    <SellerBadge tier={product.seller_tier} className="mb-2" />
                     <h3 className="font-semibold text-foreground line-clamp-2 mb-2 group-hover:text-primary transition-colors">
                       {product.title}
                     </h3>

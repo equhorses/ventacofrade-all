@@ -88,6 +88,14 @@ class ProductsService:
                     case((Products.featured_until.isnot(None) & (Products.featured_until > now), 0), else_=1)
                 )
 
+            # Preferencia por plan del vendedor en el orden por defecto (más recientes):
+            # destacados > Profesional > Básico > gratis. Si el usuario elige otro
+            # orden (precio, etc.), se respeta ese orden tras los destacados.
+            if boost_featured and sort in (None, "-created_at"):
+                from services.seller_plans import tier_rank_expression
+
+                order_clauses.append(tier_rank_expression(Products.user_id, datetime.now(timezone.utc)))
+
             if sort:
                 if sort.startswith('-'):
                     field_name = sort[1:]

@@ -4,8 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import Layout from '@/components/Layout';
+import SellerBadge from '@/components/SellerBadge';
 import { client } from '@/lib/api';
-import { Store, Star, MapPin, BadgeCheck, Sparkles } from 'lucide-react';
+import { Store, Star, MapPin, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Review } from '@/lib/api';
@@ -27,6 +28,7 @@ interface Product {
   title: string;
   price: number;
   images: string;
+  seller_tier?: string;
 }
 
 export default function VendedorPage() {
@@ -136,9 +138,12 @@ export default function VendedorPage() {
           <div className="flex-1">
             <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
               {seller.shop_name}
-              {seller.plan === 'profesional' && seller.subscription_status === 'active' && (
-                <BadgeCheck className="h-5 w-5 text-primary shrink-0" aria-label="Vendedor verificado" />
-              )}
+              <SellerBadge
+                tier={
+                  products[0]?.seller_tier ||
+                  (seller.subscription_status === 'active' ? (seller.plan === 'profesional' ? 'profesional' : 'basico') : null)
+                }
+              />
               {seller.is_founder && (
                 <span
                   className="inline-flex items-center gap-1 text-xs font-medium bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full shrink-0"

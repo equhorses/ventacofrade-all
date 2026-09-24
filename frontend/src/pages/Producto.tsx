@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import Layout from '@/components/Layout';
+import SellerBadge from '@/components/SellerBadge';
 import { client } from '@/lib/api';
 import { MapPin, Heart, Share2, MessageCircle, Eye, ArrowLeft, Church, User, Star, BadgeCheck } from 'lucide-react';
 import { toast } from 'sonner';
@@ -35,6 +36,7 @@ interface Product {
   is_featured: boolean;
   views_count: number;
   created_at: string;
+  seller_tier?: string;
 }
 
 const conditionLabels: Record<string, string> = {
@@ -242,6 +244,7 @@ export default function ProductoPage() {
               <div className="flex items-center gap-2 mb-2">
                 <Badge variant="outline" className="capitalize">{conditionLabels[product.condition]}</Badge>
                 {product.is_featured && <Badge className="bg-secondary text-secondary-foreground">Destacado</Badge>}
+                <SellerBadge tier={product.seller_tier} />
               </div>
               <h1 className="text-2xl font-bold text-foreground">{product.title}</h1>
               <p className="text-3xl font-bold text-primary mt-3">{product.price.toFixed(2)} €</p>

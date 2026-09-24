@@ -341,11 +341,11 @@ export default function SuscripcionPage() {
               <CardContent className="space-y-3">
                 <ul className="space-y-2">
                   {[
-                    'Hasta 10 anuncios activos',
-                    'Fotos ilimitadas por anuncio',
-                    'Mensajería con compradores',
-                    'Perfil de vendedor',
-                    'Soporte por email',
+                    'Anuncios ilimitados',
+                    'Tus anuncios aparecen antes que los de vendedores sin plan',
+                    '4 destacados de 7 días incluidos cada mes',
+                    'Insignia "Vendedor Plus"',
+                    'Estadísticas: visitas y favoritos por anuncio',
                   ].map((feature) => (
                     <li key={feature} className="flex items-start gap-2 text-sm">
                       <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
@@ -386,11 +386,10 @@ export default function SuscripcionPage() {
                 <ul className="space-y-2">
                   {[
                     'Anuncios ilimitados',
-                    'Anuncios destacados (x3/mes)',
-                    'Estadísticas avanzadas',
-                    'Prioridad en búsquedas',
-                    'Soporte prioritario',
-                    'Badge de vendedor verificado',
+                    'Preferencia absoluta: tus anuncios, los primeros',
+                    '9 destacados de 7 días incluidos cada mes',
+                    'Insignia "Profesional"',
+                    'Estadísticas completas: visitas, favoritos y contactos',
                   ].map((feature) => (
                     <li key={feature} className="flex items-start gap-2 text-sm">
                       <ShieldCheck className="h-4 w-4 text-secondary mt-0.5 shrink-0" />

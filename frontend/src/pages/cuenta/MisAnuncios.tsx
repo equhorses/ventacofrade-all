@@ -5,8 +5,8 @@ import AccountLayout from '@/components/AccountLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { client } from '@/lib/api';
-import { Church, Plus, Eye, Trash2, Sparkles } from 'lucide-react';
+import { client, type SellerPlanSummary, type SellerProductStats } from '@/lib/api';
+import { Church, Plus, Eye, Trash2, Sparkles, Heart, MessageCircle, Crown } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,6 +37,8 @@ export default function MisAnunciosPage() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [featuringId, setFeaturingId] = useState<number | null>(null);
   const [prices, setPrices] = useState<Record<string, number>>({});
+  const [plan, setPlan] = useState<SellerPlanSummary | null>(null);
+  const [stats, setStats] = useState<Record<number, SellerProductStats>>({});
   const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
@@ -52,8 +54,22 @@ export default function MisAnunciosPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
+  const loadPlan = async () => {
+    try {
+      const [{ data: summary }, { data: statsData }] = await Promise.all([
+        client.sellerPlans.me(),
+        client.sellerPlans.stats(),
+      ]);
+      setPlan(summary);
+      setStats(Object.fromEntries(statsData.items.map((item) => [item.product_id, item])));
+    } catch (err) {
+      console.error('Error loading seller plan:', err);
+    }
+  };
+
   const load = async () => {
     setLoading(true);
+    loadPlan();
     try {
       const res = await client.entities.products.mine({ sort: '-created_at', limit: 100 });
       setProducts(res?.data?.items || []);
@@ -88,6 +104,24 @@ export default function MisAnunciosPage() {
     }
   };
 
+  const handleIncludedFeature = async (productId: number) => {
+    setFeaturingId(productId);
+    try {
+      const { data } = await client.sellerPlans.featureWithIncluded(productId);
+      toast.success(
+        `Anuncio destacado ${plan?.included_feature_days ?? 7} días. Te quedan ${data.included_features_left} destacados este mes.`,
+      );
+      await load();
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+        'No se pudo destacar el anuncio.';
+      toast.error(message);
+    } finally {
+      setFeaturingId(null);
+    }
+  };
+
   const handleDelete = async (id: number) => {
     if (!confirm('¿Seguro que quieres eliminar este anuncio? Esta acción no se puede deshacer.')) return;
     setDeletingId(id);
@@ -113,6 +147,42 @@ export default function MisAnunciosPage() {
           </Button>
         </Link>
       </div>
+
+      {plan && (
+        <Card className="mb-4 border-primary/30">
+          <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+            {plan.tier === 'gratis' ? (
+              <>
+                <div>
+                  <p className="font-semibold text-foreground">Plan gratuito</p>
+                  <p className="text-sm text-muted-foreground">
+                    Publica todos los anuncios que quieras. Con un plan, tus anuncios aparecen antes, llevan insignia e
+                    incluyen destacados cada mes.
+                  </p>
+                </div>
+                <Link to="/cuenta/suscripcion" className="shrink-0">
+                  <Button size="sm" className="gap-1 cursor-pointer">
+                    <Crown className="h-4 w-4" /> Ver planes
+                  </Button>
+                </Link>
+              </>
+            ) : (
+              <>
+                <div>
+                  <p className="font-semibold text-foreground">
+                    Plan {plan.tier === 'profesional' ? 'Profesional' : 'Básico'}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Destacados incluidos este mes: <strong>{plan.included_features_left}</strong> de{' '}
+                    {plan.included_features_total} disponibles ({plan.included_feature_days} días cada uno). Se renuevan
+                    el {new Date(plan.resets_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}.
+                  </p>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -176,6 +246,18 @@ export default function MisAnunciosPage() {
                         <Eye className="h-3 w-3" />
                         {product.views_count ?? 0}
                       </span>
+                      {stats[product.id]?.favorites !== undefined && (
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground" title="Favoritos">
+                          <Heart className="h-3 w-3" />
+                          {stats[product.id].favorites}
+                        </span>
+                      )}
+                      {stats[product.id]?.contacts !== undefined && (
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground" title="Compradores que te han escrito">
+                          <MessageCircle className="h-3 w-3" />
+                          {stats[product.id].contacts}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
@@ -192,6 +274,14 @@ export default function MisAnunciosPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        {plan && plan.included_features_left > 0 && (product.status || 'active') === 'active' && (
+                          <DropdownMenuItem
+                            className="cursor-pointer font-medium text-primary"
+                            onClick={() => handleIncludedFeature(product.id)}
+                          >
+                            {plan.included_feature_days} días — incluido en tu plan ({plan.included_features_left} restantes)
+                          </DropdownMenuItem>
+                        )}
                         {[3, 7, 30].map((days) => (
                           <DropdownMenuItem
                             key={days}

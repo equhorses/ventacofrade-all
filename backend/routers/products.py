@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.database import get_db
 from services.products import ProductsService
 from services.seller_profiles import Seller_profilesService
+from services.seller_plans import tiers_for_users
 from dependencies.auth import get_current_user
 from schemas.auth import UserResponse
 
@@ -79,6 +80,8 @@ class ProductsResponse(BaseModel):
     featured_until: Optional[datetime] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+
+    seller_tier: Optional[str] = None  # gratis | basico | profesional
 
     class Config:
         from_attributes = True
@@ -184,6 +187,9 @@ async def query_productss_all(
             boost_featured=True,
         )
         result["items"] = [_refresh_featured_flag(p) for p in result["items"]]
+        tiers = await tiers_for_users(db, [p.user_id for p in result["items"]])
+        for p in result["items"]:
+            p.seller_tier = tiers.get(p.user_id, "gratis")
         logger.debug(f"Found {result['total']} productss")
         return result
     except HTTPException:
@@ -219,6 +225,8 @@ async def get_products(
             logger.exception(f"No se pudo incrementar views_count para el producto {id}")
             await db.rollback()
 
+        tiers = await tiers_for_users(db, [result.user_id])
+        result.seller_tier = tiers.get(result.user_id, "gratis")
         return _refresh_featured_flag(result)
     except HTTPException:
         raise

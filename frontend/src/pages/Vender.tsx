@@ -18,9 +18,14 @@ export default function VenderPage() {
             Vende tus artículos cofrades
           </h1>
           <p className="text-lg text-primary-foreground/80 max-w-2xl mx-auto">
-            Llega a miles de cofrades en toda Andalucía. Publica tus artículos de orfebrería, 
-            bordados, túnicas y más en el marketplace de referencia.
+            Publica gratis tus túnicas, orfebrería, bordados, medallas y todo lo religioso y cofrade que
+            tengas guardado. Sin límite de anuncios y sin comisiones por venta.
           </p>
+          <Link to="/publicar" className="inline-block mt-6">
+            <Button size="lg" className="bg-secondary text-secondary-foreground hover:bg-secondary/90 cursor-pointer">
+              Publicar anuncio gratis
+            </Button>
+          </Link>
         </div>
       </section>
 
@@ -31,18 +36,18 @@ export default function VenderPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="text-center">
               <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-lg">1</div>
-              <h3 className="font-semibold mb-2">Activa tu tienda</h3>
-              <p className="text-sm text-muted-foreground">Pago único de activación de 10€ para verificar tu cuenta de vendedor</p>
+              <h3 className="font-semibold mb-2">Publica gratis</h3>
+              <p className="text-sm text-muted-foreground">Sube fotos, describe tu artículo y pon el precio. Sin límite de anuncios</p>
             </div>
             <div className="text-center">
               <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-lg">2</div>
-              <h3 className="font-semibold mb-2">Publica anuncios</h3>
-              <p className="text-sm text-muted-foreground">Sube fotos, describe tus artículos y establece el precio</p>
+              <h3 className="font-semibold mb-2">Conecta y vende</h3>
+              <p className="text-sm text-muted-foreground">Recibe mensajes de compradores interesados y cierra la venta directamente</p>
             </div>
             <div className="text-center">
               <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-lg">3</div>
-              <h3 className="font-semibold mb-2">Conecta y vende</h3>
-              <p className="text-sm text-muted-foreground">Recibe mensajes de compradores interesados y cierra la venta</p>
+              <h3 className="font-semibold mb-2">Gana visibilidad (opcional)</h3>
+              <p className="text-sm text-muted-foreground">Con un plan, tus anuncios salen antes, llevan insignia e incluyen destacados cada mes</p>
             </div>
           </div>
         </div>
@@ -52,7 +57,7 @@ export default function VenderPage() {
       <section className="py-16 bg-muted/30">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-2xl font-bold text-center mb-3">Planes para vendedores</h2>
-          <p className="text-center text-muted-foreground mb-10">Elige el plan que mejor se adapte a tus necesidades</p>
+          <p className="text-center text-muted-foreground mb-10">Publicar es gratis para todos. Los planes son opcionales y dan más visibilidad a tus anuncios</p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
             {/* Basic Plan */}
@@ -71,11 +76,11 @@ export default function VenderPage() {
               <CardContent className="space-y-3">
                 <ul className="space-y-2">
                   {[
-                    'Hasta 10 anuncios activos',
-                    'Fotos ilimitadas por anuncio',
-                    'Mensajería con compradores',
-                    'Perfil de vendedor',
-                    'Soporte por email',
+                    'Anuncios ilimitados',
+                    'Tus anuncios aparecen antes que los de vendedores sin plan',
+                    '4 destacados de 7 días incluidos cada mes',
+                    'Insignia "Vendedor Plus"',
+                    'Estadísticas: visitas y favoritos por anuncio',
                   ].map((feature) => (
                     <li key={feature} className="flex items-start gap-2 text-sm">
                       <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
@@ -111,11 +116,10 @@ export default function VenderPage() {
                 <ul className="space-y-2">
                   {[
                     'Anuncios ilimitados',
-                    'Anuncios destacados (x3/mes)',
-                    'Estadísticas avanzadas',
-                    'Prioridad en búsquedas',
-                    'Soporte prioritario',
-                    'Badge de vendedor verificado',
+                    'Preferencia absoluta: tus anuncios, los primeros',
+                    '9 destacados de 7 días incluidos cada mes',
+                    'Insignia "Profesional"',
+                    'Estadísticas completas: visitas, favoritos y contactos',
                   ].map((feature) => (
                     <li key={feature} className="flex items-start gap-2 text-sm">
                       <Check className="h-4 w-4 text-secondary mt-0.5 shrink-0" />

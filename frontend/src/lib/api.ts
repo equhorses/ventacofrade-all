@@ -84,6 +84,24 @@ function makeEntity(entityName: string) {
   };
 }
 
+export type SellerTier = 'gratis' | 'basico' | 'profesional';
+
+export interface SellerPlanSummary {
+  tier: SellerTier;
+  included_features_total: number;
+  included_features_used: number;
+  included_features_left: number;
+  included_feature_days: number;
+  resets_at: string;
+}
+
+export interface SellerProductStats {
+  product_id: number;
+  views: number;
+  favorites?: number;
+  contacts?: number;
+}
+
 export const client = {
   auth: {
     async me() {
@@ -199,6 +217,20 @@ export const client = {
     },
     async getThread(productId: number | string, otherUserId: string) {
       const response = await http.get(`${baseUrl()}/api/v1/messages/conversations/${productId}/${otherUserId}`);
+      return { data: response.data };
+    },
+  },
+  sellerPlans: {
+    async me(): Promise<{ data: SellerPlanSummary }> {
+      const response = await http.get(`${baseUrl()}/api/v1/seller-plans/me`);
+      return { data: response.data };
+    },
+    async featureWithIncluded(productId: number) {
+      const response = await http.post(`${baseUrl()}/api/v1/seller-plans/feature/${productId}`, {});
+      return { data: response.data as { product_id: number; featured_until: string; included_features_left: number } };
+    },
+    async stats(): Promise<{ data: { tier: SellerTier; items: SellerProductStats[] } }> {
+      const response = await http.get(`${baseUrl()}/api/v1/seller-plans/stats`);
       return { data: response.data };
     },
   },
