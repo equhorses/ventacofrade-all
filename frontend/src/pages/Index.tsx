@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import Layout from '@/components/Layout';
+import { getPlaceholders, PlaceholderCard } from '@/components/PlaceholderListings';
 import WelcomeModal from '@/components/WelcomeModal';
 import AdSlot from '@/components/AdSlot';
 import { client } from '@/lib/api';
@@ -195,20 +196,20 @@ export default function HomePage() {
             </Link>
           </div>
 
-          {featuredProducts.length > 0 ? (
+          {!loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {featuredProducts.map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))}
+              {getPlaceholders(null, featuredProducts.length, 6).map((item) => (
+                <PlaceholderCard key={item.key} item={item} />
+              ))}
             </div>
           ) : (
-            <div className="text-center py-12 bg-background rounded-lg border border-border">
-              <Church className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-              <h3 className="text-lg font-semibold text-foreground mb-2">Aún no hay anuncios</h3>
-              <p className="text-muted-foreground mb-4">Sé el primero en publicar un artículo cofrade</p>
-              <Link to="/publicar">
-                <Button className="bg-primary hover:bg-primary/90 cursor-pointer">Publicar anuncio</Button>
-              </Link>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="aspect-[4/3] rounded-lg bg-muted animate-pulse" />
+              ))}
             </div>
           )}
         </div>

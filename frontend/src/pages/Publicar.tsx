@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -53,6 +53,16 @@ export default function PublicarPage() {
     checkAuth();
     loadCategories();
   }, []);
+
+  // Si se llega desde una tarjeta de categoría (/publicar?categoria=slug), preselecciona la categoría.
+  const [searchParams] = useSearchParams();
+  useEffect(() => {
+    const slug = searchParams.get('categoria');
+    if (!slug || form.category_id) return;
+    const match = categories.find((c) => c.slug === slug);
+    if (match) setForm((prev) => ({ ...prev, category_id: String(match.id) }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categories]);
 
   const checkAuth = async () => {
     try {

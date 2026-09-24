@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,7 @@ import Layout from '@/components/Layout';
 import AdSlot from '@/components/AdSlot';
 import { client } from '@/lib/api';
 import { Search, MapPin, Church, SlidersHorizontal } from 'lucide-react';
+import { getPlaceholders, PlaceholderCard } from '@/components/PlaceholderListings';
 
 interface Product {
   id: number;
@@ -46,6 +47,14 @@ export default function ExplorarPage() {
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get('categoria') || 'todas');
   const [selectedCondition, setSelectedCondition] = useState('todas');
   const [sortBy, setSortBy] = useState('-created_at');
+  const location = useLocation();
+
+  // Tarjetas de relleno mientras hay pocos anuncios (no en búsquedas ni en favoritos).
+  const PLACEHOLDER_TARGET = 12;
+  const showPlaceholders = !searchParams.get('q') && location.pathname !== '/favoritos';
+  const placeholders = showPlaceholders
+    ? getPlaceholders(selectedCategory !== 'todas' ? selectedCategory : null, products.length, PLACEHOLDER_TARGET)
+    : [];
 
   useEffect(() => {
     loadCategories();
@@ -226,7 +235,7 @@ export default function ExplorarPage() {
               </Card>
             ))}
           </div>
-        ) : products.length > 0 ? (
+        ) : products.length > 0 || placeholders.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {products.map((product) => (
               <Link key={product.id} to={`/producto/${product.id}`} className="group cursor-pointer">
@@ -262,6 +271,9 @@ export default function ExplorarPage() {
                   </CardContent>
                 </Card>
               </Link>
+            ))}
+            {placeholders.map((item) => (
+              <PlaceholderCard key={item.key} item={item} />
             ))}
           </div>
         ) : (
