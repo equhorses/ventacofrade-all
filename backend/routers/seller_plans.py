@@ -188,13 +188,13 @@ async def bump_product(
     current_user: UserResponse = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Sube un anuncio para que vuelva arriba como recién publicado."""
+    """Renueva un anuncio: vuelve arriba como recién publicado."""
     now = datetime.now(timezone.utc)
     user_id = str(current_user.id)
     profile = await _profile(db, user_id)
     tier = seller_tier(profile, now)
     if tier not in MANUAL_BUMP_INTERVAL:
-        raise HTTPException(status_code=403, detail="Subir anuncios está disponible con los planes Básico y Profesional.")
+        raise HTTPException(status_code=403, detail="Renovar anuncios está disponible con los planes Básico y Profesional.")
 
     product = (await db.execute(select(Products).where(Products.id == product_id))).scalar_one_or_none()
     if not product:
@@ -202,13 +202,13 @@ async def bump_product(
     if product.user_id != user_id:
         raise HTTPException(status_code=403, detail="Este anuncio no te pertenece.")
     if (product.status or "active") != "active":
-        raise HTTPException(status_code=400, detail="Solo se pueden subir anuncios activos.")
+        raise HTTPException(status_code=400, detail="Solo se pueden renovar anuncios activos.")
 
     next_bump = next_manual_bump_at(profile, tier)
     if next_bump:
         raise HTTPException(
             status_code=403,
-            detail=f"Podrás volver a subir un anuncio a partir del {next_bump.strftime('%d/%m/%Y %H:%M')} (hora UTC).",
+            detail=f"Podrás volver a renovar un anuncio a partir del {next_bump.strftime('%d/%m/%Y')}.",
         )
 
     product.bumped_at = now

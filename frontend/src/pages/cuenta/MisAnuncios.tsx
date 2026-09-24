@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { client, type SellerPlanSummary, type SellerProductStats } from '@/lib/api';
-import { Church, Plus, Eye, Trash2, Sparkles, Heart, MessageCircle, Crown, ArrowUp, Palmtree } from 'lucide-react';
+import { Church, Plus, Eye, Trash2, Sparkles, Heart, MessageCircle, Crown, RefreshCw, Palmtree } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -149,10 +149,10 @@ export default function MisAnunciosPage() {
     setBumpingId(productId);
     try {
       await client.sellerPlans.bump(productId);
-      toast.success('Anuncio subido: vuelve a aparecer arriba como recién publicado.');
+      toast.success('Anuncio renovado: vuelve a aparecer arriba como recién publicado.');
       await load();
     } catch (err) {
-      toast.error(errorMessage(err, 'No se pudo subir el anuncio.'));
+      toast.error(errorMessage(err, 'No se pudo renovar el anuncio.'));
     } finally {
       setBumpingId(null);
     }
@@ -227,10 +227,10 @@ export default function MisAnunciosPage() {
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">
                     {plan.auto_bump
-                      ? 'Tus anuncios se suben solos cada semana y además puedes subir uno al día.'
-                      : 'Puedes subir un anuncio a la semana para que vuelva arriba.'}
+                      ? 'Renovar un anuncio lo vuelve a poner arriba como recién publicado. Tus anuncios se renuevan solos cada semana y además puedes renovar uno al día.'
+                      : 'Renovar un anuncio lo vuelve a poner arriba como recién publicado. Puedes renovar uno a la semana.'}
                     {plan.next_bump_at &&
-                      ` Próxima subida disponible: ${new Date(plan.next_bump_at).toLocaleString('es-ES', {
+                      ` Próxima renovación disponible: ${new Date(plan.next_bump_at).toLocaleString('es-ES', {
                         day: 'numeric',
                         month: 'long',
                         hour: '2-digit',
@@ -367,14 +367,19 @@ export default function MisAnunciosPage() {
                     </DropdownMenu>
                     {plan?.can_bump && (product.status || 'active') === 'active' && (
                       <Button
-                        variant="ghost"
-                        size="icon"
-                        className="cursor-pointer"
-                        title={plan.next_bump_at ? 'Aún no puedes subir otro anuncio' : 'Subir anuncio (vuelve arriba)'}
+                        variant="outline"
+                        size="sm"
+                        className="cursor-pointer gap-1"
+                        title={
+                          plan.next_bump_at
+                            ? 'Aún no puedes renovar otro anuncio'
+                            : 'Vuelve a ponerlo arriba como recién publicado'
+                        }
                         disabled={bumpingId === product.id || Boolean(plan.next_bump_at)}
                         onClick={() => handleBump(product.id)}
                       >
-                        <ArrowUp className="h-4 w-4" />
+                        <RefreshCw className="h-3 w-3" />
+                        Renovar
                       </Button>
                     )}
                     <Link to={`/producto/${product.id}`}>
