@@ -30,7 +30,7 @@ ALLOWED_CONTENT_TYPES = {
     "image/gif",
 }
 
-ALLOWED_FOLDERS = {"products", "avatars", "shops"}
+ALLOWED_FOLDERS = {"products", "avatars", "shops", "ads"}
 
 MAX_UPLOAD_URL_EXPIRY_SECONDS = 300  # 5 minutes
 

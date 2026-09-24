@@ -23,8 +23,9 @@ TIER_FREE = "gratis"
 TIER_BASIC = "basico"
 TIER_PRO = "profesional"
 
-# Plan que se aplica durante el acceso gratuito de fundadores y ganadores del sorteo.
-COMPLIMENTARY_TIER = TIER_BASIC
+# Plan que se aplica durante el acceso gratuito de fundadores y ganadores del sorteo:
+# todas las ventajas del Profesional (tienda propia, subida masiva, 9 destacados, etc.).
+COMPLIMENTARY_TIER = TIER_PRO
 
 # Destacados de 7 días incluidos cada mes natural.
 INCLUDED_FEATURES_PER_MONTH = {TIER_BASIC: 4, TIER_PRO: 9}
