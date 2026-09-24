@@ -27,6 +27,10 @@ TIER_PRO = "profesional"
 # todas las ventajas del Profesional (tienda propia, subida masiva, 9 destacados, etc.).
 COMPLIMENTARY_TIER = TIER_PRO
 
+# La cuenta de super admin (rol "admin", la del equipo de VentaCofrade) tiene todas
+# las ventajas siempre: se le pone acceso gratuito hasta esta fecha al crear su perfil.
+STAFF_ACCESS_UNTIL = datetime(2099, 12, 31, tzinfo=timezone.utc)
+
 # Destacados de 7 días incluidos cada mes natural.
 INCLUDED_FEATURES_PER_MONTH = {TIER_BASIC: 4, TIER_PRO: 9}
 INCLUDED_FEATURE_DAYS = 7

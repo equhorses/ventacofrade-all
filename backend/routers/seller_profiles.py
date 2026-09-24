@@ -310,6 +310,13 @@ async def create_seller_profiles(
                 await db.commit()
                 await db.refresh(result)
 
+        # La cuenta de super admin (equipo VentaCofrade) tiene todas las ventajas de serie.
+        if current_user.role == "admin":
+            from services.seller_plans import STAFF_ACCESS_UNTIL
+            result.free_access_until = STAFF_ACCESS_UNTIL
+            await db.commit()
+            await db.refresh(result)
+
         logger.info(f"Seller_profiles created successfully with id: {result.id}")
         return result
     except ValueError as e:
