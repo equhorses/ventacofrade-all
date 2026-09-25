@@ -180,6 +180,38 @@ export interface CatalogPublishItem {
   images: string[];
 }
 
+export interface LandingSummary {
+  slug: string;
+  name: string;
+  parent?: string | null;
+}
+
+export interface LandingProduct {
+  id: number;
+  title: string;
+  price: number;
+  images?: string | null;
+  condition: string;
+  location_city?: string | null;
+  location_province?: string | null;
+  is_featured: boolean;
+  seller_tier?: SellerTier;
+}
+
+export interface LandingPage {
+  slug: string;
+  name: string;
+  title: string;
+  description: string;
+  intro: string[];
+  category_slug: string | null;
+  matches: LandingProduct[];
+  related: LandingProduct[];
+  related_landings: LandingSummary[];
+  children: LandingSummary[];
+  indexable: boolean;
+}
+
 export const client = {
   auth: {
     async me() {
@@ -364,6 +396,16 @@ export const client = {
       return {
         data: response.data as { created: number; without_photos: number; vacation_mode: boolean; product_ids: number[] },
       };
+    },
+  },
+  landings: {
+    async list() {
+      const response = await http.get(`${baseUrl()}/api/v1/landings`);
+      return { data: response.data as { items: LandingSummary[]; popular: LandingSummary[] } };
+    },
+    async get(slug: string): Promise<{ data: LandingPage }> {
+      const response = await http.get(`${baseUrl()}/api/v1/landings/${encodeURIComponent(slug)}`);
+      return { data: response.data };
     },
   },
   payments: {

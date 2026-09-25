@@ -9,6 +9,7 @@ import RedProfesionalPage from './pages/RedProfesional';
 import ProfesionalDetallePage from './pages/ProfesionalDetalle';
 import VendedorPage from './pages/Vendedor';
 import TiendaPage from './pages/Tienda';
+import VentaPage, { VentaIndexPage } from './pages/Venta';
 import Vender from './pages/Vender';
 import Publicar from './pages/Publicar';
 import Documentacion from './pages/Documentacion';
@@ -56,6 +57,8 @@ const AppRoutes = () => (
     <Route path="/profesional/:id" element={<ProfesionalDetallePage />} />
     <Route path="/vendedor/:id" element={<VendedorPage />} />
     <Route path="/tienda/:slug" element={<TiendaPage />} />
+    <Route path="/venta" element={<VentaIndexPage />} />
+    <Route path="/venta/:slug" element={<VentaPage />} />
     <Route path="/vender" element={<Vender />} />
     <Route path="/publicar" element={<Publicar />} />
     <Route path="/documentacion" element={<Documentacion />} />

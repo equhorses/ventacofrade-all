@@ -28,6 +28,19 @@ import { client } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
+// Enlaces del pie a las páginas de búsqueda (/venta/...). Ayudan a que Google las encuentre.
+// La lista completa y sus textos están en backend/services/seo_landings.py.
+const POPULAR_SEARCHES: [string, string][] = [
+  ['tunicas-de-nazareno', 'Túnicas de nazareno'],
+  ['paso-de-misterio', 'Pasos de misterio'],
+  ['paso-de-palio', 'Pasos de palio'],
+  ['orfebreria-cofrade', 'Orfebrería cofrade'],
+  ['mantos-y-sayas', 'Mantos y sayas'],
+  ['medallas-de-hermandad', 'Medallas de hermandad'],
+  ['costales-y-ropa-de-costalero', 'Costales'],
+  ['miniaturas-cofrades', 'Miniaturas cofrades'],
+];
+
 interface LayoutProps {
   children: React.ReactNode;
 }
@@ -315,9 +328,9 @@ export default function Layout({ children }: LayoutProps) {
               <h4 className="font-semibold mb-3 text-sm uppercase tracking-wider">Explorar</h4>
               <ul className="space-y-2 text-sm text-primary-foreground/70">
                 <li><Link to="/explorar" className="hover:text-primary-foreground transition-colors cursor-pointer">Todos los anuncios</Link></li>
-                <li><Link to="/explorar?categoria=orfebreria" className="hover:text-primary-foreground transition-colors cursor-pointer">Orfebrería</Link></li>
-                <li><Link to="/explorar?categoria=bordados" className="hover:text-primary-foreground transition-colors cursor-pointer">Bordados</Link></li>
-                <li><Link to="/explorar?categoria=tunicas-capirotes" className="hover:text-primary-foreground transition-colors cursor-pointer">Túnicas</Link></li>
+                <li><Link to="/venta/orfebreria-cofrade" className="hover:text-primary-foreground transition-colors cursor-pointer">Orfebrería</Link></li>
+                <li><Link to="/venta/bordados-cofrades" className="hover:text-primary-foreground transition-colors cursor-pointer">Bordados</Link></li>
+                <li><Link to="/venta/tunicas-de-nazareno" className="hover:text-primary-foreground transition-colors cursor-pointer">Túnicas</Link></li>
               </ul>
             </div>
             <div>
@@ -336,6 +349,19 @@ export default function Layout({ children }: LayoutProps) {
                 <li>Sevilla, Andalucía · España</li>
                 <li>contacto@ventacofrade.com</li>
               </ul>
+            </div>
+          </div>
+          <div className="mt-8">
+            <h4 className="font-semibold mb-3 text-sm uppercase tracking-wider">Búsquedas populares</h4>
+            <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-primary-foreground/70">
+              {POPULAR_SEARCHES.map(([slug, label]) => (
+                <Link key={slug} to={`/venta/${slug}`} className="hover:text-primary-foreground transition-colors">
+                  {label}
+                </Link>
+              ))}
+              <Link to="/venta" className="hover:text-primary-foreground transition-colors underline">
+                Ver todas
+              </Link>
             </div>
           </div>
           <div className="border-t border-primary-foreground/20 mt-8 pt-6 text-center text-sm text-primary-foreground/60">

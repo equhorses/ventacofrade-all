@@ -24,6 +24,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.database import get_db
 from models.categories import Categories
 from models.products import Products
+from services.seo_landings import (
+    CATEGORY_LANDING,
+    LANDINGS,
+    LANDINGS_BY_SLUG,
+    POPULAR,
+    build_landing,
+    indexable_slugs,
+    description_for,
+    title_for,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -133,13 +143,130 @@ ul.list li{{padding:12px 0;border-bottom:1px solid #e5e5e5}}
 </head>
 <body>
 <header><strong>{SITE_NAME}</strong> · Marketplace cofrade<br>
-<nav><a href="{SITE_URL}/">Inicio</a><a href="{SITE_URL}/explorar">Explorar anuncios</a><a href="{SITE_URL}/vender">Vender</a><a href="{SITE_URL}/blog/">Guías</a></nav></header>
+<nav><a href="{SITE_URL}/">Inicio</a><a href="{SITE_URL}/explorar">Explorar anuncios</a><a href="{SITE_URL}/venta">Búsquedas</a><a href="{SITE_URL}/vender">Vender</a><a href="{SITE_URL}/blog/">Guías</a></nav></header>
 <main>
 {body}
 </main>
-<footer>{SITE_NAME}: el marketplace de artículos religiosos y cofrades. Publicar y comprar es gratis.</footer>
+<footer>{popular_links()}<p>{SITE_NAME}: el marketplace de artículos religiosos y cofrades. Publicar y comprar es gratis.</p></footer>
 </body>
 </html>"""
+
+
+def landing_url(slug: str) -> str:
+    return f"{SITE_URL}/venta/{slug}"
+
+
+def category_url(category) -> str:
+    """Dirección que mejor posiciona para una categoría: su página de búsqueda si la tiene."""
+    slug = CATEGORY_LANDING.get(category.slug)
+    return landing_url(slug) if slug else f"{SITE_URL}/explorar?categoria={quote(category.slug)}"
+
+
+def popular_links() -> str:
+    links = "".join(
+        f'<a href="{landing_url(s)}">{esc(LANDINGS_BY_SLUG[s]["name"])}</a>' for s in POPULAR if s in LANDINGS_BY_SLUG
+    )
+    return f"<p><strong>Búsquedas populares:</strong> {links}</p>"
+
+
+def product_items(products) -> str:
+    return "".join(
+        f'<li><a href="{SITE_URL}/producto/{p.id}">{esc(p.title)}</a> · {esc(format_price(p.price))}'
+        f'{" · " + esc(p.location_province) if p.location_province else ""}</li>'
+        for p in products
+    )
+
+
+def landing_page(data: dict) -> str:
+    item = data["landing"]
+    url = landing_url(item["slug"])
+    matches, related = data["matches"], data["related"]
+    intro = "".join(f"<p>{esc(par)}</p>" for par in item["intro"])
+    if matches:
+        results = f'<h2>{len(matches)} anuncios de {esc(item["name"].lower())}</h2><ul class="list">{product_items(matches)}</ul>'
+    else:
+        results = (
+            f"<p>Ahora mismo no hay anuncios de {esc(item['name'].lower())}. "
+            f'<a href="{SITE_URL}/publicar">Publica el tuyo gratis</a> o mira otros anuncios parecidos.</p>'
+        )
+    if related:
+        results += f'<h2>Otros anuncios que te pueden interesar</h2><ul class="list">{product_items(related)}</ul>'
+    related_links = "".join(
+        f'<li><a href="{landing_url(r["slug"])}">{esc(r["name"])}</a></li>' for r in data["related_landings"]
+    )
+    child_links = "".join(
+        f'<li><a href="{landing_url(c["slug"])}">{esc(c["name"])}</a></li>' for c in data["children"]
+    )
+    body = (
+        f"<h1>{esc(item['name'])} en venta</h1>{intro}{results}"
+        f'<p><a href="{SITE_URL}/publicar">¿Tienes {esc(item["name"].lower())}? Publica tu anuncio gratis</a></p>'
+        + (f"<h2>Búsquedas más concretas</h2><ul>{child_links}</ul>" if child_links else "")
+        + (f"<h2>Búsquedas relacionadas</h2><ul>{related_links}</ul>" if related_links else "")
+    )
+    structured = [
+        {
+            "@context": "https://schema.org",
+            "@type": "CollectionPage",
+            "name": f"{item['name']} en venta",
+            "url": url,
+            "description": description_for(item),
+            "mainEntity": {
+                "@type": "ItemList",
+                "numberOfItems": len(matches),
+                "itemListElement": [
+                    {"@type": "ListItem", "position": i + 1, "url": f"{SITE_URL}/producto/{p.id}", "name": p.title}
+                    for i, p in enumerate(matches[:30])
+                ],
+            },
+        },
+        {
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+                {"@type": "ListItem", "position": 1, "name": SITE_NAME, "item": f"{SITE_URL}/"},
+                {"@type": "ListItem", "position": 2, "name": "Búsquedas", "item": f"{SITE_URL}/venta"},
+                {"@type": "ListItem", "position": 3, "name": item["name"], "item": url},
+            ],
+        },
+    ]
+    first_image = next((split_images(p.images)[0] for p in matches + related if split_images(p.images)), None)
+    return page(
+        title=title_for(item),
+        description=description_for(item),
+        canonical=url,
+        body=body,
+        image=first_image,
+        structured=structured,
+        noindex=not data["indexable"],
+    )
+
+
+def landings_index_page() -> str:
+    def block(item: dict) -> str:
+        children = "".join(
+            f'<li><a href="{landing_url(c["slug"])}">{esc(c["name"])}</a></li>'
+            for c in LANDINGS
+            if c.get("parent") == item["slug"]
+        )
+        return (
+            f'<li><a href="{landing_url(item["slug"])}"><strong>{esc(item["name"])} en venta</strong></a>'
+            + (f"<ul>{children}</ul>" if children else "")
+            + "</li>"
+        )
+
+    links = "".join(block(i) for i in LANDINGS if not i.get("parent"))
+    body = (
+        "<h1>Qué buscar en VentaCofrade</h1>"
+        "<p>Todas las búsquedas de artículos cofrades y religiosos: pasos, túnicas, orfebrería, bordados, "
+        "imágenes, cera, medallas, instrumentos de banda y mucho más.</p>"
+        f'<ul class="list">{links}</ul>'
+    )
+    return page(
+        title=f"Artículos cofrades en venta por tipo | {SITE_NAME}",
+        description="Encuentra pasos, túnicas de nazareno, orfebrería, bordados, imágenes y enseres cofrades en venta.",
+        canonical=f"{SITE_URL}/venta",
+        body=body,
+    )
 
 
 def not_found_page() -> str:
@@ -172,7 +299,7 @@ def product_page(product, category) -> str:
         f"<li><strong>Estado:</strong> {esc(condition)}</li>" if condition else "",
         f"<li><strong>Ubicación:</strong> {esc(location)}</li>" if location else "",
         (
-            f'<li><strong>Categoría:</strong> <a href="{SITE_URL}/explorar?categoria={quote(category.slug)}">'
+            f'<li><strong>Categoría:</strong> <a href="{category_url(category)}">'
             f"{esc(category_name)}</a></li>"
             if category
             else ""
@@ -217,7 +344,7 @@ def product_page(product, category) -> str:
             "@type": "ListItem",
             "position": 2,
             "name": category_name,
-            "item": f"{SITE_URL}/explorar?categoria={quote(category.slug)}",
+            "item": category_url(category),
         })
     breadcrumb.append({"@type": "ListItem", "position": len(breadcrumb) + 1, "name": product.title, "item": url})
 
@@ -234,7 +361,7 @@ def product_page(product, category) -> str:
 
 def listing_page(products, category, categories) -> str:
     if category:
-        url = f"{SITE_URL}/explorar?categoria={quote(category.slug)}"
+        url = category_url(category)
         heading = f"{category.name} en venta"
         intro = category.description or f"Anuncios de {category.name.lower()} publicados por cofrades."
         title = f"{category.name} de segunda mano | {SITE_NAME}"
@@ -244,14 +371,8 @@ def listing_page(products, category, categories) -> str:
         intro = "Túnicas, orfebrería, bordados, imágenes, insignias y enseres cofrades publicados por cofrades de toda España."
         title = f"Anuncios de artículos cofrades | {SITE_NAME}"
 
-    items = "".join(
-        f'<li><a href="{SITE_URL}/producto/{p.id}">{esc(p.title)}</a> · {esc(format_price(p.price))}'
-        f'{" · " + esc(p.location_province) if p.location_province else ""}</li>'
-        for p in products
-    )
-    category_links = "".join(
-        f'<li><a href="{SITE_URL}/explorar?categoria={quote(c.slug)}">{esc(c.name)}</a></li>' for c in categories
-    )
+    items = product_items(products)
+    category_links = "".join(f'<li><a href="{category_url(c)}">{esc(c.name)}</a></li>' for c in categories)
     body = (
         f"<h1>{esc(heading)}</h1><p>{esc(intro)}</p>"
         + (f'<ul class="list">{items}</ul>' if items else "<p>Todavía no hay anuncios publicados en esta sección.</p>")
@@ -260,14 +381,18 @@ def listing_page(products, category, categories) -> str:
     return page(title=title, description=shorten(intro), canonical=url, body=body)
 
 
-def sitemap_xml(products, categories) -> str:
+def sitemap_xml(products, categories, landing_slugs: Iterable[str] = ()) -> str:
     def lastmod(value: Optional[datetime]) -> str:
         return f"<lastmod>{value.date().isoformat()}</lastmod>" if value else ""
 
     urls = [f"<url><loc>{SITE_URL}/explorar</loc></url>"]
     urls += [
-        f"<url><loc>{esc(f'{SITE_URL}/explorar?categoria={quote(c.slug)}')}</loc></url>" for c in categories
+        f"<url><loc>{esc(f'{SITE_URL}/explorar?categoria={quote(c.slug)}')}</loc></url>"
+        for c in categories
+        if c.slug not in CATEGORY_LANDING
     ]
+    urls.append(f"<url><loc>{SITE_URL}/venta</loc></url>")
+    urls += [f"<url><loc>{landing_url(slug)}</loc><changefreq>daily</changefreq></url>" for slug in landing_slugs]
     urls += [
         f"<url><loc>{SITE_URL}/producto/{p.id}</loc>{lastmod(p.updated_at or p.created_at)}</url>"
         for p in products
@@ -310,6 +435,28 @@ async def seo_listing(categoria: Optional[str] = Query(None), db: AsyncSession =
     return HTMLResponse(listing_page(products, category, categories), headers=CACHE_HEADERS)
 
 
+@router.get("/venta", response_class=HTMLResponse, include_in_schema=False)
+async def seo_landings_index():
+    return HTMLResponse(landings_index_page(), headers=CACHE_HEADERS)
+
+
+@router.get("/venta/{slug}", response_class=HTMLResponse, include_in_schema=False)
+async def seo_landing(slug: str, db: AsyncSession = Depends(get_db)):
+    data = await build_landing(db, slug)
+    if not data:
+        return HTMLResponse(
+            page(
+                title=f"Búsqueda no encontrada | {SITE_NAME}",
+                description="Esta búsqueda no existe en VentaCofrade.",
+                canonical=f"{SITE_URL}/venta",
+                body=f'<h1>Búsqueda no encontrada</h1><p><a href="{SITE_URL}/venta">Ver todas las búsquedas</a>.</p>',
+                noindex=True,
+            ),
+            status_code=404,
+        )
+    return HTMLResponse(landing_page(data), headers=CACHE_HEADERS)
+
+
 @router.get("/sitemap-productos.xml", include_in_schema=False)
 async def seo_sitemap(db: AsyncSession = Depends(get_db)):
     categories = await _categories(db)
@@ -320,4 +467,7 @@ async def seo_sitemap(db: AsyncSession = Depends(get_db)):
         .limit(MAX_SITEMAP)
     )
     products = list((await db.execute(stmt)).scalars().all())
-    return Response(sitemap_xml(products, categories), media_type="application/xml", headers=CACHE_HEADERS)
+    landing_slugs = await indexable_slugs(db)
+    return Response(
+        sitemap_xml(products, categories, landing_slugs), media_type="application/xml", headers=CACHE_HEADERS
+    )
