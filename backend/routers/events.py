@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.auth import AccessTokenError, decode_access_token
 from core.database import get_db
 from models.user_events import UserEvent
+from services.admin_alerts import alert_stuck_now
 
 logger = logging.getLogger(__name__)
 
@@ -65,4 +66,8 @@ async def record_event(payload: EventIn, request: Request, db: AsyncSession = De
         )
     )
     await db.commit()
+    try:
+        await alert_stuck_now(db, claims.get("email"), payload.kind, payload.detail)
+    except Exception:  # un aviso que falla nunca debe molestar al usuario
+        logger.exception("No se pudo enviar el aviso de atascado")
     return Response(status_code=204)

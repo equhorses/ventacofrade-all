@@ -12,11 +12,12 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 from services.seller_plan_jobs import auto_bump_pro_listings, send_monthly_reports
+from services.admin_alerts import send_daily_stuck_summary
 from services.scheduled_jobs import (
     run_daily_jobs,
     send_pending_invitation_emails,
     send_launch_campaign_emails,
-    check_signup_deadlines,
+    check_signup_deadlines,  # noqa: F401  (tarea apagada, ver abajo)
 )
 
 logger = logging.getLogger(__name__)
@@ -40,9 +41,14 @@ def start_scheduler() -> None:
     _scheduler.add_job(
         send_launch_campaign_emails, IntervalTrigger(hours=2), id="launch_campaign_batches", replace_existing=True
     )
-    # Plazo de 18 días (cuenta creada -> tienda terminada): recordatorio y expiración.
+    # Plazo de 18 días (cuenta creada -> tienda terminada): APAGADO desde el 27/09/2026.
+    # Con el regalo de Fundador + 12 meses a todos, su email de "tu acceso ha caducado" contradecía el regalo.
+    # _scheduler.add_job(
+    #     check_signup_deadlines, IntervalTrigger(hours=2), id="signup_deadline_checks", replace_existing=True
+    # )
+    # Resumen diario de atascados a contacto@ventacofrade.com (07:30 UTC ≈ 08:30/09:30 en España).
     _scheduler.add_job(
-        check_signup_deadlines, IntervalTrigger(hours=2), id="signup_deadline_checks", replace_existing=True
+        send_daily_stuck_summary, CronTrigger(hour=7, minute=30), id="stuck_summary", replace_existing=True
     )
     # Ventajas de los planes: subida automática semanal (Profesional) y resumen mensual.
     _scheduler.add_job(auto_bump_pro_listings, CronTrigger(hour=7, minute=0), id="auto_bump_pro", replace_existing=True)

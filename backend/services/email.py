@@ -682,20 +682,36 @@ async def send_monthly_report_email(
 SITE_URL = "https://www.ventacofrade.com"
 
 
-def _email_shell(title: str, body_html: str, button_text: Optional[str] = None, button_url: Optional[str] = None) -> str:
+def _email_shell(
+    title: str,
+    body_html: str,
+    button_text: Optional[str] = None,
+    button_url: Optional[str] = None,
+    subtitle: Optional[str] = None,
+) -> str:
+    """Diseño habitual de los emails de VentaCofrade (logo redondo, fondo claro, botón morado centrado)."""
+    subtitle_html = (
+        f'<p style="text-align:center; color:#52525b; margin-top:0;">{subtitle}</p>' if subtitle else ""
+    )
     button = (
-        f'<p style="margin-top: 24px;"><a href="{button_url}" style="background-color:#6d28d9;color:#fff;'
-        f'padding:10px 20px;border-radius:6px;text-decoration:none;">{button_text}</a></p>'
+        f'<p style="text-align:center; margin-top: 24px;"><a href="{button_url}" style="background-color:#6d28d9;'
+        f'color:#fff;padding:12px 28px;border-radius:8px;text-decoration:none;font-weight:bold;display:inline-block;">'
+        f"{button_text}</a></p>"
         if button_text and button_url
         else ""
     )
     return f"""
-    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
-      <h2 style="color: #6d28d9;">{title}</h2>
-      {body_html}
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; background:#faf9fb; padding: 24px; border-radius: 12px;">
+      <div style="text-align:center; margin-bottom: 12px;">
+        <img src="https://ventacofrade.com/logo-circle-email.png" alt="VentaCofrade" width="72" height="72" />
+      </div>
+      <h2 style="color: #6d28d9; text-align:center; margin-bottom: 4px;">{title}</h2>
+      {subtitle_html}
+      <div style="color:#27272a; font-size: 15px; line-height: 1.55;">{body_html}</div>
       {button}
-      <p style="margin-top: 24px; color: #666; font-size: 13px;">
-        ¿Dudas? Escríbenos a <a href="mailto:contacto@ventacofrade.com">contacto@ventacofrade.com</a>.
+      <p style="margin-top: 24px; color: #666; font-size: 13px; border-top: 1px solid #e4e4e7; padding-top: 16px;">
+        Si tienes cualquier duda, escríbenos a
+        <a href="mailto:contacto@ventacofrade.com" style="color:#6d28d9;">contacto@ventacofrade.com</a>.
       </p>
     </div>
     """
@@ -737,13 +753,11 @@ APOLOGY_CTAS = {
     "google": ("Crear mi cuenta", f"{SITE_URL}/login?modo=registro"),
 }
 APOLOGY_EXTRA = {
-    "contrasena": "<p>Si no recuerdas tu contraseña, ahora ya puedes crear una nueva en un minuto.</p>",
-    "google": "<p>Si te registras con Google, recuerda marcar antes la casilla «Soy mayor de 18 años»: "
-              "era justo lo que te dejó fuera la otra vez.</p>",
-    "registro": "<p>Regístrate con este mismo email y el regalo se activa solo.</p>",
-    "publicar": "<p>Publicar es gratis y se hace en dos minutos desde el móvil: una foto, un precio y listo.</p>",
-    "con_anuncios": "<p>Gracias por ser de los primeros en publicar. Ahora tienes también tu tienda propia "
-                    "para compartir todo tu catálogo con un solo enlace.</p>",
+    "contrasena": "Si no recuerdas tu contraseña, ya puedes crear una nueva.",
+    "google": "Si entras con Google, marca antes la casilla de mayor de edad.",
+    "registro": "Regístrate con este email y el regalo se activa solo.",
+    "publicar": "Publicar es gratis y se hace en dos minutos.",
+    "con_anuncios": "Gracias por ser de los primeros en publicar.",
 }
 
 
@@ -751,18 +765,13 @@ async def send_apology_email(to_email: str, group: str) -> bool:
     button_text, button_url = APOLOGY_CTAS.get(group, APOLOGY_CTAS["publicar"])
     html = _email_shell(
         "Nuestro primer izquierdo no fue del todo bien",
-        "<p>Las salidas siempre son complejas, y la nuestra también lo ha sido. 🙈</p>"
-        "<p>En estos primeros días algunos botones de nuestros emails llevaban a una página en blanco, "
-        "no había forma de recuperar la contraseña y el registro con Google dejaba fuera a quien no "
-        "marcaba una casilla. Ha sido culpa nuestra, lo sentimos de verdad. <strong>Ya está todo arreglado.</strong></p>"
-        "<p>Para compensarlo, te regalamos la <strong>insignia de Fundador</strong> y "
-        "<strong>12 meses del plan Profesional gratis</strong>: tus anuncios salen los primeros, tienes tu "
-        "propia tienda dentro de VentaCofrade y destacados incluidos cada mes.</p>"
-        + APOLOGY_EXTRA.get(group, "")
-        + "<p>Ahora sí: <strong>¡al cielo con ella!</strong></p>"
-        "<p>Daniel, de VentaCofrade</p>",
+        "<p>Estos días algunas cosas de la web no funcionaron como debían. Ya está arreglado, y lo sentimos.</p>"
+        "<p>Para compensarte: <strong>insignia de Fundador</strong> y <strong>12 meses del plan Profesional "
+        f"gratis</strong>. {APOLOGY_EXTRA.get(group, '')}</p>"
+        "<p>Ahora sí: <strong>¡al cielo con ella!</strong><br>Daniel, de VentaCofrade</p>",
         button_text,
         button_url,
+        subtitle="Las salidas siempre son complejas.",
     )
     return await _send_via_resend(
         to_email, "Perdón por la salida (y un regalo para ti)", html, f"disculpas: {group}",
