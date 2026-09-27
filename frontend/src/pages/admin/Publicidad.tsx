@@ -58,7 +58,15 @@ function SlotEditor({ ad, onSaved }: { ad: HouseAdAdmin; onSaved: (updated: Hous
       toast.success('Anuncio guardado');
     } catch (err) {
       console.error('Error saving house ad:', err);
-      toast.error('No se pudo guardar el anuncio');
+      const e = err as { response?: { status?: number; data?: { detail?: unknown } }; message?: string };
+      const detail = e.response?.data?.detail;
+      const reason =
+        typeof detail === 'string'
+          ? detail
+          : e.response?.status
+            ? `error ${e.response.status}`
+            : e.message || 'sin conexión con el servidor';
+      toast.error(`No se pudo guardar el anuncio (${reason})`);
     } finally {
       setSaving(false);
     }
