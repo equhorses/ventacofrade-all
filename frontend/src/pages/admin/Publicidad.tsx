@@ -60,10 +60,16 @@ function SlotEditor({ ad, onSaved }: { ad: HouseAdAdmin; onSaved: (updated: Hous
       console.error('Error saving house ad:', err);
       const e = err as { response?: { status?: number; data?: { detail?: unknown } }; message?: string };
       const detail = e.response?.data?.detail;
+      const firstMsg =
+        Array.isArray(detail) && detail[0] && typeof detail[0] === 'object'
+          ? String((detail[0] as { msg?: unknown }).msg ?? '')
+          : '';
       const reason =
         typeof detail === 'string'
           ? detail
-          : e.response?.status
+          : firstMsg
+            ? firstMsg
+            : e.response?.status
             ? `error ${e.response.status}`
             : e.message || 'sin conexión con el servidor';
       toast.error(`No se pudo guardar el anuncio (${reason})`);

@@ -97,8 +97,10 @@ export default function AdSlot({ slot, label = 'Publicidad' }: { slot: string; l
     return (
       <a
         href={houseAd.link_url}
-        target="_blank"
-        rel="noopener noreferrer sponsored"
+        // mailto: y enlaces de la propia web se abren en la misma pestaña (si no, queda una pestaña vacía)
+        {...(/^https?:\/\//i.test(houseAd.link_url) && !/ventacofrade\.com/i.test(houseAd.link_url)
+          ? { target: '_blank', rel: 'noopener noreferrer sponsored' }
+          : {})}
         className="w-full flex flex-col items-center gap-1 my-4"
       >
         <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</span>

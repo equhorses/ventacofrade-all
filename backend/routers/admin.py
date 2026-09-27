@@ -1497,7 +1497,8 @@ class HouseAdAdminResponse(BaseModel):
 
 
 class UpsertHouseAdRequest(BaseModel):
-    slot: str
+    # El hueco viene en la URL (/house-ads/{slot}); aquí es opcional y se ignora.
+    slot: Optional[str] = None
     title: str
     image_url: str
     link_url: str
