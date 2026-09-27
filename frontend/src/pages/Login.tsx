@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Layout from '@/components/Layout';
 import { toast } from 'sonner';
-import { authApi } from '@/lib/auth';
+import { authApi, NEXT_PATH_STORAGE_KEY } from '@/lib/auth';
 import { getAPIBaseURL } from '@/lib/config';
 import { AlertTriangle, Gift } from 'lucide-react';
 import { INVITE_TOKEN_STORAGE_KEY } from '@/components/ComingSoonGate';
@@ -167,6 +167,13 @@ export default function LoginPage() {
       return;
     }
     localStorage.removeItem(INVITE_TOKEN_STORAGE_KEY);
+    // Google vuelve a /auth/callback; allí recogemos a dónde quería ir.
+    try {
+      if (nextPath) sessionStorage.setItem(NEXT_PATH_STORAGE_KEY, nextPath);
+      else sessionStorage.removeItem(NEXT_PATH_STORAGE_KEY);
+    } catch {
+      /* sin almacenamiento: vuelve a la portada */
+    }
     const ageParam = mode === 'register' && ageConfirmed ? '1' : '0';
     window.location.href = `${getAPIBaseURL()}/api/v1/auth/google/login?age_confirmed=${ageParam}`;
   };
@@ -194,7 +201,7 @@ export default function LoginPage() {
         toast.success('Sesión iniciada');
       }
       localStorage.removeItem(INVITE_TOKEN_STORAGE_KEY);
-      window.location.href = mode === 'register' ? '/?welcome=1' : nextPath || '/';
+      window.location.href = nextPath || (mode === 'register' ? '/?welcome=1' : '/');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Algo salió mal';
       if (mode === 'login' && message.includes('incorrectos')) setWrongPassword(true);

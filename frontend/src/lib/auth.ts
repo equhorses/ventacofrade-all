@@ -118,3 +118,6 @@ class RPApi {
 }
 
 export const authApi = new RPApi();
+
+// A dónde volver tras entrar con Google (se guarda antes de salir hacia Google).
+export const NEXT_PATH_STORAGE_KEY = 'vc_login_next';

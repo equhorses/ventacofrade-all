@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { saveToken } from '@/lib/auth';
+import { saveToken, NEXT_PATH_STORAGE_KEY } from '@/lib/auth';
 
 // This page receives the redirect from the backend after a Google login,
 // which arrives with either ?token=... (success) or ?error=... (failure).
@@ -17,7 +17,15 @@ export default function AuthCallback() {
     if (token) {
       saveToken(token);
       toast.success('Sesión iniciada con Google');
-      navigate(isNewUser ? '/?welcome=1' : '/', { replace: true });
+      let next = '';
+      try {
+        next = sessionStorage.getItem(NEXT_PATH_STORAGE_KEY) || '';
+        sessionStorage.removeItem(NEXT_PATH_STORAGE_KEY);
+      } catch {
+        /* sin almacenamiento */
+      }
+      const safeNext = next.startsWith('/') && !next.startsWith('//') ? next : '';
+      navigate(safeNext || (isNewUser ? '/?welcome=1' : '/'), { replace: true });
       window.location.reload(); // refresh so the header picks up the logged-in user
     } else {
       toast.error(error || 'No se pudo iniciar sesión con Google');

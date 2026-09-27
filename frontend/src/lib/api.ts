@@ -276,7 +276,10 @@ export const client = {
       }
     },
     toLogin() {
-      window.location.href = '/login';
+      // Vuelve a la página donde estaba (p. ej. /publicar) al terminar de entrar.
+      const here = window.location.pathname + window.location.search;
+      const skip = here === '/' || here.startsWith('/login') || here.startsWith('/auth/');
+      window.location.href = skip ? '/login' : `/login?next=${encodeURIComponent(here)}`;
     },
   },
   entities: {
