@@ -272,6 +272,8 @@ async def create_seller_profiles(
             if invitation:
                 now = datetime.now(timezone.utc)
                 invitation.status = "redeemed"
+                # Todo invitado es Fundador (regalo de lanzamiento, septiembre 2026).
+                result.is_founder = True
                 invitation.redeemed_by_user_id = str(current_user.id)
                 invitation.redeemed_at = now
 

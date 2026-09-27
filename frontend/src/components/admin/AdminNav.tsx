@@ -9,6 +9,7 @@ const TABS: { to: string; label: string; allowedRoles?: string[] }[] = [
   { to: '/admin', label: 'Resumen' },
   { to: '/admin/usuarios', label: 'Usuarios' },
   { to: '/admin/anuncios', label: 'Anuncios' },
+  { to: '/admin/atascados', label: 'Atascados', allowedRoles: ['soporte'] },
   { to: '/admin/mensajes', label: 'Mensajes', allowedRoles: ['soporte'] },
   { to: '/admin/vendedores', label: 'Vendedores', allowedRoles: ['marketing'] },
   { to: '/admin/publicidad', label: 'Publicidad', allowedRoles: ['marketing'] },

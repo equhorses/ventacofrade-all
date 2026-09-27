@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Layout from '@/components/Layout';
-import { client } from '@/lib/api';
+import { client, trackEvent } from '@/lib/api';
 import { Upload, ImagePlus, X, Loader2, Sparkles, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -55,6 +55,7 @@ export default function PublicarPage() {
   useEffect(() => {
     checkAuth();
     loadCategories();
+    trackEvent('publish_started');
   }, []);
 
   useEffect(() => {
@@ -132,6 +133,12 @@ export default function PublicarPage() {
       } catch (err) {
         console.error('Error uploading image:', err);
         toast.error(`No se pudo subir ${file.name}`);
+        trackEvent(
+          'upload_failed',
+          `${file.name} (${file.type || 'sin tipo'}, ${(file.size / 1024 / 1024).toFixed(1)} MB): ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
       } finally {
         setUploadingCount((c) => c - 1);
       }
@@ -197,6 +204,8 @@ export default function PublicarPage() {
       console.error('Error creating product:', err);
       const backendMessage = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
       toast.error(backendMessage || 'Error al publicar. Inténtalo de nuevo.');
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      trackEvent('publish_failed', `${status ? `error ${status}` : 'sin conexión'}: ${backendMessage || ''}`);
     } finally {
       setLoading(false);
     }

@@ -27,6 +27,10 @@ http.interceptors.response.use(
   (error) => {
     const status = error?.response?.status;
     const url: string = error?.config?.url || '';
+    const method = String(error?.config?.method || 'get').toLowerCase();
+    if ((!status || status >= 500) && method !== 'get' && !url.includes('/api/v1/events')) {
+      trackEvent('api_error', `${method.toUpperCase()} ${url.replace(/^https?:\/\/[^/]+/, '')} → ${status || 'sin conexión'}`);
+    }
     const hadToken = !!getStoredToken();
     if (status === 401 && hadToken && !url.includes('/api/v1/auth/') && !sessionExpiredHandled) {
       sessionExpiredHandled = true;
@@ -229,6 +233,34 @@ export interface LandingPage {
   related_landings: LandingSummary[];
   children: LandingSummary[];
   indexable: boolean;
+}
+
+export interface StuckUser {
+  email: string;
+  name: string | null;
+  has_account: boolean;
+  reason: string;
+  reason_label: string;
+  when: string | null;
+  detail: string | null;
+  origin: string;
+  last_help_at: string | null;
+}
+
+/** Aviso de un momento en que alguien se puede atascar (para Admin → Atascados). Nunca falla. */
+export function trackEvent(kind: 'publish_started' | 'publish_failed' | 'upload_failed' | 'api_error', detail?: string) {
+  try {
+    if (!getStoredToken()) return;
+    http
+      .post(`${baseUrl()}/api/v1/events`, {
+        kind,
+        detail: detail ? String(detail).slice(0, 1000) : undefined,
+        path: window.location.pathname.slice(0, 255),
+      })
+      .catch(() => undefined);
+  } catch {
+    // nunca rompe la web
+  }
 }
 
 export const client = {
@@ -497,6 +529,14 @@ export const client = {
     },
   },
   admin: {
+    async listStuck() {
+      const response = await http.get(`${baseUrl()}/api/v1/admin/atascados`);
+      return { data: response.data as { items: StuckUser[]; total: number } };
+    },
+    async sendHelp(email: string, reason: string) {
+      const response = await http.post(`${baseUrl()}/api/v1/admin/atascados/ayuda`, { email, reason });
+      return { data: response.data as { ok: boolean } };
+    },
     async listSellers(search?: string) {
       const response = await http.get(`${baseUrl()}/api/v1/admin/sellers`, {
         params: search ? { search } : {},

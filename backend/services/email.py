@@ -480,7 +480,9 @@ async def send_signup_expired_email(to_email: str) -> bool:
     )
 
 
-async def _send_via_resend(to_email: str, subject: str, html_content: str, log_label: str) -> bool:
+async def _send_via_resend(
+    to_email: str, subject: str, html_content: str, log_label: str, reply_to: Optional[str] = None
+) -> bool:
     """Shared sender for the emails below — keeps the Resend call in one place."""
     api_key = getattr(settings, "resend_api_key", None)
     from_email = getattr(settings, "resend_from_email", None)
@@ -490,6 +492,8 @@ async def _send_via_resend(to_email: str, subject: str, html_content: str, log_l
         return False
 
     payload = {"from": from_email, "to": [to_email], "subject": subject, "html": html_content}
+    if reply_to:
+        payload["reply_to"] = reply_to
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -722,54 +726,103 @@ async def send_google_account_hint_email(to_email: str) -> bool:
     return await _send_via_resend(to_email, "Cómo entrar en VentaCofrade", html, "pista cuenta de Google")
 
 
-async def send_rescue_forgot_password_email(to_email: str) -> bool:
-    """Para quien intentó entrar y falló la contraseña cuando aún no había forma de recuperarla."""
+# ---------------------------------------------------------------------------
+# Disculpas por los fallos de la salida (septiembre 2026)
+# ---------------------------------------------------------------------------
+APOLOGY_CTAS = {
+    "publicar": ("Publicar mi primer anuncio", f"{SITE_URL}/publicar"),
+    "con_anuncios": ("Ver mi tienda", f"{SITE_URL}/cuenta/tienda"),
+    "contrasena": ("Recuperar mi contraseña", f"{SITE_URL}/recuperar-contrasena"),
+    "registro": ("Crear mi cuenta", f"{SITE_URL}/login?modo=registro"),
+    "google": ("Crear mi cuenta", f"{SITE_URL}/login?modo=registro"),
+}
+APOLOGY_EXTRA = {
+    "contrasena": "<p>Si no recuerdas tu contraseña, ahora ya puedes crear una nueva en un minuto.</p>",
+    "google": "<p>Si te registras con Google, recuerda marcar antes la casilla «Soy mayor de 18 años»: "
+              "era justo lo que te dejó fuera la otra vez.</p>",
+    "registro": "<p>Regístrate con este mismo email y el regalo se activa solo.</p>",
+    "publicar": "<p>Publicar es gratis y se hace en dos minutos desde el móvil: una foto, un precio y listo.</p>",
+    "con_anuncios": "<p>Gracias por ser de los primeros en publicar. Ahora tienes también tu tienda propia "
+                    "para compartir todo tu catálogo con un solo enlace.</p>",
+}
+
+
+async def send_apology_email(to_email: str, group: str) -> bool:
+    button_text, button_url = APOLOGY_CTAS.get(group, APOLOGY_CTAS["publicar"])
     html = _email_shell(
-        "Ya puedes recuperar tu contraseña",
-        "<p>Hace poco intentaste entrar en VentaCofrade y no pudiste con tu contraseña. Lo sentimos: "
-        "entonces no había forma de recuperarla.</p>"
-        "<p>Ya la hay. Pulsa el botón, escribe tu email y te mandamos un enlace para crear una nueva.</p>",
-        "Recuperar mi contraseña",
-        f"{SITE_URL}/recuperar-contrasena",
+        "Nuestro primer izquierdo no fue del todo bien",
+        "<p>Las salidas siempre son complejas, y la nuestra también lo ha sido. 🙈</p>"
+        "<p>En estos primeros días algunos botones de nuestros emails llevaban a una página en blanco, "
+        "no había forma de recuperar la contraseña y el registro con Google dejaba fuera a quien no "
+        "marcaba una casilla. Ha sido culpa nuestra, lo sentimos de verdad. <strong>Ya está todo arreglado.</strong></p>"
+        "<p>Para compensarlo, te regalamos la <strong>insignia de Fundador</strong> y "
+        "<strong>12 meses del plan Profesional gratis</strong>: tus anuncios salen los primeros, tienes tu "
+        "propia tienda dentro de VentaCofrade y destacados incluidos cada mes.</p>"
+        + APOLOGY_EXTRA.get(group, "")
+        + "<p>Ahora sí: <strong>¡al cielo con ella!</strong></p>"
+        "<p>Daniel, de VentaCofrade</p>",
+        button_text,
+        button_url,
     )
-    return await _send_via_resend(to_email, "Ya puedes recuperar tu contraseña de VentaCofrade", html, "rescate: contraseña")
+    return await _send_via_resend(
+        to_email, "Perdón por la salida (y un regalo para ti)", html, f"disculpas: {group}",
+        reply_to="contacto@ventacofrade.com",
+    )
 
 
-async def send_rescue_google_age_email(to_email: str) -> bool:
-    """Para quien intentó registrarse con Google y se quedó fuera por la casilla de mayor de edad."""
+# ---------------------------------------------------------------------------
+# Mensaje de ayuda a quien se ha atascado (se envía desde Admin → Atascados)
+# ---------------------------------------------------------------------------
+HELP_MESSAGES = {
+    "publish_failed": (
+        "Vimos que al publicar tu anuncio te dio un error. Ha sido cosa nuestra, no tuya.",
+        "Volver a publicar", f"{SITE_URL}/publicar",
+    ),
+    "upload_failed": (
+        "Vimos que no se pudo subir alguna foto. Suele pasar con fotos muy pesadas o en formato HEIC del iPhone: "
+        "prueba con JPG o haz una captura de la foto y súbela.",
+        "Volver a publicar", f"{SITE_URL}/publicar",
+    ),
+    "api_error": (
+        "Vimos que la web te dio un error mientras la usabas. Ha sido cosa nuestra y ya lo estamos mirando.",
+        "Volver a VentaCofrade", f"{SITE_URL}/",
+    ),
+    "publish_abandoned": (
+        "Vimos que empezaste a publicar un anuncio y no llegaste a terminarlo. ¿Te surgió alguna duda?",
+        "Terminar mi anuncio", f"{SITE_URL}/publicar",
+    ),
+    "no_listing": (
+        "Ya tienes tu cuenta creada, pero todavía no has publicado nada. Publicar es gratis y se hace en dos minutos.",
+        "Publicar mi primer anuncio", f"{SITE_URL}/publicar",
+    ),
+    "login_failed": (
+        "Vimos que no pudiste entrar con tu contraseña. Puedes crear una nueva en un minuto.",
+        "Recuperar mi contraseña", f"{SITE_URL}/recuperar-contrasena",
+    ),
+    "reset_unfinished": (
+        "Pediste cambiar la contraseña y no llegaste a terminarlo. El enlace caduca en una hora, así que puedes "
+        "pedir uno nuevo cuando quieras.",
+        "Crear una contraseña nueva", f"{SITE_URL}/recuperar-contrasena",
+    ),
+    "google_age": (
+        "Intentaste registrarte con Google y no se completó porque faltaba marcar la casilla de mayor de edad. "
+        "Márcala y vuelve a pulsar «Continuar con Google».",
+        "Crear mi cuenta", f"{SITE_URL}/login?modo=registro",
+    ),
+}
+
+
+async def send_help_email(to_email: str, reason: str) -> bool:
+    text, button_text, button_url = HELP_MESSAGES.get(reason, HELP_MESSAGES["no_listing"])
     html = _email_shell(
-        "Tu registro no llegó a completarse",
-        "<p>Intentaste crear tu cuenta en VentaCofrade con Google, pero faltó marcar la casilla "
-        "«Soy mayor de 18 años» y el registro no se completó. Fue culpa nuestra por no avisarlo bien.</p>"
-        "<p>Ya lo hemos arreglado: pulsa el botón, marca la casilla y vuelve a pulsar «Continuar con Google».</p>",
-        "Crear mi cuenta",
-        f"{SITE_URL}/login?modo=registro",
+        "¿Te echamos una mano?",
+        f"<p>Hola. {text}</p>"
+        "<p>Si quieres, contéstanos a este email contándonos qué te ha pasado y te ayudamos personalmente. "
+        "Si tienes muchos artículos, también podemos ayudarte a subirlos.</p>",
+        button_text,
+        button_url,
     )
-    return await _send_via_resend(to_email, "Termina de crear tu cuenta en VentaCofrade", html, "rescate: registro Google")
-
-
-async def send_rescue_publish_email(to_email: str) -> bool:
-    """Para quien se registró y no publicó: los emails anteriores llevaban a una página en blanco."""
-    html = _email_shell(
-        "Perdona, el enlace no funcionaba",
-        "<p>Te escribimos hace unos días para que publicaras tu primer anuncio en VentaCofrade, pero el "
-        "botón llevaba a una página en blanco. Ha sido un fallo nuestro y ya está arreglado.</p>"
-        "<p>Publicar es gratis y se hace en dos minutos desde el móvil: una foto, un precio y listo.</p>",
-        "Publicar mi primer anuncio",
-        f"{SITE_URL}/publicar",
+    return await _send_via_resend(
+        to_email, "¿Te echamos una mano con VentaCofrade?", html, f"ayuda: {reason}",
+        reply_to="contacto@ventacofrade.com",
     )
-    return await _send_via_resend(to_email, "Perdona: ya puedes publicar en VentaCofrade", html, "rescate: publicar")
-
-
-async def send_rescue_signup_email(to_email: str) -> bool:
-    """Para invitados que no llegaron a crear cuenta: sus emails también llevaban a una página en blanco."""
-    html = _email_shell(
-        "Perdona, el enlace no funcionaba",
-        "<p>Te escribimos para invitarte a VentaCofrade, pero el botón del email llevaba a una página en "
-        "blanco. Ha sido un fallo nuestro y ya está arreglado.</p>"
-        "<p>Crear tu cuenta es gratis y publicar también. Si te registras con este mismo email, "
-        "te reconoceremos al momento.</p>",
-        "Crear mi cuenta",
-        f"{SITE_URL}/login?modo=registro",
-    )
-    return await _send_via_resend(to_email, "Perdona: ya puedes entrar en VentaCofrade", html, "rescate: registro")

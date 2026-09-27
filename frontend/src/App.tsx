@@ -38,6 +38,7 @@ import AdminAnunciosPage from './pages/admin/Anuncios';
 import AdminMensajesPage from './pages/admin/Mensajes';
 import AdminSeguridadPage from './pages/admin/Seguridad';
 import AdminAuditoriaPage from './pages/admin/Auditoria';
+import AdminAtascadosPage from './pages/admin/Atascados';
 import AdminPlataformasPage from './pages/admin/Plataformas';
 import ProtectedAdminRoute from './components/ProtectedAdminRoute';
 import { AuthProvider } from './contexts/AuthContext';
@@ -141,6 +142,14 @@ const AppRoutes = () => (
       element={
         <ProtectedAdminRoute allowedRoles={['seguridad']}>
           <AdminSeguridadPage />
+        </ProtectedAdminRoute>
+      }
+    />
+    <Route
+      path="/admin/atascados"
+      element={
+        <ProtectedAdminRoute allowedRoles={['soporte']}>
+          <AdminAtascadosPage />
         </ProtectedAdminRoute>
       }
     />
