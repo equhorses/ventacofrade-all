@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,7 @@ import Layout from '@/components/Layout';
 import { toast } from 'sonner';
 import { authApi } from '@/lib/auth';
 import { getAPIBaseURL } from '@/lib/config';
-import { Gift } from 'lucide-react';
+import { AlertTriangle, Gift } from 'lucide-react';
 import { INVITE_TOKEN_STORAGE_KEY } from '@/components/ComingSoonGate';
 
 const HCAPTCHA_SITE_KEY = import.meta.env.VITE_HCAPTCHA_SITE_KEY as string | undefined;
@@ -82,7 +82,17 @@ function GoogleIcon() {
 export default function LoginPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<'login' | 'register'>(
+    searchParams.get('modo') === 'registro' ? 'register' : 'login',
+  );
+  // Vuelve de Google sin haber marcado la casilla de mayor de edad (cuenta nueva).
+  const googleNeedsAge = searchParams.get('edad') === 'google';
+  const sessionExpired = searchParams.get('caducada') === '1';
+  const nextPath = (() => {
+    const next = searchParams.get('next') || '';
+    return next.startsWith('/') && !next.startsWith('//') ? next : '';
+  })();
+  const [wrongPassword, setWrongPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -184,9 +194,11 @@ export default function LoginPage() {
         toast.success('Sesión iniciada');
       }
       localStorage.removeItem(INVITE_TOKEN_STORAGE_KEY);
-      window.location.href = mode === 'register' ? '/?welcome=1' : '/';
+      window.location.href = mode === 'register' ? '/?welcome=1' : nextPath || '/';
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Algo salió mal');
+      const message = err instanceof Error ? err.message : 'Algo salió mal';
+      if (mode === 'login' && message.includes('incorrectos')) setWrongPassword(true);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -205,6 +217,20 @@ export default function LoginPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {sessionExpired && (
+              <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                Tu sesión ha caducado. Vuelve a entrar y seguirás donde lo dejaste.
+              </div>
+            )}
+            {googleNeedsAge && mode === 'register' && (
+              <div className="mb-5 flex gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                <span>
+                  Casi está: para crear tu cuenta, <strong>marca la casilla de abajo</strong> y vuelve a pulsar
+                  «Continuar con Google».
+                </span>
+              </div>
+            )}
             {pendingInvite && (
               <div className="mb-5 rounded-lg border border-purple-200 bg-purple-50 px-4 py-3 text-sm text-purple-900">
                 <div className="flex gap-2">
@@ -226,7 +252,13 @@ export default function LoginPage() {
               // Required for every new account, not just raffle invites.
               // Google Sign-In doesn't tell us the person's age, so this
               // self-declared checkbox is our age gate at signup time.
-              <label className="mb-5 flex items-start gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+              <label
+                className={`mb-5 flex items-start gap-2 text-sm cursor-pointer select-none ${
+                  googleNeedsAge && !ageConfirmed
+                    ? 'rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-amber-900 font-medium'
+                    : 'text-muted-foreground'
+                }`}
+              >
                 <input
                   type="checkbox"
                   checked={ageConfirmed}
@@ -296,6 +328,18 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Mínimo 8 caracteres"
                 />
+                {mode === 'login' && (
+                  <div className="text-right">
+                    <Link
+                      to={`/recuperar-contrasena${email ? `?email=${encodeURIComponent(email)}` : ''}`}
+                      className={`text-sm underline underline-offset-2 ${
+                        wrongPassword ? 'text-primary font-semibold' : 'text-muted-foreground hover:text-primary'
+                      }`}
+                    >
+                      ¿Has olvidado tu contraseña?
+                    </Link>
+                  </div>
+                )}
               </div>
               {mode === 'register' && HCAPTCHA_SITE_KEY && (
                 <div ref={captchaContainerRef} className="flex justify-center" />

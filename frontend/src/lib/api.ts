@@ -19,6 +19,25 @@ http.interceptors.request.use((config) => {
   return config;
 });
 
+// Si la sesión ha caducado, avisar y llevar a entrar de nuevo, en vez de dejar que
+// publicar o guardar fallen sin explicación.
+let sessionExpiredHandled = false;
+http.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status;
+    const url: string = error?.config?.url || '';
+    const hadToken = !!getStoredToken();
+    if (status === 401 && hadToken && !url.includes('/api/v1/auth/') && !sessionExpiredHandled) {
+      sessionExpiredHandled = true;
+      localStorage.removeItem('vc_auth_token');
+      const next = window.location.pathname + window.location.search;
+      window.location.href = `/login?caducada=1&next=${encodeURIComponent(next)}`;
+    }
+    return Promise.reject(error);
+  },
+);
+
 function baseUrl() {
   return getAPIBaseURL();
 }

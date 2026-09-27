@@ -287,7 +287,7 @@ async def send_nudge_not_published_email(to_email: str) -> bool:
       activo — solo te falta publicar tu primer anuncio para empezar a vender.</p>
       <p>Se hace en menos de 2 minutos: sube una foto, pon un precio, y listo.</p>
       <p style="margin-top: 24px;">
-        <a href="https://www.ventacofrade.com/cuenta/publicar" style="background-color:#6d28d9;
+        <a href="https://www.ventacofrade.com/publicar" style="background-color:#6d28d9;
         color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;">Publicar mi primer anuncio</a>
       </p>
       <p style="margin-top: 24px; color: #666; font-size: 13px;">
@@ -348,7 +348,7 @@ async def send_launch_campaign_catalog_email(to_email: str, name: str | None, in
         siempre — solo el acceso gratis pasaría a nuestro plan Free.
       </p>
       <p style="margin-top: 24px;">
-        <a href="https://www.ventacofrade.com/cuenta/publicar" style="background-color:#6d28d9;
+        <a href="https://www.ventacofrade.com/publicar" style="background-color:#6d28d9;
         color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;">Publicar mi primer artículo</a>
       </p>
       <p style="margin-top: 24px; color: #666; font-size: 13px;">
@@ -408,7 +408,7 @@ async def send_signup_early_checkin_email(to_email: str, deadline) -> bool:
       <p>Todavía te queda tiempo de sobra, pero si te has quedado atascado en
       algún paso o tienes dudas, responde a este email y te ayudamos encantados.</p>
       <p style="margin-top: 24px;">
-        <a href="https://www.ventacofrade.com/cuenta/publicar" style="background-color:#6d28d9;
+        <a href="https://www.ventacofrade.com/publicar" style="background-color:#6d28d9;
         color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;">Continuar con mi tienda</a>
       </p>
       <p style="margin-top: 24px; color: #666; font-size: 13px;">
@@ -437,7 +437,7 @@ async def send_finish_shop_reminder_email(to_email: str, deadline) -> bool:
       montar tu tienda antes del <strong>{deadline_str}</strong>.</p>
       <p>Se hace en un par de minutos: completa tu perfil de vendedor y estará listo.</p>
       <p style="margin-top: 24px;">
-        <a href="https://www.ventacofrade.com/cuenta/publicar" style="background-color:#6d28d9;
+        <a href="https://www.ventacofrade.com/publicar" style="background-color:#6d28d9;
         color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;">Terminar mi tienda</a>
       </p>
       <p style="margin-top: 24px; color: #666; font-size: 13px;">
@@ -465,7 +465,7 @@ async def send_signup_expired_email(to_email: str) -> bool:
       <p>Tu cuenta sigue activa con normalidad — puedes seguir usando VentaCofrade
       con nuestro plan Free en cualquier momento.</p>
       <p style="margin-top: 24px;">
-        <a href="https://www.ventacofrade.com/cuenta/publicar" style="background-color:#6d28d9;
+        <a href="https://www.ventacofrade.com/publicar" style="background-color:#6d28d9;
         color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;">Ir a mi cuenta</a>
       </p>
       <p style="margin-top: 24px; color: #666; font-size: 13px;">
@@ -522,7 +522,7 @@ async def send_raffle_prize_activated_email(to_email: str, deadline) -> bool:
         Si no lo haces en ese plazo, el premio podrá ofrecerse a otra persona.
       </p>
       <p style="margin-top: 24px;">
-        <a href="https://www.ventacofrade.com/cuenta/publicar" style="background-color:#6d28d9;
+        <a href="https://www.ventacofrade.com/publicar" style="background-color:#6d28d9;
         color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;">Publicar mi primer anuncio</a>
       </p>
       <p style="margin-top: 24px; color: #666; font-size: 13px;">
@@ -547,7 +547,7 @@ async def send_raffle_deadline_reminder_email(to_email: str, deadline) -> bool:
       <p>Tienes hasta el <strong>{deadline_str}</strong> para publicar al menos un anuncio real,
       o el premio podrá revocarse y ofrecerse a otra persona participante.</p>
       <p style="margin-top: 24px;">
-        <a href="https://www.ventacofrade.com/cuenta/publicar" style="background-color:#6d28d9;
+        <a href="https://www.ventacofrade.com/publicar" style="background-color:#6d28d9;
         color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;">Publicar ahora</a>
       </p>
     </div>
@@ -673,3 +673,103 @@ async def send_monthly_report_email(
     except httpx.HTTPError as exc:
         logger.error("Fallo al enviar informe mensual a %s: %s", to_email, exc)
         return False
+
+
+SITE_URL = "https://www.ventacofrade.com"
+
+
+def _email_shell(title: str, body_html: str, button_text: Optional[str] = None, button_url: Optional[str] = None) -> str:
+    button = (
+        f'<p style="margin-top: 24px;"><a href="{button_url}" style="background-color:#6d28d9;color:#fff;'
+        f'padding:10px 20px;border-radius:6px;text-decoration:none;">{button_text}</a></p>'
+        if button_text and button_url
+        else ""
+    )
+    return f"""
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
+      <h2 style="color: #6d28d9;">{title}</h2>
+      {body_html}
+      {button}
+      <p style="margin-top: 24px; color: #666; font-size: 13px;">
+        ¿Dudas? Escríbenos a <a href="mailto:contacto@ventacofrade.com">contacto@ventacofrade.com</a>.
+      </p>
+    </div>
+    """
+
+
+async def send_password_reset_email(to_email: str, reset_url: str) -> bool:
+    html = _email_shell(
+        "Crea una contraseña nueva",
+        "<p>Hemos recibido una petición para cambiar la contraseña de tu cuenta de VentaCofrade.</p>"
+        "<p>Pulsa el botón para elegir una nueva. El enlace caduca en 1 hora y solo sirve una vez.</p>"
+        "<p style='color:#666;font-size:13px;'>Si no lo has pedido tú, ignora este email: tu contraseña no cambia.</p>",
+        "Crear contraseña nueva",
+        reset_url,
+    )
+    return await _send_via_resend(to_email, "Crea una contraseña nueva en VentaCofrade", html, "restablecer contraseña")
+
+
+async def send_google_account_hint_email(to_email: str) -> bool:
+    html = _email_shell(
+        "Tu cuenta entra con Google",
+        "<p>Has pedido cambiar la contraseña, pero tu cuenta de VentaCofrade se creó con Google, así que no "
+        "tiene contraseña propia.</p>"
+        "<p>Para entrar, pulsa <strong>«Continuar con Google»</strong> en la página de acceso y elige esta "
+        "misma cuenta de Google.</p>",
+        "Ir a iniciar sesión",
+        f"{SITE_URL}/login",
+    )
+    return await _send_via_resend(to_email, "Cómo entrar en VentaCofrade", html, "pista cuenta de Google")
+
+
+async def send_rescue_forgot_password_email(to_email: str) -> bool:
+    """Para quien intentó entrar y falló la contraseña cuando aún no había forma de recuperarla."""
+    html = _email_shell(
+        "Ya puedes recuperar tu contraseña",
+        "<p>Hace poco intentaste entrar en VentaCofrade y no pudiste con tu contraseña. Lo sentimos: "
+        "entonces no había forma de recuperarla.</p>"
+        "<p>Ya la hay. Pulsa el botón, escribe tu email y te mandamos un enlace para crear una nueva.</p>",
+        "Recuperar mi contraseña",
+        f"{SITE_URL}/recuperar-contrasena",
+    )
+    return await _send_via_resend(to_email, "Ya puedes recuperar tu contraseña de VentaCofrade", html, "rescate: contraseña")
+
+
+async def send_rescue_google_age_email(to_email: str) -> bool:
+    """Para quien intentó registrarse con Google y se quedó fuera por la casilla de mayor de edad."""
+    html = _email_shell(
+        "Tu registro no llegó a completarse",
+        "<p>Intentaste crear tu cuenta en VentaCofrade con Google, pero faltó marcar la casilla "
+        "«Soy mayor de 18 años» y el registro no se completó. Fue culpa nuestra por no avisarlo bien.</p>"
+        "<p>Ya lo hemos arreglado: pulsa el botón, marca la casilla y vuelve a pulsar «Continuar con Google».</p>",
+        "Crear mi cuenta",
+        f"{SITE_URL}/login?modo=registro",
+    )
+    return await _send_via_resend(to_email, "Termina de crear tu cuenta en VentaCofrade", html, "rescate: registro Google")
+
+
+async def send_rescue_publish_email(to_email: str) -> bool:
+    """Para quien se registró y no publicó: los emails anteriores llevaban a una página en blanco."""
+    html = _email_shell(
+        "Perdona, el enlace no funcionaba",
+        "<p>Te escribimos hace unos días para que publicaras tu primer anuncio en VentaCofrade, pero el "
+        "botón llevaba a una página en blanco. Ha sido un fallo nuestro y ya está arreglado.</p>"
+        "<p>Publicar es gratis y se hace en dos minutos desde el móvil: una foto, un precio y listo.</p>",
+        "Publicar mi primer anuncio",
+        f"{SITE_URL}/publicar",
+    )
+    return await _send_via_resend(to_email, "Perdona: ya puedes publicar en VentaCofrade", html, "rescate: publicar")
+
+
+async def send_rescue_signup_email(to_email: str) -> bool:
+    """Para invitados que no llegaron a crear cuenta: sus emails también llevaban a una página en blanco."""
+    html = _email_shell(
+        "Perdona, el enlace no funcionaba",
+        "<p>Te escribimos para invitarte a VentaCofrade, pero el botón del email llevaba a una página en "
+        "blanco. Ha sido un fallo nuestro y ya está arreglado.</p>"
+        "<p>Crear tu cuenta es gratis y publicar también. Si te registras con este mismo email, "
+        "te reconoceremos al momento.</p>",
+        "Crear mi cuenta",
+        f"{SITE_URL}/login?modo=registro",
+    )
+    return await _send_via_resend(to_email, "Perdona: ya puedes entrar en VentaCofrade", html, "rescate: registro")

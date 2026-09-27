@@ -92,6 +92,26 @@ class RPApi {
     }
   }
 
+  async forgotPassword(email: string): Promise<string> {
+    try {
+      const response = await this.client.post(`${this.getBaseURL()}/api/v1/auth/forgot-password`, { email });
+      return response.data.message as string;
+    } catch (error: any) {
+      throw new Error(error.response?.data?.detail || 'No se pudo enviar el email. Inténtalo de nuevo.');
+    }
+  }
+
+  async resetPassword(token: string, password: string) {
+    try {
+      const response = await this.client.post(`${this.getBaseURL()}/api/v1/auth/reset-password`, { token, password });
+      setStoredToken(response.data.token);
+      return response.data.user;
+    } catch (error: any) {
+      const detail = error.response?.data?.detail;
+      throw new Error(typeof detail === 'string' ? detail : 'No se pudo cambiar la contraseña');
+    }
+  }
+
   async logout() {
     clearStoredToken();
   }

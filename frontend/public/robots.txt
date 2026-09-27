@@ -3,6 +3,7 @@ Allow: /
 Disallow: /admin
 Disallow: /cuenta
 Disallow: /auth/
+Disallow: /restablecer-contrasena
 
 # Asistentes y buscadores de IA: acceso permitido explícitamente
 User-agent: GPTBot

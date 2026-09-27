@@ -17,6 +17,14 @@ from schemas.auth import (
 from services.auth import AuthService
 from services.audit import log_login_attempt, is_locked_out
 from services.hcaptcha import verify_hcaptcha_token
+from services import password_reset
+from services.email import send_google_account_hint_email, send_password_reset_email
+from core.security import hash_password
+from models.auth import User
+from models.audit import LoginAttempt
+from pydantic import BaseModel, EmailStr, Field
+from sqlalchemy import func, select
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/api/v1/auth", tags=["authentication"])
@@ -27,6 +35,9 @@ GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo"
 GOOGLE_STATE_COOKIE = "google_oauth_state"
 GOOGLE_AGE_CONFIRMED_COOKIE = "google_oauth_age_confirmed"
+AGE_REQUIRED_DETAIL = "Debes confirmar que eres mayor de 18 años para crear una cuenta"
+SITE_URL = "https://www.ventacofrade.com"
+RESET_REQUESTS_PER_HOUR = 3
 
 
 @router.post("/register", response_model=AuthTokenResponse, status_code=status.HTTP_201_CREATED)
@@ -222,6 +233,13 @@ async def google_callback(
             db, email=email, method="google", success=False,
             reason=str(exc.detail)[:255], ip_address=client_ip, user_agent=user_agent,
         )
+        if exc.detail == AGE_REQUIRED_DETAIL:
+            # Cuenta nueva sin marcar la casilla: en vez de echarle, le devolvemos al registro
+            # con la casilla resaltada para que la marque y vuelva a pulsar Google.
+            return RedirectResponse(
+                url=f"{frontend_url}/login?{urlencode({'modo': 'registro', 'edad': 'google'})}",
+                status_code=status.HTTP_302_FOUND,
+            )
         return redirect_with_error(str(exc.detail))
 
     await log_login_attempt(
@@ -254,3 +272,92 @@ async def logout():
     """Logout user. The token is stateless (JWT), so logging out is handled
     client-side by discarding the stored token."""
     return {"success": True}
+
+
+# ---------------------------------------------------------------------------
+# Recuperar contraseña
+# ---------------------------------------------------------------------------
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(min_length=10, max_length=500)
+    password: str = Field(min_length=8, max_length=128)
+
+
+FORGOT_OK = {
+    "ok": True,
+    "message": "Si hay una cuenta con ese email, te hemos enviado un enlace para crear una contraseña nueva.",
+}
+
+
+@router.post("/forgot-password")
+async def forgot_password(payload: ForgotPasswordRequest, request: Request, db: AsyncSession = Depends(get_db)):
+    """Envía el enlace para restablecer la contraseña. Responde siempre lo mismo,
+    exista o no la cuenta, para no revelar qué emails están registrados."""
+    email = payload.email.strip().lower()
+    client_ip = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent", "")[:255]
+
+    since = datetime.now(timezone.utc) - timedelta(hours=1)
+    recent = (
+        await db.execute(
+            select(func.count()).select_from(LoginAttempt).where(
+                LoginAttempt.email == email, LoginAttempt.method == "reset", LoginAttempt.created_at >= since
+            )
+        )
+    ).scalar_one()
+    if recent >= RESET_REQUESTS_PER_HOUR:
+        return FORGOT_OK
+
+    user = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
+    reason = "sin cuenta"
+    if user and user.account_status != "banned":
+        if user.password_hash:
+            token = password_reset.make_token(user.id, user.password_hash)
+            sent = await send_password_reset_email(email, f"{SITE_URL}/restablecer-contrasena?token={token}")
+            reason = "enlace enviado" if sent else "fallo al enviar email"
+        else:
+            sent = await send_google_account_hint_email(email)
+            reason = "cuenta de Google: pista enviada" if sent else "fallo al enviar email"
+
+    await log_login_attempt(
+        db, email=email, method="reset", success=False, reason=f"Petición de nueva contraseña: {reason}",
+        ip_address=client_ip, user_agent=user_agent,
+    )
+    return FORGOT_OK
+
+
+@router.post("/reset-password", response_model=AuthTokenResponse)
+async def reset_password(payload: ResetPasswordRequest, request: Request, db: AsyncSession = Depends(get_db)):
+    """Guarda la contraseña nueva y deja la sesión iniciada."""
+    invalid = HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="El enlace no es válido o ha caducado. Pide uno nuevo desde «¿Has olvidado tu contraseña?».",
+    )
+    data = password_reset.read_token(payload.token)
+    if not data:
+        raise invalid
+    user_id, fingerprint = data
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    if not user or user.account_status == "banned":
+        raise invalid
+    if not password_reset.matches_current_password(fingerprint, user.password_hash):
+        raise invalid  # ya se usó (la contraseña cambió después de pedir el enlace)
+
+    user.password_hash = hash_password(payload.password)
+    user.last_login = datetime.now(timezone.utc)
+    if user.account_status == "suspended":
+        user.account_status = "active"
+        user.suspended_at = None
+    await db.commit()
+    await db.refresh(user)
+
+    await log_login_attempt(
+        db, email=user.email, method="reset", success=True, reason="Contraseña cambiada",
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent", "")[:255],
+    )
+    token, _, _ = await AuthService(db).issue_app_token(user=user)
+    return AuthTokenResponse(token=token, user=UserResponse.model_validate(user))

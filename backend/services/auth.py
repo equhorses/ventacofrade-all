@@ -153,10 +153,11 @@ class AuthService:
     ) -> Tuple[str, datetime, Dict[str, Any]]:
         """Generate application JWT token for the authenticated user."""
         try:
-            expires_minutes = int(getattr(settings, "jwt_expire_minutes", 60))
+            # 30 días por defecto: con 60 minutos la gente se quedaba sin sesión a mitad de publicar.
+            expires_minutes = int(getattr(settings, "jwt_expire_minutes", 60 * 24 * 30))
         except (TypeError, ValueError):
-            logger.warning("Invalid JWT_EXPIRE_MINUTES value; fallback to 60 minutes")
-            expires_minutes = 60
+            logger.warning("Invalid JWT_EXPIRE_MINUTES value; fallback to 30 days")
+            expires_minutes = 60 * 24 * 30
         expires_at = datetime.now(timezone.utc) + timedelta(minutes=expires_minutes)
 
         claims: Dict[str, Any] = {

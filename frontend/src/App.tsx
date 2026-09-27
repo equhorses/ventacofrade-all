@@ -17,6 +17,9 @@ import Publicidad from './pages/Publicidad';
 import AuthCallback from './pages/AuthCallback';
 import AuthError from './pages/AuthError';
 import Login from './pages/Login';
+import RecuperarContrasenaPage from './pages/RecuperarContrasena';
+import RestablecerContrasenaPage from './pages/RestablecerContrasena';
+import NoEncontradaPage from './pages/NoEncontrada';
 import PerfilPage from './pages/cuenta/Perfil';
 import MisAnunciosPage from './pages/cuenta/MisAnuncios';
 import MensajesPage from './pages/cuenta/Mensajes';
@@ -70,6 +73,10 @@ const AppRoutes = () => (
     <Route path="/legal/bases-sorteo" element={<BasesSorteo />} />
     <Route path="/favoritos" element={<Explorar />} />
     <Route path="/login" element={<Login />} />
+    <Route path="/recuperar-contrasena" element={<RecuperarContrasenaPage />} />
+    <Route path="/restablecer-contrasena" element={<RestablecerContrasenaPage />} />
+    {/* Enlace antiguo de algunos emails: lleva a la página real de publicar. */}
+    <Route path="/cuenta/publicar" element={<Navigate to="/publicar" replace />} />
     <Route path="/cuenta" element={<Navigate to="/cuenta/perfil" replace />} />
     <Route path="/cuenta/perfil" element={<PerfilPage />} />
     <Route path="/cuenta/anuncios" element={<MisAnunciosPage />} />
@@ -163,6 +170,7 @@ const AppRoutes = () => (
     />
     <Route path="/auth/callback" element={<AuthCallback />} />
     <Route path="/auth/error" element={<AuthError />} />
+    <Route path="*" element={<NoEncontradaPage />} />
   </Routes>
 );
 
