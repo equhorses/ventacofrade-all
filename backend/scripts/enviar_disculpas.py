@@ -10,7 +10,11 @@ Cada persona recibe UN email con el botón que le sirve:
 Uso (consola del BACKEND de Railway, no la de Postgres):
   python scripts/enviar_disculpas.py                 -> solo lista a quién iría (no envía nada)
   python scripts/enviar_disculpas.py --prueba tu@email.com   -> te lo manda solo a ti para verlo
-  python scripts/enviar_disculpas.py --enviar        -> envía a todos
+  python scripts/enviar_disculpas.py --enviar        -> envía (como mucho 90 por tanda; repetir al día
+                                                        siguiente manda a los que faltan)
+
+Se descartan solos los correos de prueba y los mal escritos (gmail.con, hotmsil.com...),
+que rebotarían y perjudican la reputación del dominio.
 
 Quien ya lo recibió no lo vuelve a recibir (queda en la auditoría como "rescue_email").
 """
@@ -18,6 +22,7 @@ Quien ya lo recibió no lo vuelve a recibir (queda en la auditoría como "rescue
 import argparse
 import asyncio
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -36,6 +41,25 @@ from services.email import send_apology_email  # noqa: E402
 AGE_REASON = "Debes confirmar que eres mayor de 18 años para crear una cuenta"
 WRONG_PASSWORD = "Email o contraseña incorrectos"
 ORDER = ["contrasena", "google", "publicar", "con_anuncios", "registro"]
+BATCH_DEFAULT = 90  # el plan gratis de Resend permite 100 al día; dejamos margen para los avisos
+
+TYPO_DOMAINS = {
+    "gmail.con", "gmail.co", "gmial.com", "gmai.com", "gmal.com", "gamil.com",
+    "hotmsil.com", "hotmial.com", "hotmai.com", "hotmail.con", "hotmal.com",
+    "yahoo.ed", "yahoo.con", "yaho.es", "yahoo.e", "outlook.con",
+}
+TEST_LOCAL = re.compile(r"^(prueba|test|demo|ejemplo)[\d._-]*$")
+
+
+def discard_reason(email: str) -> str:
+    local, _, domain = email.partition("@")
+    if not domain or "." not in domain:
+        return "correo sin dominio válido"
+    if domain in TYPO_DOMAINS or domain.endswith((".con", ".ed")):
+        return "dominio mal escrito"
+    if TEST_LOCAL.match(local) or domain in {"example.com", "test.com", "ventacofrade.com"}:
+        return "cuenta de prueba"
+    return ""
 
 
 async def collect(db) -> list[tuple[str, str, str]]:
@@ -101,6 +125,7 @@ async def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--enviar", action="store_true")
     parser.add_argument("--prueba", metavar="EMAIL")
+    parser.add_argument("--max", type=int, default=BATCH_DEFAULT, help="máximo de envíos en esta tanda")
     args = parser.parse_args()
 
     if not db_manager.async_session_maker:
@@ -113,27 +138,43 @@ async def main() -> None:
 
     async with db_manager.async_session_maker() as db:
         rows = await collect(db)
+        discarded = [(r[0], discard_reason(r[0])) for r in rows if discard_reason(r[0])]
+        rows = [r for r in rows if not discard_reason(r[0])]
         for g in ORDER:
             subset = [r for r in rows if r[1] == g]
             print(f"\n== {g}: {len(subset)}")
             for email, _, origin in subset:
                 print(f"   {email:45s} ({origin})")
-        print(f"\nTotal: {len(rows)} personas")
+        if discarded:
+            print(f"\n== descartados (no se envían): {len(discarded)}")
+            for email, why in discarded:
+                print(f"   {email:45s} ({why})")
+        print(f"\nTotal a enviar: {len(rows)} personas")
+        if len(rows) > args.max:
+            print(f"Se envían {args.max} en esta tanda; el resto, repitiendo el comando mañana.")
 
         if not args.enviar:
             print("No se ha enviado nada. Para enviar: python scripts/enviar_disculpas.py --enviar")
             return
 
-        sent = failed = 0
-        for email, g, _ in rows:
+        sent = failed = streak = 0
+        for email, g, _ in rows[: args.max]:
             if await send_apology_email(email, g):
                 sent += 1
+                streak = 0
                 await log_admin_action(db, None, "system", "rescue_email", target=email, details=f"disculpas:{g}")
             else:
                 failed += 1
+                streak += 1
                 print(f"   FALLÓ {email}")
+                if streak >= 5:
+                    print("   5 fallos seguidos: paro (probablemente el límite diario de Resend). Repite mañana.")
+                    break
             await asyncio.sleep(0.6)  # margen frente al límite de Resend
-        print(f"\nTerminado: {sent} enviados, {failed} fallidos.")
+        pending = len(rows) - sent
+        print(f"\nTerminado: {sent} enviados, {failed} fallidos, {pending} pendientes.")
+        if pending:
+            print("Para los pendientes: python scripts/enviar_disculpas.py --enviar (mañana)")
 
 
 if __name__ == "__main__":
