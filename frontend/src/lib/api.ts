@@ -505,10 +505,11 @@ export const client = {
       });
       return { data: response.data as { consent: CatalogConsent; already: boolean } };
     },
-    async platformList(sellerEmail: string, url: string) {
+    async platformList(sellerEmail: string, url: string, keywords?: string) {
       const response = await http.post(`${baseUrl()}/api/v1/catalog-import/platform/list`, {
         seller_email: sellerEmail,
         url,
+        keywords: keywords || undefined,
       });
       return {
         data: response.data as { platform: 'todocoleccion' | 'wallapop'; items: PlatformListItem[]; seller: CatalogFileSeller },

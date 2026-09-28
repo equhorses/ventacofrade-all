@@ -17,7 +17,7 @@ import json
 import logging
 import re
 from typing import Optional
-from urllib.parse import parse_qs, urljoin, urlparse
+from urllib.parse import parse_qs, quote_plus, urljoin, urlparse
 
 from services import catalog_import as ci
 
@@ -63,18 +63,48 @@ def source_key(url: str) -> str:
         if m:
             return f"wallapop:{m.group(1).lower()}"
     raise ci.ImportErrorForUser(
-        "Pega la dirección de la TIENDA del vendedor: en Todocolección, todocoleccion.net/tienda/SUNOMBRE; "
+        "Pega la dirección del vendedor: en Todocolección, su tienda (todocoleccion.net/tienda/NOMBRE) "
+        "o su perfil (todocoleccion.net/usuario/NOMBRE); "
         "en Wallapop, la dirección de su perfil (es.wallapop.com/user/...)."
     )
 
 
 def _tc_nick(url: str) -> Optional[str]:
+    """Nombre del vendedor en la dirección: /tienda/X, /usuario/X, ?tienda=X o ?identificadorvendedor=X."""
     parsed = urlparse(url)
-    m = re.match(r"^/tienda/([^/?#]+)", parsed.path)
+    m = re.match(r"^/(?:tienda|usuario)/([^/?#]+)", parsed.path)
     if m:
         return m.group(1)
-    tienda = parse_qs(parsed.query).get("tienda")
-    return tienda[0] if tienda else None
+    query = parse_qs(parsed.query)
+    for key in ("tienda", "identificadorvendedor"):
+        if query.get(key):
+            return query[key][0]
+    return None
+
+
+async def _tc_catalog_filter(client, url: str) -> str:
+    """Parámetro del catálogo de Todocolección con todos los lotes en venta del vendedor."""
+    parsed = urlparse(url)
+    query = parse_qs(parsed.query)
+    if query.get("identificadorvendedor"):
+        return "identificadorvendedor=" + quote_plus(query["identificadorvendedor"][0])
+    if query.get("tienda"):
+        return "tienda=" + quote_plus(query["tienda"][0])
+    m = re.match(r"^/tienda/([^/?#]+)", parsed.path)
+    if m:
+        return "tienda=" + quote_plus(m.group(1))
+    if re.match(r"^/usuario/[^/?#]+", parsed.path):
+        # El perfil enlaza a "todos sus lotes" con su identificador de vendedor (p. ej. Antiguedades_Riera).
+        html = await _get_html(client, f"https://{TC_HOST}{parsed.path}")
+        found = re.search(r"identificadorvendedor=([^\"'&<>\s]+)", html)
+        if found:
+            return "identificadorvendedor=" + quote_plus(htmllib.unescape(found.group(1)))
+        shop = re.search(r"todocoleccion\.net/tienda/([a-z0-9_-]+)", html, re.I)
+        if shop:
+            return "tienda=" + quote_plus(shop.group(1))
+        raise PlatformBlocked("No encontramos los lotes en venta de ese perfil. Prueba con la dirección de su tienda.")
+    source_key(url)  # lanza el error explicativo
+    return ""
 
 
 async def _get_html(client, url: str) -> str:
@@ -147,19 +177,25 @@ def _tc_list_page(html: str, page_url: str) -> list[dict]:
     return list(items.values())
 
 
-async def _tc_list(client, url: str) -> list[dict]:
-    nick = _tc_nick(url)
-    if not nick:
-        source_key(url)  # lanza el error explicativo
+async def _tc_list(client, url: str, keywords: Optional[str] = None) -> list[dict]:
+    seller = await _tc_catalog_filter(client, url)
+    search = f"&bu={quote_plus(keywords.strip())}" if keywords and keywords.strip() else ""
     found: dict[str, dict] = {}
     for page in range(1, LIST_MAX_PAGES + 1):
-        page_url = f"https://{TC_HOST}/s/catalogo?P={page}&tienda={nick}"
+        page_url = f"https://{TC_HOST}/s/catalogo?P={page}&{seller}{search}"
         html = await _get_html(client, page_url)
         new = 0
         for it in _tc_list_page(html, page_url):
             if it["source_url"] not in found:
                 found[it["source_url"]] = it
                 new += 1
+        if page == 1 and not new and search:
+            # Si la búsqueda por palabras no funciona, se lee todo el catálogo.
+            search = ""
+            html = await _get_html(client, f"https://{TC_HOST}/s/catalogo?P=1&{seller}")
+            for it in _tc_list_page(html, page_url):
+                found.setdefault(it["source_url"], it)
+            new = len(found)
         if not new or len(found) >= LIST_MAX_ITEMS:
             break
         await asyncio.sleep(PAGE_PAUSE)
@@ -321,13 +357,13 @@ def _wp_detail(html: str, url: str) -> dict:
 
 
 # ---------- Puntos de entrada ----------
-async def list_items(url: str) -> tuple[str, list[dict]]:
+async def list_items(url: str, keywords: Optional[str] = None) -> tuple[str, list[dict]]:
     url = ci.normalize_url(url)
     platform = platform_of(url)
     if not platform:
         raise ci.ImportErrorForUser("Esta opción es solo para tiendas de Todocolección o perfiles de Wallapop.")
     async with ci.http_client() as client:
-        items = await (_tc_list(client, url) if platform == "todocoleccion" else _wp_list(client, url))
+        items = await (_tc_list(client, url, keywords) if platform == "todocoleccion" else _wp_list(client, url))
     if not items:
         raise PlatformBlocked(
             "No hemos encontrado anuncios en esa tienda. Comprueba la dirección o usa la opción del Excel + fotos."

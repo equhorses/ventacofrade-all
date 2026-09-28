@@ -200,6 +200,8 @@ export default function ImportarCatalogoPage() {
   const [consent, setConsent] = useState<CatalogConsent | null>(null);
   const [consentChecked, setConsentChecked] = useState(false);
   const [platform, setPlatform] = useState<'todocoleccion' | 'wallapop' | null>(null);
+  const [keywords, setKeywords] = useState('');
+  const [filter, setFilter] = useState('');
 
   useEffect(() => {
     Promise.all([client.catalogImport.status(), client.entities.categories.query({ sort: 'order_index', limit: 50 })])
@@ -359,7 +361,7 @@ export default function ImportarCatalogoPage() {
     setPhase('working');
     setProgress({ label: 'Leyendo la lista de sus anuncios, página a página… (puede tardar un par de minutos)', value: 25 });
     try {
-      const { data } = await client.catalogImport.platformList(sellerEmail.trim(), platformUrl.trim());
+      const { data } = await client.catalogImport.platformList(sellerEmail.trim(), platformUrl.trim(), keywords.trim());
       setSeller(data.seller);
       setPlatform(data.platform);
       setRows(
@@ -748,8 +750,19 @@ export default function ImportarCatalogoPage() {
                     setPlatformUrl(e.target.value);
                     setConsentChecked(false);
                   }}
-                  placeholder="todocoleccion.net/tienda/SUNOMBRE  o  es.wallapop.com/user/..."
+                  placeholder="todocoleccion.net/usuario/NOMBRE  o  es.wallapop.com/user/..."
                 />
+              </div>
+              <div className="space-y-1">
+                <Label>Solo los que tengan estas palabras (opcional)</Label>
+                <Input
+                  value={keywords}
+                  onChange={(e) => setKeywords(e.target.value)}
+                  placeholder="Ej. semana santa"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Útil si tiene miles de lotes de todo tipo. Solo en Todocolección; sin palabras se traen todos (hasta 2.000).
+                </p>
               </div>
               {consentChecked && (
                 <div className="rounded-md bg-muted/60 p-3 text-sm">
@@ -797,7 +810,12 @@ export default function ImportarCatalogoPage() {
   }
 
   // phase === 'review'
-  const allSelected = rows.length > 0 && rows.every((r) => r.selected);
+  const filterNorm = filter.trim().toLowerCase();
+  const visibleRows = filterNorm
+    ? rows.filter((r) => `${r.title} ${r.description}`.toLowerCase().includes(filterNorm))
+    : rows;
+  const visibleKeys = new Set(visibleRows.map((r) => r.key));
+  const allSelected = visibleRows.length > 0 && visibleRows.every((r) => r.selected);
   return (
     <AccountLayout
       title="Elige qué importar"
@@ -872,16 +890,24 @@ export default function ImportarCatalogoPage() {
           <label className="flex items-center gap-2 text-sm cursor-pointer">
             <Checkbox
               checked={allSelected}
-              onCheckedChange={(v) => setRows((prev) => prev.map((r) => ({ ...r, selected: v === true })))}
+              onCheckedChange={(v) =>
+                setRows((prev) => prev.map((r) => (visibleKeys.has(r.key) ? { ...r, selected: v === true } : r)))
+              }
             />
-            Marcar todos ({rows.length})
+            Marcar todos ({visibleRows.length})
           </label>
+          <Input
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder="Filtrar: virgen, candelabro, bordado…"
+            className="max-w-xs h-8"
+          />
           <Button variant="ghost" size="sm" onClick={startOver} className="cursor-pointer text-muted-foreground">
             Empezar de nuevo
           </Button>
         </div>
 
-        {rows.map((r) => {
+        {visibleRows.map((r) => {
           const miss = missing(r);
           const hasError = showErrors && r.selected && miss.length > 0;
           return (

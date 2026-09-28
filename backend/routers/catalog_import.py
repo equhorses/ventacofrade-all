@@ -359,6 +359,7 @@ async def _accepted_consent(db: AsyncSession, seller: UserResponse, url: str) ->
 class PlatformRequest(BaseModel):
     seller_email: str
     url: str
+    keywords: Optional[str] = None  # solo lista los que coincidan (p. ej. "semana santa")
 
 
 @router.post("/platform/consent-request")
@@ -457,7 +458,7 @@ async def platform_list(
     seller = await _target_user(db, payload.seller_email)
     await _accepted_consent(db, seller, payload.url)
     try:
-        platform, items = await pi.list_items(payload.url)
+        platform, items = await pi.list_items(payload.url, payload.keywords)
     except ci.ImportErrorForUser as e:
         raise HTTPException(status_code=400, detail=str(e))
     titles = set(
