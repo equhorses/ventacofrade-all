@@ -194,6 +194,52 @@ export interface CatalogItem {
   already_published: boolean;
 }
 
+export interface CatalogFileItem {
+  title: string;
+  description: string | null;
+  price: number | null;
+  category: string | null;
+  condition: string;
+  ref: string | null;
+  photos: string[];
+  already_published: boolean;
+}
+
+export interface CatalogFileSeller {
+  email: string;
+  name: string | null;
+  shop_name: string | null;
+  province: string | null;
+  city: string | null;
+  published: number;
+}
+
+export interface CatalogConsent {
+  id: number;
+  status: 'pending' | 'accepted' | 'revoked';
+  source_url: string;
+  consent_text: string;
+  created_at: string | null;
+  accepted_at: string | null;
+}
+
+export interface PlatformListItem {
+  source_url: string;
+  title: string;
+  price: number | null;
+  images: string[];
+  already_published: boolean;
+}
+
+export interface PlatformDetail {
+  source_url: string;
+  title?: string;
+  description?: string | null;
+  price?: number | null;
+  images?: string[];
+  error?: string;
+}
+
 export interface CatalogPublishItem {
   title: string;
   description?: string;
@@ -445,7 +491,62 @@ export const client = {
       });
       return { data: response.data as { source: 'shopify' | 'woocommerce' | 'web'; items: CatalogItem[] } };
     },
-    async publish(data: { location_province: string; location_city?: string; items: CatalogPublishItem[] }) {
+    // Solo admin: Todocolección / Wallapop con autorización del vendedor.
+    async consentStatus(sellerEmail: string, url: string) {
+      const response = await http.get(`${baseUrl()}/api/v1/catalog-import/platform/consent`, {
+        params: { seller_email: sellerEmail, url },
+      });
+      return { data: response.data as { consent: CatalogConsent | null } };
+    },
+    async consentRequest(sellerEmail: string, url: string) {
+      const response = await http.post(`${baseUrl()}/api/v1/catalog-import/platform/consent-request`, {
+        seller_email: sellerEmail,
+        url,
+      });
+      return { data: response.data as { consent: CatalogConsent; already: boolean } };
+    },
+    async platformList(sellerEmail: string, url: string) {
+      const response = await http.post(`${baseUrl()}/api/v1/catalog-import/platform/list`, {
+        seller_email: sellerEmail,
+        url,
+      });
+      return {
+        data: response.data as { platform: 'todocoleccion' | 'wallapop'; items: PlatformListItem[]; seller: CatalogFileSeller },
+      };
+    },
+    async platformDetails(sellerEmail: string, url: string, itemUrls: string[]) {
+      const response = await http.post(`${baseUrl()}/api/v1/catalog-import/platform/details`, {
+        seller_email: sellerEmail,
+        url,
+        item_urls: itemUrls,
+      });
+      return { data: response.data as { items: PlatformDetail[] } };
+    },
+    // El vendedor: ver y aceptar la autorización que se le pide por el mensajero.
+    async getConsent(id: number) {
+      const response = await http.get(`${baseUrl()}/api/v1/catalog-import/consents/${id}`);
+      return { data: response.data as CatalogConsent };
+    },
+    async acceptConsent(id: number) {
+      const response = await http.post(`${baseUrl()}/api/v1/catalog-import/consents/${id}/accept`, { accept: true });
+      return { data: response.data as CatalogConsent };
+    },
+    // Solo admin: lee el Excel/CSV del catálogo de otro vendedor.
+    async parseFile(file: File, sellerEmail: string) {
+      const form = new FormData();
+      form.append('file', file);
+      form.append('seller_email', sellerEmail);
+      const response = await http.post(`${baseUrl()}/api/v1/catalog-import/parse-file`, form);
+      return {
+        data: response.data as { items: CatalogFileItem[]; skipped: number; columns: string[]; seller: CatalogFileSeller },
+      };
+    },
+    async publish(data: {
+      location_province: string;
+      location_city?: string;
+      items: CatalogPublishItem[];
+      seller_email?: string;
+    }) {
       const response = await http.post(`${baseUrl()}/api/v1/catalog-import/publish`, data);
       return {
         data: response.data as { created: number; without_photos: number; vacation_mode: boolean; product_ids: number[] },

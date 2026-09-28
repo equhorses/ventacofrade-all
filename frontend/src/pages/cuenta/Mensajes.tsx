@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { client } from '@/lib/api';
 import { MessageCircle, Church } from 'lucide-react';
+import { stripConsentMarker } from '@/components/ConsentCard';
 
 interface Conversation {
   product_id: number;
@@ -93,7 +94,7 @@ export default function MensajesPage() {
                     <p className="text-xs text-muted-foreground truncate mb-0.5">Sobre: {c.product_title}</p>
                     <p className={`text-sm truncate ${c.unread_count > 0 ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
                       {c.last_message_is_mine && <span className="text-muted-foreground">Tú: </span>}
-                      {c.last_message}
+                      {stripConsentMarker(c.last_message)}
                     </p>
                   </div>
 

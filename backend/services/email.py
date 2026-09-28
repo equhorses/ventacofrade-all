@@ -835,3 +835,20 @@ async def send_help_email(to_email: str, reason: str) -> bool:
         to_email, "¿Te echamos una mano con VentaCofrade?", html, f"ayuda: {reason}",
         reply_to="contacto@ventacofrade.com",
     )
+
+
+async def send_new_support_message_email(to_email: str, name: Optional[str], preview: str, thread_url: str) -> bool:
+    """Aviso de que VentaCofrade le ha escrito por el mensajero (p. ej. para pedir una autorización)."""
+    hello = f"Hola {html_escape(name)}," if name else "Hola,"
+    body = (
+        f"<p>{hello}</p>"
+        f"<p>Te hemos escrito un mensaje en VentaCofrade:</p>"
+        f"<p style='background:#fff;border-left:3px solid #6d28d9;padding:10px 14px;color:#3f3f46;'>{html_escape(preview)}</p>"
+    )
+    return await _send_via_resend(
+        to_email,
+        "Tienes un mensaje de VentaCofrade",
+        _email_shell("Tienes un mensaje", body, "Ver el mensaje", thread_url),
+        "mensaje de soporte",
+        reply_to="contacto@ventacofrade.com",
+    )

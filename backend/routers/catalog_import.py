@@ -3,24 +3,45 @@
   GET  /status   → si puede usarlo y qué web tiene en su perfil
   POST /fetch    → lee los productos de su web (Shopify, WooCommerce o cualquier web)
   POST /publish  → publica los elegidos (máx. 20 por tanda); las fotos se copian a nuestro bucket
+
+Solo admin:
+  POST /parse-file → lee un Excel/CSV con el catálogo de un vendedor (sin web propia, p. ej. el de
+                     Importamatic de Todocolección) para publicarlo en SU cuenta con /publish + seller_email.
+  Todocolección / Wallapop, con autorización del vendedor por el mensajero:
+  POST /platform/consent-request → le escribe por el mensajero pidiéndole permiso (con casilla)
+  GET  /platform/consent         → estado de la autorización
+  POST /platform/list            → lista rápida de sus anuncios (para marcar solo los cofrades)
+  POST /platform/details         → descripción y fotos de los marcados
+
+El vendedor:
+  GET  /consents/{id}         → ver la autorización que se le pide
+  POST /consents/{id}/accept  → aceptarla (queda registrado texto, fecha, IP y navegador)
 """
 
 import asyncio
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db
 from dependencies.auth import get_current_user
+from models.auth import User
+from models.catalog_import_consents import CatalogImportConsent
 from models.categories import Categories
+from models.messages import Messages
 from models.products import Products
 from models.seller_profiles import Seller_profiles
 from schemas.auth import UserResponse
 from services import catalog_import as ci
+from services.audit import log_admin_action
+from services.catalog_file import MAX_FILE_BYTES, CatalogFileError, parse_catalog_file
+from services import platform_import as pi
 from services.seller_plans import TIER_PRO, seller_tier
 from services.storage import StorageNotConfiguredError, StorageService
 
@@ -127,6 +148,59 @@ class PublishRequest(BaseModel):
     location_province: str
     location_city: Optional[str] = None
     items: list[PublishItem] = Field(min_length=1)
+    # Solo admin: publicar en la cuenta de otro vendedor (importación desde archivo).
+    seller_email: Optional[str] = None
+
+
+async def _target_user(db: AsyncSession, email: str) -> UserResponse:
+    normalized = (email or "").strip().lower()
+    if not normalized:
+        raise HTTPException(status_code=400, detail="Escribe el email de la cuenta del vendedor.")
+    user = (
+        await db.execute(select(User).where(func.lower(User.email) == normalized).limit(1))
+    ).scalar_one_or_none()
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="No hay ninguna cuenta con ese email. El vendedor tiene que registrarse primero (gratis).",
+        )
+    if user.account_status == "banned":
+        raise HTTPException(status_code=400, detail="Esa cuenta está bloqueada.")
+    return UserResponse.model_validate(user)
+
+
+@router.post("/parse-file")
+async def parse_file(
+    file: UploadFile = File(...),
+    seller_email: str = Form(...),
+    current_user: UserResponse = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Solo el administrador puede importar para otro vendedor.")
+    seller = await _target_user(db, seller_email)
+    data = await file.read(MAX_FILE_BYTES + 1)
+    try:
+        parsed = parse_catalog_file(file.filename or "", data)
+    except CatalogFileError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    titles = (
+        await db.execute(select(func.lower(Products.title)).where(Products.user_id == str(seller.id)))
+    ).scalars().all()
+    existing = set(titles)
+    for it in parsed["items"]:
+        it["already_published"] = it["title"].lower() in existing
+    profile = await _profile(db, str(seller.id))
+    parsed["seller"] = {
+        "email": seller.email,
+        "name": seller.name,
+        "shop_name": profile.shop_name if profile else None,
+        "province": profile.province if profile else None,
+        "city": profile.city if profile else None,
+        "published": len(titles),
+    }
+    return parsed
 
 
 @router.post("/publish")
@@ -135,8 +209,18 @@ async def publish(
     current_user: UserResponse = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    user_id = str(current_user.id)
-    profile = await _require_pro(db, current_user)
+    on_behalf = bool(payload.seller_email)
+    if on_behalf:
+        if current_user.role != "admin":
+            raise HTTPException(status_code=403, detail="Solo el administrador puede publicar para otro vendedor.")
+        from routers.seller_profiles import ensure_seller_profile
+
+        seller = await _target_user(db, payload.seller_email)
+        profile = await ensure_seller_profile(db, seller)
+        user_id = str(seller.id)
+    else:
+        user_id = str(current_user.id)
+        profile = await _require_pro(db, current_user)
     if len(payload.items) > PUBLISH_BATCH_MAX:
         raise HTTPException(status_code=400, detail=f"Máximo {PUBLISH_BATCH_MAX} anuncios por tanda.")
     if payload.location_province not in PROVINCES:
@@ -199,9 +283,281 @@ async def publish(
         created.append(product)
     await db.commit()
     logger.info("Importar catálogo: user=%s publicados=%s", user_id, len(created))
+    if on_behalf:
+        await log_admin_action(
+            db, current_user.id, current_user.email, "catalog_import_for_seller",
+            target=payload.seller_email.strip().lower(), details=f"{len(created)} anuncios",
+        )
     return {
         "created": len(created),
         "without_photos": without_photos,
         "vacation_mode": vacation,
         "product_ids": [p.id for p in created],
     }
+
+
+
+# ---------- Todocolección / Wallapop con autorización del vendedor ----------
+PLATFORM_NAMES = {"todocoleccion": "Todocolección", "wallapop": "Wallapop"}
+CONSENT_MARKER = "[[autorizacion-catalogo:{id}]]"
+SUPPORT_PRODUCT_ID = 0
+
+
+def _consent_text(platform: str, url: str) -> str:
+    name = PLATFORM_NAMES.get(platform, platform)
+    return (
+        f"Autorizo a VentaCofrade a copiar los anuncios de mi tienda en {name} ({url}) que elijamos, "
+        "con sus títulos, descripciones, precios y fotos, y a publicarlos en mi cuenta de VentaCofrade. "
+        "Declaro que esos anuncios, sus textos y sus fotos son míos. "
+        "Puedo cambiar, pausar o borrar cualquiera de ellos cuando quiera desde «Mis anuncios»."
+    )
+
+
+def _require_admin(current_user: UserResponse):
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Solo el administrador puede hacer esto.")
+
+
+def _consent_out(c: Optional[CatalogImportConsent]) -> Optional[dict]:
+    if not c:
+        return None
+    return {
+        "id": c.id,
+        "status": c.status,
+        "source_url": c.source_url,
+        "consent_text": c.consent_text,
+        "created_at": c.created_at,
+        "accepted_at": c.accepted_at,
+    }
+
+
+async def _latest_consent(db: AsyncSession, user_id: str, key: str) -> Optional[CatalogImportConsent]:
+    return (
+        await db.execute(
+            select(CatalogImportConsent)
+            .where(CatalogImportConsent.user_id == user_id, CatalogImportConsent.source_key == key)
+            .order_by(CatalogImportConsent.id.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+
+
+async def _accepted_consent(db: AsyncSession, seller: UserResponse, url: str) -> tuple[str, CatalogImportConsent]:
+    try:
+        key = pi.source_key(ci.normalize_url(url))
+    except ci.ImportErrorForUser as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    consent = await _latest_consent(db, str(seller.id), key)
+    if not consent or consent.status != "accepted":
+        raise HTTPException(
+            status_code=403,
+            detail="El vendedor todavía no ha aceptado la autorización para esa tienda. Pídesela primero.",
+        )
+    return key, consent
+
+
+class PlatformRequest(BaseModel):
+    seller_email: str
+    url: str
+
+
+@router.post("/platform/consent-request")
+async def platform_consent_request(
+    payload: PlatformRequest,
+    current_user: UserResponse = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    _require_admin(current_user)
+    seller = await _target_user(db, payload.seller_email)
+    try:
+        url = ci.normalize_url(payload.url)
+        key = pi.source_key(url)
+    except ci.ImportErrorForUser as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    platform = key.split(":", 1)[0]
+
+    existing = await _latest_consent(db, str(seller.id), key)
+    if existing and existing.status in ("accepted", "pending"):
+        return {"consent": _consent_out(existing), "already": True}
+
+    consent = CatalogImportConsent(
+        user_id=str(seller.id),
+        email=seller.email.lower(),
+        source_key=key,
+        source_url=url,
+        consent_text=_consent_text(platform, url),
+        status="pending",
+        requested_by_email=current_user.email,
+    )
+    db.add(consent)
+    await db.flush()
+
+    name = PLATFORM_NAMES[platform]
+    hello = f"Hola {seller.name.split()[0]}" if seller.name else "Hola"
+    text = (
+        f"{hello}, para que no tengas que subir tu catálogo a mano, podemos traer a VentaCofrade "
+        f"tus anuncios de {name}, con sus fotos, descripciones y precios. "
+        "Solo subiremos los artículos cofrades, y los podrás cambiar o quitar cuando quieras.\n\n"
+        "Si te parece bien, marca la casilla de abajo y pulsa «Aceptar».\n\n"
+        + CONSENT_MARKER.format(id=consent.id)
+    )
+    message = Messages(
+        user_id=str(current_user.id),
+        receiver_id=str(seller.id),
+        product_id=SUPPORT_PRODUCT_ID,
+        content=text,
+        is_read=False,
+    )
+    db.add(message)
+    await db.flush()
+    consent.message_id = message.id
+    await db.commit()
+    await db.refresh(consent)
+
+    await log_admin_action(
+        db, current_user.id, current_user.email, "catalog_consent_requested", target=seller.email.lower(), details=key
+    )
+    try:
+        from services.email import SITE_URL, send_new_support_message_email
+
+        await send_new_support_message_email(
+            seller.email,
+            seller.name,
+            f"Podemos traer tus anuncios de {name} a VentaCofrade. Solo necesitamos tu permiso.",
+            f"{SITE_URL}/cuenta/mensajes/{SUPPORT_PRODUCT_ID}/{current_user.id}",
+        )
+    except Exception as exc:  # el aviso por email nunca debe impedir la petición
+        logger.warning("No se pudo avisar por email de la autorización: %s", exc)
+    return {"consent": _consent_out(consent), "already": False}
+
+
+@router.get("/platform/consent")
+async def platform_consent_status(
+    seller_email: str,
+    url: str,
+    current_user: UserResponse = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    _require_admin(current_user)
+    seller = await _target_user(db, seller_email)
+    try:
+        key = pi.source_key(ci.normalize_url(url))
+    except ci.ImportErrorForUser as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"consent": _consent_out(await _latest_consent(db, str(seller.id), key))}
+
+
+@router.post("/platform/list")
+async def platform_list(
+    payload: PlatformRequest,
+    current_user: UserResponse = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    _require_admin(current_user)
+    seller = await _target_user(db, payload.seller_email)
+    await _accepted_consent(db, seller, payload.url)
+    try:
+        platform, items = await pi.list_items(payload.url)
+    except ci.ImportErrorForUser as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    titles = set(
+        (await db.execute(select(func.lower(Products.title)).where(Products.user_id == str(seller.id)))).scalars().all()
+    )
+    for it in items:
+        it["already_published"] = it["title"].lower() in titles
+    profile = await _profile(db, str(seller.id))
+    return {
+        "platform": platform,
+        "items": items,
+        "seller": {
+            "email": seller.email,
+            "name": seller.name,
+            "shop_name": profile.shop_name if profile else None,
+            "province": profile.province if profile else None,
+            "city": profile.city if profile else None,
+            "published": len(titles),
+        },
+    }
+
+
+class PlatformDetailsRequest(PlatformRequest):
+    item_urls: list[str] = Field(min_length=1, max_length=pi.DETAIL_BATCH_MAX)
+
+
+@router.post("/platform/details")
+async def platform_details(
+    payload: PlatformDetailsRequest,
+    current_user: UserResponse = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    _require_admin(current_user)
+    seller = await _target_user(db, payload.seller_email)
+    key, _ = await _accepted_consent(db, seller, payload.url)
+    return {"items": await pi.item_details(payload.item_urls, key)}
+
+
+@router.get("/consents/{consent_id}")
+async def get_consent(
+    consent_id: int,
+    current_user: UserResponse = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    consent = await db.get(CatalogImportConsent, consent_id)
+    if not consent or (consent.user_id != str(current_user.id) and current_user.role != "admin"):
+        raise HTTPException(status_code=404, detail="Autorización no encontrada")
+    return _consent_out(consent)
+
+
+class AcceptConsentRequest(BaseModel):
+    accept: bool
+
+
+@router.post("/consents/{consent_id}/accept")
+async def accept_consent(
+    consent_id: int,
+    payload: AcceptConsentRequest,
+    request: Request,
+    current_user: UserResponse = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    consent = await db.get(CatalogImportConsent, consent_id)
+    if not consent or consent.user_id != str(current_user.id):
+        raise HTTPException(status_code=404, detail="Autorización no encontrada")
+    if not payload.accept:
+        raise HTTPException(status_code=400, detail="Marca la casilla para aceptar.")
+    if consent.status == "accepted":
+        return _consent_out(consent)
+    if consent.status != "pending":
+        raise HTTPException(status_code=400, detail="Esta autorización ya no está activa.")
+    forwarded = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+    consent.status = "accepted"
+    consent.accepted_at = datetime.now(timezone.utc)
+    consent.accepted_ip = (forwarded or (request.client.host if request.client else ""))[:100] or None
+    consent.accepted_user_agent = (request.headers.get("user-agent") or "")[:500] or None
+    await db.commit()
+    await db.refresh(consent)
+    await log_admin_action(
+        db, current_user.id, current_user.email, "catalog_consent_accepted",
+        target=consent.email, details=f"{consent.source_key} (ip {consent.accepted_ip})",
+    )
+    try:
+        import html as htmllib
+
+        from services.admin_alerts import alert_email
+        from services.email import SITE_URL, _email_shell, _send_via_resend
+
+        await _send_via_resend(
+            alert_email(),
+            f"Autorización aceptada: {consent.email}",
+            _email_shell(
+                "Autorización aceptada",
+                f"<p><strong>{htmllib.escape(consent.email)}</strong> ha aceptado que importemos sus anuncios de "
+                f"{htmllib.escape(consent.source_url)}.</p><p>Ya puedes traerlos desde Importar catálogo.</p>",
+                "Ir a Importar catálogo",
+                f"{SITE_URL}/cuenta/importar",
+            ),
+            "aviso autorización catálogo",
+        )
+    except Exception as exc:
+        logger.warning("No se pudo avisar de la autorización aceptada: %s", exc)
+    return _consent_out(consent)

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { client } from '@/lib/api';
 import { ArrowLeft, Send, Church } from 'lucide-react';
+import ConsentCard, { CONSENT_MARKER_RE, stripConsentMarker } from '@/components/ConsentCard';
 
 interface ThreadMessage {
   id: number;
@@ -162,7 +163,10 @@ export default function ConversacionPage() {
                       : 'bg-card border border-border rounded-bl-sm'
                   }`}
                 >
-                  <p className="whitespace-pre-line">{m.content}</p>
+                  <p className="whitespace-pre-line">{stripConsentMarker(m.content)}</p>
+                  {!m.is_mine && CONSENT_MARKER_RE.test(m.content) && (
+                    <ConsentCard consentId={Number(m.content.match(CONSENT_MARKER_RE)?.[1])} canAccept />
+                  )}
                   <p className={`text-[10px] mt-1 ${m.is_mine ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
                     {formatTime(m.created_at)}
                   </p>

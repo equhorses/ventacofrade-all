@@ -1,3 +1,4 @@
+import ConsentCard, { CONSENT_MARKER_RE, stripConsentMarker } from '@/components/ConsentCard';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -244,7 +245,10 @@ export default function AdminMensajesPage() {
                     m.is_from_staff ? 'bg-primary text-primary-foreground' : 'bg-background border'
                   }`}
                 >
-                  {m.content}
+                  <span className="whitespace-pre-line">{stripConsentMarker(m.content)}</span>
+                  {CONSENT_MARKER_RE.test(m.content) && (
+                    <ConsentCard consentId={Number(m.content.match(CONSENT_MARKER_RE)?.[1])} canAccept={false} />
+                  )}
                 </div>
               </div>
             ))}

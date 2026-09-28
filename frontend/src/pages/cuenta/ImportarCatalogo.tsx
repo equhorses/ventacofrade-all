@@ -10,16 +10,37 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { client, type CatalogImportStatus } from '@/lib/api';
-import { CheckCircle2, ChevronDown, ChevronUp, Crown, Download, Globe, ImageOff, Loader2 } from 'lucide-react';
+import {
+  client,
+  type CatalogConsent,
+  type CatalogFileItem,
+  type CatalogFileSeller,
+  type CatalogImportStatus,
+} from '@/lib/api';
+import {
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Crown,
+  Download,
+  ExternalLink,
+  FileSpreadsheet,
+  Globe,
+  ImageOff,
+  Loader2,
+  Store,
+} from 'lucide-react';
 
 // Importar el catálogo desde la web propia del vendedor (Shopify, WooCommerce o cualquier web).
+// El admin, además, puede importar para otro vendedor desde un Excel/CSV + sus fotos.
 
 const PROVINCES = [
   'Sevilla', 'Málaga', 'Cádiz', 'Córdoba', 'Granada', 'Huelva', 'Jaén', 'Almería',
   'Madrid', 'Barcelona', 'Valencia', 'Murcia', 'Otra',
 ];
 const BATCH = 20;
+const MAX_PHOTOS = 6;
+const UPLOAD_CONCURRENCY = 4;
 const DRAFT_KEY = 'vc_catalog_import_draft';
 
 interface Category {
@@ -37,6 +58,12 @@ interface Row {
   category_id: string;
   condition: string;
   images: string[];
+  // Fotos del ordenador (importación desde archivo); se suben al publicar.
+  local?: { file: File; url: string }[];
+  // Importación desde Todocolección / Wallapop: primero lista, luego se "preparan" los marcados.
+  source_url?: string;
+  prepared?: boolean;
+  prepError?: string;
   open: boolean;
 }
 
@@ -64,6 +91,89 @@ const missing = (r: Row) =>
     Boolean,
   ) as string[];
 
+// ---------- Importación desde archivo (admin) ----------
+const norm = (v: string) =>
+  v
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+const stem = (name: string) => name.toLowerCase().replace(/\.[a-z0-9]{2,5}$/, '');
+const IMAGE_RE = /\.(jpe?g|png|webp|gif|heic|heif)$/i;
+
+// Carpeta que contiene la foto (si eligió una carpeta con subcarpetas por artículo).
+function folderOf(f: File) {
+  const parts = ((f as File & { webkitRelativePath?: string }).webkitRelativePath || '').split('/');
+  return parts.length >= 3 ? parts[parts.length - 2] : '';
+}
+
+function refMatches(fileStem: string, ref: string) {
+  if (!fileStem.startsWith(ref)) return false;
+  const next = fileStem.charAt(ref.length);
+  if (!next || !/[a-z0-9]/.test(next)) return true; // 101.jpg, 101_1.jpg, 101-2.jpg, 101 (3).jpg
+  return /\d$/.test(ref) && /[a-z]/.test(next) && fileStem.length === ref.length + 1; // 101a.jpg
+}
+
+// Empareja las fotos de un artículo: por el nombre que pone el Excel, por la referencia o por la carpeta.
+function matchPhotos(item: CatalogFileItem, files: File[]): File[] {
+  const out: File[] = [];
+  const add = (f: File) => {
+    if (!out.includes(f)) out.push(f);
+  };
+  for (const p of item.photos) {
+    if (/^https?:/i.test(p)) continue;
+    const base = (p.split(/[\\/]/).pop() || '').toLowerCase();
+    files.forEach((f) => {
+      const n = f.name.toLowerCase();
+      if (n === base || stem(n) === stem(base)) add(f);
+    });
+  }
+  if (!out.length && item.ref) {
+    const ref = item.ref.toLowerCase().trim();
+    files.forEach((f) => {
+      if (refMatches(stem(f.name), ref) || (folderOf(f) && norm(folderOf(f)) === norm(ref))) add(f);
+    });
+  }
+  if (!out.length) {
+    const t = norm(item.title);
+    files.forEach((f) => {
+      const folder = folderOf(f);
+      if ((folder && norm(folder) === t) || norm(stem(f.name).replace(/[\s_-]*\(?\d{1,2}\)?$/, '')) === t) add(f);
+    });
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name, 'es', { numeric: true })).slice(0, MAX_PHOTOS);
+}
+
+function guessCategory(text: string | null, categories: Category[]) {
+  if (!text) return '';
+  const t = norm(text);
+  const exact = categories.find((c) => norm(c.name) === t);
+  const partial = categories.find((c) => {
+    const n = norm(c.name);
+    return n && (t.includes(n) || n.includes(t));
+  });
+  return String((exact || partial)?.id ?? '');
+}
+
+async function uploadAll(files: File[], onEach: () => void): Promise<Map<File, string>> {
+  const done = new Map<File, string>();
+  let next = 0;
+  const worker = async () => {
+    while (next < files.length) {
+      const f = files[next++];
+      try {
+        done.set(f, await client.storage.uploadImage(f, 'products'));
+      } catch {
+        // foto que no se pudo subir: el anuncio se publica con las demás
+      }
+      onEach();
+    }
+  };
+  await Promise.all(Array.from({ length: UPLOAD_CONCURRENCY }, worker));
+  return done;
+}
+
 const SOURCE_LABEL = { shopify: 'tu tienda Shopify', woocommerce: 'tu tienda WooCommerce', web: 'tu web' };
 
 export default function ImportarCatalogoPage() {
@@ -80,6 +190,16 @@ export default function ImportarCatalogoPage() {
   const [progress, setProgress] = useState({ label: '', value: 0 });
   const [showErrors, setShowErrors] = useState(false);
   const [result, setResult] = useState<{ created: number; withoutPhotos: number; vacation: boolean } | null>(null);
+  // Importación desde archivo para otro vendedor (solo admin)
+  const [sellerEmail, setSellerEmail] = useState('');
+  const [sheet, setSheet] = useState<File | null>(null);
+  const [photoFiles, setPhotoFiles] = useState<File[]>([]);
+  const [seller, setSeller] = useState<CatalogFileSeller | null>(null);
+  const fileMode = seller !== null; // importación para otro vendedor (archivo o plataforma)
+  const [platformUrl, setPlatformUrl] = useState('');
+  const [consent, setConsent] = useState<CatalogConsent | null>(null);
+  const [consentChecked, setConsentChecked] = useState(false);
+  const [platform, setPlatform] = useState<'todocoleccion' | 'wallapop' | null>(null);
 
   useEffect(() => {
     Promise.all([client.catalogImport.status(), client.entities.categories.query({ sort: 'order_index', limit: 50 })])
@@ -108,11 +228,13 @@ export default function ImportarCatalogoPage() {
 
   useEffect(() => {
     try {
-      if (phase === 'review' && rows.length) localStorage.setItem(DRAFT_KEY, JSON.stringify({ rows, province, city }));
+      // Las fotos del ordenador no se pueden guardar en un borrador: la importación desde archivo no se guarda.
+      if (phase === 'review' && rows.length && !fileMode)
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({ rows, province, city }));
     } catch {
       // sin almacenamiento
     }
-  }, [rows, province, city, phase]);
+  }, [rows, province, city, phase, fileMode]);
 
   const clearDraft = () => {
     try {
@@ -124,6 +246,7 @@ export default function ImportarCatalogoPage() {
 
   const selectedRows = useMemo(() => rows.filter((r) => r.selected), [rows]);
   const incomplete = selectedRows.filter((r) => missing(r).length > 0).length;
+  const unprepared = selectedRows.filter((r) => r.source_url && !r.prepared && !r.prepError).length;
 
   const update = (key: string, patch: Partial<Row>) =>
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
@@ -159,6 +282,154 @@ export default function ImportarCatalogoPage() {
     }
   };
 
+  const readFile = async () => {
+    if (!sellerEmail.trim() || !sheet) {
+      toast.error('Pon el email del vendedor y elige el Excel o CSV');
+      return;
+    }
+    setPhase('working');
+    setProgress({ label: 'Leyendo el archivo…', value: 30 });
+    try {
+      const { data } = await client.catalogImport.parseFile(sheet, sellerEmail.trim());
+      const images = photoFiles.filter((f) => IMAGE_RE.test(f.name));
+      const used = new Set<File>();
+      const newRows: Row[] = data.items.map((it, i) => {
+        const matched = matchPhotos(it, images);
+        matched.forEach((f) => used.add(f));
+        const remote = it.photos.filter((p) => /^https?:/i.test(p));
+        return {
+          key: `f${i}-${it.title}`,
+          selected: !it.already_published,
+          already: it.already_published,
+          title: it.title,
+          description: it.description || '',
+          price: it.price ? String(it.price).replace('.', ',') : '',
+          category_id: guessCategory(it.category, categories),
+          condition: it.condition || '',
+          images: remote.slice(0, Math.max(0, MAX_PHOTOS - matched.length)),
+          local: matched.map((file) => ({ file, url: URL.createObjectURL(file) })),
+          open: false,
+        };
+      });
+      setSeller(data.seller);
+      setRows(newRows);
+      setProvince(data.seller.province && PROVINCES.includes(data.seller.province) ? data.seller.province : '');
+      setCity(data.seller.city || '');
+      const withPhotos = newRows.filter((r) => (r.local?.length || 0) + r.images.length > 0).length;
+      const unused = images.length - used.size;
+      toast.success(
+        `${newRows.length} artículos leídos · ${withPhotos} con fotos` +
+          (unused > 0 ? ` · ${unused} fotos sin emparejar` : '') +
+          (data.skipped ? ` · ${data.skipped} filas sin título ignoradas` : ''),
+      );
+      setPhase('review');
+    } catch (err) {
+      toast.error(errorDetail(err, 'No se pudo leer el archivo'));
+      setPhase('start');
+    }
+  };
+
+  const checkConsent = async (ask: boolean) => {
+    if (!sellerEmail.trim() || !platformUrl.trim()) {
+      toast.error('Pon el email del vendedor y la dirección de su tienda');
+      return;
+    }
+    try {
+      if (ask) {
+        const { data } = await client.catalogImport.consentRequest(sellerEmail.trim(), platformUrl.trim());
+        setConsent(data.consent);
+        toast.success(
+          data.already
+            ? data.consent.status === 'accepted'
+              ? 'Ya la tenía aceptada'
+              : 'Ya se la habías pedido; sigue pendiente'
+            : 'Mensaje enviado. Te avisaremos en contacto@ cuando acepte',
+        );
+      } else {
+        const { data } = await client.catalogImport.consentStatus(sellerEmail.trim(), platformUrl.trim());
+        setConsent(data.consent);
+      }
+      setConsentChecked(true);
+    } catch (err) {
+      toast.error(errorDetail(err, 'No se pudo comprobar la autorización'));
+    }
+  };
+
+  const loadPlatformList = async () => {
+    setPhase('working');
+    setProgress({ label: 'Leyendo la lista de sus anuncios, página a página… (puede tardar un par de minutos)', value: 25 });
+    try {
+      const { data } = await client.catalogImport.platformList(sellerEmail.trim(), platformUrl.trim());
+      setSeller(data.seller);
+      setPlatform(data.platform);
+      setRows(
+        data.items.map((it, i) => ({
+          key: `p${i}-${it.source_url}`,
+          selected: false, // tiene cosas no cofrades: se marcan a mano
+          already: it.already_published,
+          title: it.title,
+          description: '',
+          price: it.price ? String(it.price).replace('.', ',') : '',
+          category_id: '',
+          condition: 'usado',
+          images: it.images,
+          source_url: it.source_url,
+          prepared: false,
+          open: false,
+        })),
+      );
+      setProvince(data.seller.province && PROVINCES.includes(data.seller.province) ? data.seller.province : '');
+      setCity(data.seller.city || '');
+      toast.success(`${data.items.length} anuncios encontrados. Marca los cofrades.`);
+      setPhase('review');
+    } catch (err) {
+      toast.error(errorDetail(err, 'No se pudo leer su tienda'));
+      setPhase('start');
+    }
+  };
+
+  const prepareSelected = async () => {
+    const pending = rows.filter((r) => r.selected && !r.prepared && !r.prepError && r.source_url);
+    if (!pending.length) return;
+    setPhase('working');
+    try {
+      for (let i = 0; i < pending.length; i += BATCH) {
+        const chunk = pending.slice(i, i + BATCH);
+        setProgress({
+          label: `Trayendo descripciones y fotos (${Math.min(i + BATCH, pending.length)} de ${pending.length})`,
+          value: Math.round((i / pending.length) * 100),
+        });
+        const { data } = await client.catalogImport.platformDetails(
+          sellerEmail.trim(),
+          platformUrl.trim(),
+          chunk.map((r) => r.source_url as string),
+        );
+        const byUrl = new Map(data.items.map((d) => [d.source_url, d]));
+        setRows((prev) =>
+          prev.map((r) => {
+            const d = r.source_url ? byUrl.get(r.source_url) : undefined;
+            if (!d) return r;
+            if (d.error) return { ...r, prepError: d.error };
+            return {
+              ...r,
+              prepared: true,
+              prepError: undefined,
+              title: r.title || d.title || '',
+              description: d.description || r.description,
+              price: d.price ? String(d.price).replace('.', ',') : r.price,
+              images: d.images?.length ? d.images : r.images,
+            };
+          }),
+        );
+      }
+      toast.success('Preparados. Revisa categorías y precios y publica.');
+    } catch (err) {
+      toast.error(errorDetail(err, 'Se interrumpió la preparación; los que faltan siguen marcados.'));
+    } finally {
+      setPhase('review');
+    }
+  };
+
   const applyBulk = () => {
     if (!bulkCategory && !bulkCondition) return;
     setRows((prev) =>
@@ -188,22 +459,35 @@ export default function ImportarCatalogoPage() {
     try {
       for (let i = 0; i < pending.length; i += BATCH) {
         const chunk = pending.slice(i, i + BATCH);
-        setProgress({
-          label: `Publicando y copiando fotos (${Math.min(i + BATCH, pending.length)} de ${pending.length})`,
-          value: Math.round((i / pending.length) * 100),
-        });
+        const label = `Publicando y copiando fotos (${Math.min(i + BATCH, pending.length)} de ${pending.length})`;
+        setProgress({ label, value: Math.round((i / pending.length) * 100) });
+        const localFiles = chunk.flatMap((r) => (r.local || []).map((l) => l.file));
+        let uploadedCount = 0;
+        const uploaded = localFiles.length
+          ? await uploadAll(localFiles, () => {
+              uploadedCount += 1;
+              setProgress({ label: `${label} · foto ${uploadedCount} de ${localFiles.length}`, value: Math.round((i / pending.length) * 100) });
+            })
+          : new Map<File, string>();
         const { data } = await client.catalogImport.publish({
           location_province: province,
           location_city: city.trim() || undefined,
+          seller_email: seller?.email,
           items: chunk.map((r) => ({
             title: r.title.trim(),
             description: r.description.trim() || undefined,
             price: parsePrice(r.price) as number,
             category_id: Number(r.category_id),
             condition: r.condition || 'nuevo',
-            images: r.images,
+            images: [
+              ...(r.local || []).map((l) => uploaded.get(l.file)).filter((u): u is string => !!u),
+              ...r.images,
+            ].slice(0, MAX_PHOTOS),
           })),
         });
+        total.withoutPhotos += chunk.filter(
+          (r) => (r.local || []).length > 0 && !(r.local || []).some((l) => uploaded.has(l.file)) && !r.images.length,
+        ).length;
         total.created += data.created;
         total.withoutPhotos += data.without_photos;
         total.vacation = data.vacation_mode;
@@ -226,9 +510,14 @@ export default function ImportarCatalogoPage() {
   const startOver = () => {
     if (rows.length && phase === 'review' && !window.confirm('¿Descartar la importación sin publicar?')) return;
     clearDraft();
+    rows.forEach((r) => r.local?.forEach((l) => URL.revokeObjectURL(l.url)));
     setRows([]);
     setResult(null);
     setShowErrors(false);
+    setSeller(null);
+    setSheet(null);
+    setPhotoFiles([]);
+    setPlatform(null);
     setPhase('start');
   };
 
@@ -307,9 +596,14 @@ export default function ImportarCatalogoPage() {
             <p className="text-lg font-semibold text-foreground">
               ¡{result.created} {result.created === 1 ? 'anuncio publicado' : 'anuncios publicados'}!
             </p>
+            {seller && (
+              <p className="text-sm text-muted-foreground">
+                En la cuenta de <strong>{seller.shop_name || seller.name || seller.email}</strong> ({seller.email}).
+              </p>
+            )}
             {result.withoutPhotos > 0 && (
               <p className="text-sm text-amber-800">
-                En {result.withoutPhotos} no se pudieron copiar las fotos desde tu web: añádelas desde «Mis anuncios».
+                En {result.withoutPhotos} no se pudieron copiar las fotos: se pueden añadir desde «Mis anuncios».
               </p>
             )}
             {result.vacation && (
@@ -366,6 +660,138 @@ export default function ImportarCatalogoPage() {
             </Button>
           </CardContent>
         </Card>
+        {status.is_admin && (
+          <Card className="mt-4 border-primary/40">
+            <CardContent className="p-6 space-y-4">
+              <div className="flex items-start gap-3">
+                <FileSpreadsheet className="h-6 w-6 text-primary shrink-0" />
+                <div className="space-y-1">
+                  <p className="font-semibold text-foreground">Solo admin: subir el catálogo de otro vendedor</p>
+                  <p className="text-sm text-muted-foreground">
+                    Con el Excel o CSV que nos manda (por ejemplo, el que usó en Importamatic de Todocolección) y sus
+                    fotos. Se publica en SU cuenta; antes lo revisas todo aquí.
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label>Email de la cuenta del vendedor</Label>
+                <Input
+                  type="email"
+                  value={sellerEmail}
+                  onChange={(e) => setSellerEmail(e.target.value)}
+                  placeholder="vendedor@correo.com"
+                />
+                <p className="text-xs text-muted-foreground">Tiene que haberse registrado antes en VentaCofrade.</p>
+              </div>
+              <div className="space-y-1">
+                <Label>Excel o CSV del catálogo</Label>
+                <Input type="file" accept=".xlsx,.xlsm,.csv,.txt" onChange={(e) => setSheet(e.target.files?.[0] || null)} />
+                <p className="text-xs text-muted-foreground">
+                  Primera fila con los nombres de las columnas: Título, Precio, Descripción y, si las tiene, Categoría,
+                  Estado, Referencia y Fotos.
+                </p>
+              </div>
+              <div className="space-y-1">
+                <Label>Carpeta de fotos</Label>
+                <input
+                  type="file"
+                  multiple
+                  // @ts-expect-error atributo no estándar: permite elegir una carpeta entera
+                  webkitdirectory=""
+                  onChange={(e) => setPhotoFiles(Array.from(e.target.files || []))}
+                  className="block text-sm"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {photoFiles.length
+                    ? `${photoFiles.filter((f) => IMAGE_RE.test(f.name)).length} fotos elegidas. `
+                    : ''}
+                  Se emparejan solas por el nombre del archivo que pone el Excel, por la referencia (101.jpg,
+                  101_2.jpg…) o por subcarpetas con el título o la referencia de cada artículo.
+                </p>
+              </div>
+              <Button onClick={readFile} disabled={!sellerEmail.trim() || !sheet} className="cursor-pointer">
+                <FileSpreadsheet className="h-4 w-4 mr-1" /> Leer el catálogo
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+        {status.is_admin && (
+          <Card className="mt-4 border-primary/40">
+            <CardContent className="p-6 space-y-4">
+              <div className="flex items-start gap-3">
+                <Store className="h-6 w-6 text-primary shrink-0" />
+                <div className="space-y-1">
+                  <p className="font-semibold text-foreground">Solo admin: traer sus anuncios de Todocolección o Wallapop</p>
+                  <p className="text-sm text-muted-foreground">
+                    Primero le pedimos permiso por el mensajero (marca una casilla y queda registrado). Cuando acepte,
+                    traes la lista de sus anuncios, marcas solo los cofrades y se publican en SU cuenta.
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label>Email de la cuenta del vendedor</Label>
+                <Input
+                  type="email"
+                  value={sellerEmail}
+                  onChange={(e) => {
+                    setSellerEmail(e.target.value);
+                    setConsentChecked(false);
+                  }}
+                  placeholder="vendedor@correo.com"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Dirección de su tienda</Label>
+                <Input
+                  value={platformUrl}
+                  onChange={(e) => {
+                    setPlatformUrl(e.target.value);
+                    setConsentChecked(false);
+                  }}
+                  placeholder="todocoleccion.net/tienda/SUNOMBRE  o  es.wallapop.com/user/..."
+                />
+              </div>
+              {consentChecked && (
+                <div className="rounded-md bg-muted/60 p-3 text-sm">
+                  {!consent && <p>Todavía no se le ha pedido autorización para esta tienda.</p>}
+                  {consent?.status === 'pending' && (
+                    <p>
+                      Autorización <strong>pendiente</strong>: se la pedimos el{' '}
+                      {consent.created_at ? new Date(consent.created_at).toLocaleDateString('es-ES') : ''}. Te llegará un
+                      aviso a contacto@ cuando la acepte.
+                    </p>
+                  )}
+                  {consent?.status === 'accepted' && (
+                    <p className="text-green-700 font-medium">
+                      Autorización aceptada el{' '}
+                      {consent.accepted_at ? new Date(consent.accepted_at).toLocaleString('es-ES') : ''}.
+                    </p>
+                  )}
+                </div>
+              )}
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => checkConsent(false)}
+                  disabled={!sellerEmail.trim() || !platformUrl.trim()}
+                  className="cursor-pointer"
+                >
+                  Comprobar autorización
+                </Button>
+                {consentChecked && !consent && (
+                  <Button onClick={() => checkConsent(true)} className="cursor-pointer">
+                    Pedirle autorización por el mensajero
+                  </Button>
+                )}
+                {consent?.status === 'accepted' && (
+                  <Button onClick={loadPlatformList} className="cursor-pointer">
+                    <Download className="h-4 w-4 mr-1" /> Traer la lista de sus anuncios
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </AccountLayout>
     );
   }
@@ -378,6 +804,12 @@ export default function ImportarCatalogoPage() {
       description="Marca los productos, ponles categoría y revisa los precios. Nada se publica hasta que pulses «Publicar»."
     >
       <div className="space-y-4 pb-28">
+        {seller && (
+          <div className="rounded-md border border-primary/40 bg-primary/5 p-3 text-sm">
+            Se publicará en la cuenta de <strong>{seller.shop_name || seller.name || seller.email}</strong> (
+            {seller.email}){seller.published > 0 && `, que ya tiene ${seller.published} anuncios`}.
+          </div>
+        )}
         <Card>
           <CardContent className="p-4 space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -463,8 +895,13 @@ export default function ImportarCatalogoPage() {
                     aria-label="Importar este producto"
                   />
                   <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-md overflow-hidden bg-muted shrink-0 flex items-center justify-center">
-                    {r.images[0] ? (
-                      <img src={r.images[0]} alt="" loading="lazy" className="w-full h-full object-cover" />
+                    {r.local?.[0] || r.images[0] ? (
+                      <img
+                        src={r.local?.[0]?.url || r.images[0]}
+                        alt=""
+                        loading="lazy"
+                        className="w-full h-full object-cover"
+                      />
                     ) : (
                       <ImageOff className="h-5 w-5 text-muted-foreground" />
                     )}
@@ -515,15 +952,40 @@ export default function ImportarCatalogoPage() {
                       className="text-xs text-primary flex items-center gap-1 cursor-pointer"
                     >
                       {r.open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                      {r.images.length} {r.images.length === 1 ? 'foto' : 'fotos'} · descripción
+                      {r.images.length + (r.local?.length || 0)}{' '}
+                      {r.images.length + (r.local?.length || 0) === 1 ? 'foto' : 'fotos'} · descripción
                     </button>
+                    {r.source_url && (
+                      <p className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
+                        {r.selected && !r.prepared && !r.prepError && (
+                          <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">Sin preparar</span>
+                        )}
+                        {r.prepared && <span className="bg-green-100 text-green-800 px-2 py-0.5 rounded-full">Preparado</span>}
+                        {r.prepError && <span className="text-destructive">No se pudo preparar: {r.prepError}</span>}
+                        <a href={r.source_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-primary">
+                          Ver el original <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </p>
+                    )}
                     {hasError && <p className="text-xs text-destructive">Falta: {miss.join(', ')}</p>}
                   </div>
                 </div>
                 {r.open && (
                   <div className="space-y-2 pl-7">
-                    {r.images.length > 0 && (
+                    {r.images.length + (r.local?.length || 0) > 0 && (
                       <div className="flex gap-2 flex-wrap">
+                        {(r.local || []).map((l, i) => (
+                          <div key={l.url} className="relative w-16 h-16 rounded-md overflow-hidden bg-muted">
+                            <img src={l.url} alt="" loading="lazy" className="w-full h-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => update(r.key, { local: (r.local || []).filter((_, j) => j !== i) })}
+                              className="absolute top-0.5 right-0.5 bg-black/60 text-white text-[10px] rounded px-1 cursor-pointer"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
                         {r.images.map((img, i) => (
                           <div key={img} className="relative w-16 h-16 rounded-md overflow-hidden bg-muted">
                             <img src={img} alt="" loading="lazy" className="w-full h-full object-cover" />
@@ -558,9 +1020,15 @@ export default function ImportarCatalogoPage() {
             {selectedRows.length} de {rows.length} marcados
             {incomplete > 0 && ` · ${incomplete} sin completar`}
           </span>
-          <Button onClick={publish} disabled={!selectedRows.length} className="cursor-pointer">
-            Publicar {selectedRows.length} {selectedRows.length === 1 ? 'anuncio' : 'anuncios'}
-          </Button>
+          {platform && unprepared > 0 ? (
+            <Button onClick={prepareSelected} className="cursor-pointer">
+              Preparar {unprepared} {unprepared === 1 ? 'marcado' : 'marcados'}
+            </Button>
+          ) : (
+            <Button onClick={publish} disabled={!selectedRows.length} className="cursor-pointer">
+              Publicar {selectedRows.length} {selectedRows.length === 1 ? 'anuncio' : 'anuncios'}
+            </Button>
+          )}
         </div>
       </div>
     </AccountLayout>
