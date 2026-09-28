@@ -201,6 +201,8 @@ export default function ImportarCatalogoPage() {
   const [consentChecked, setConsentChecked] = useState(false);
   const [platform, setPlatform] = useState<'todocoleccion' | 'wallapop' | null>(null);
   const [keywords, setKeywords] = useState('');
+  const [asDraft, setAsDraft] = useState(true);
+  const [coverMark, setCoverMark] = useState(true);
   const [filter, setFilter] = useState('');
 
   useEffect(() => {
@@ -475,6 +477,8 @@ export default function ImportarCatalogoPage() {
           location_province: province,
           location_city: city.trim() || undefined,
           seller_email: seller?.email,
+          as_draft: seller ? asDraft : undefined,
+          cover_tc_watermark: platform === 'todocoleccion' ? coverMark : undefined,
           items: chunk.map((r) => ({
             title: r.title.trim(),
             description: r.description.trim() || undefined,
@@ -498,6 +502,11 @@ export default function ImportarCatalogoPage() {
         setRows((prev) => prev.filter((r) => !done.has(r.key)));
       }
       clearDraft();
+      if (seller && asDraft && total.created > 0) {
+        client.catalogImport
+          .notifySellerDrafts(seller.email, total.created)
+          .catch(() => toast.error('Subidos, pero no se pudo avisar al vendedor. Escríbele tú.'));
+      }
       setResult(total);
       setPhase('done');
     } catch (err) {
@@ -596,11 +605,18 @@ export default function ImportarCatalogoPage() {
           <CardContent className="p-8 space-y-4 text-center">
             <CheckCircle2 className="h-10 w-10 text-green-700 mx-auto" />
             <p className="text-lg font-semibold text-foreground">
-              ¡{result.created} {result.created === 1 ? 'anuncio publicado' : 'anuncios publicados'}!
+              ¡{result.created}{' '}
+              {seller && asDraft
+                ? result.created === 1 ? 'borrador subido' : 'borradores subidos'
+                : result.created === 1 ? 'anuncio publicado' : 'anuncios publicados'}
+              !
             </p>
             {seller && (
               <p className="text-sm text-muted-foreground">
-                En la cuenta de <strong>{seller.shop_name || seller.name || seller.email}</strong> ({seller.email}).
+                En la cuenta de <strong>{seller.shop_name || seller.name || seller.email}</strong> ({seller.email})
+                {asDraft
+                  ? ', en borrador. Le hemos avisado por el mensajero y por email para que los revise y los active.'
+                  : '.'}
               </p>
             )}
             {result.withoutPhotos > 0 && (
@@ -823,9 +839,27 @@ export default function ImportarCatalogoPage() {
     >
       <div className="space-y-4 pb-28">
         {seller && (
-          <div className="rounded-md border border-primary/40 bg-primary/5 p-3 text-sm">
-            Se publicará en la cuenta de <strong>{seller.shop_name || seller.name || seller.email}</strong> (
-            {seller.email}){seller.published > 0 && `, que ya tiene ${seller.published} anuncios`}.
+          <div className="rounded-md border border-primary/40 bg-primary/5 p-3 text-sm space-y-2">
+            <p>
+              Se subirá a la cuenta de <strong>{seller.shop_name || seller.name || seller.email}</strong> (
+              {seller.email}){seller.published > 0 && `, que ya tiene ${seller.published} anuncios`}.
+            </p>
+            <label className="flex items-start gap-2 cursor-pointer">
+              <Checkbox checked={asDraft} onCheckedChange={(v) => setAsDraft(v === true)} className="mt-0.5" />
+              <span>
+                <strong>Subir como borradores</strong>: no los ve nadie hasta que el vendedor los revise y los active
+                (le avisamos al terminar).
+              </span>
+            </label>
+            {platform === 'todocoleccion' && (
+              <label className="flex items-start gap-2 cursor-pointer">
+                <Checkbox checked={coverMark} onCheckedChange={(v) => setCoverMark(v === true)} className="mt-0.5" />
+                <span>
+                  <strong>Tapar la marca de agua de Todocolección</strong> con un recuadro morado de VentaCofrade
+                  (abajo a la derecha de cada foto).
+                </span>
+              </label>
+            )}
           </div>
         )}
         <Card>
@@ -1052,7 +1086,9 @@ export default function ImportarCatalogoPage() {
             </Button>
           ) : (
             <Button onClick={publish} disabled={!selectedRows.length} className="cursor-pointer">
-              Publicar {selectedRows.length} {selectedRows.length === 1 ? 'anuncio' : 'anuncios'}
+              {seller && asDraft
+                ? `Subir ${selectedRows.length} ${selectedRows.length === 1 ? 'borrador' : 'borradores'}`
+                : `Publicar ${selectedRows.length} ${selectedRows.length === 1 ? 'anuncio' : 'anuncios'}`}
             </Button>
           )}
         </div>

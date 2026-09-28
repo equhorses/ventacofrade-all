@@ -55,7 +55,7 @@ export default function PublicarPage() {
   useEffect(() => {
     checkAuth();
     loadCategories();
-    trackEvent('publish_started');
+    if (!new URLSearchParams(window.location.search).get('editar')) trackEvent('publish_started');
   }, []);
 
   useEffect(() => {
@@ -70,6 +70,31 @@ export default function PublicarPage() {
 
   // Si se llega desde una tarjeta de categoría (/publicar?categoria=slug), preselecciona la categoría.
   const [searchParams] = useSearchParams();
+  // /publicar?editar=ID → editar un anuncio propio (también los borradores importados).
+  const editId = Number(searchParams.get('editar')) || null;
+  const [editStatus, setEditStatus] = useState<string | null>(null);
+  const saveMode = useRef<'keep' | 'activate'>('keep');
+
+  useEffect(() => {
+    if (!editId || !user) return;
+    client.entities.products
+      .get({ id: editId })
+      .then(({ data }) => {
+        const p = data as Record<string, unknown>;
+        setForm({
+          title: String(p.title ?? ''),
+          description: String(p.description ?? ''),
+          price: p.price != null ? String(p.price) : '',
+          category_id: p.category_id != null ? String(p.category_id) : '',
+          condition: String(p.condition ?? ''),
+          location_province: String(p.location_province ?? ''),
+          location_city: String(p.location_city ?? ''),
+        });
+        setImageUrls(String(p.images ?? '').split(',').filter(Boolean));
+        setEditStatus(String(p.status ?? 'active'));
+      })
+      .catch(() => toast.error('No se pudo cargar el anuncio para editarlo'));
+  }, [editId, user]);
   useEffect(() => {
     const slug = searchParams.get('categoria');
     if (!slug || form.category_id) return;
@@ -168,6 +193,33 @@ export default function PublicarPage() {
     }
 
     setLoading(true);
+    if (editId) {
+      try {
+        const activate = saveMode.current === 'activate';
+        await client.entities.products.update({
+          id: editId,
+          data: {
+            title: form.title,
+            description: form.description,
+            price: parseFloat(form.price),
+            category_id: parseInt(form.category_id),
+            condition: form.condition,
+            location_province: form.location_province,
+            location_city: form.location_city,
+            images: imageUrls.join(','),
+            ...(activate ? { status: 'active' } : {}),
+          },
+        });
+        toast.success(activate ? '¡Anuncio activado! Ya es visible.' : 'Cambios guardados');
+        navigate('/cuenta/anuncios');
+      } catch (err) {
+        const backendMessage = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+        toast.error(backendMessage || 'No se pudieron guardar los cambios.');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
     try {
       const { data: created } = await client.entities.products.create({
         data: {
@@ -319,7 +371,13 @@ export default function PublicarPage() {
   return (
     <Layout>
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <h1 className="text-2xl font-bold text-foreground mb-6">Publicar anuncio</h1>
+        <h1 className="text-2xl font-bold text-foreground mb-6">{editId ? 'Editar anuncio' : 'Publicar anuncio'}</h1>
+        {editId && editStatus === 'draft' && (
+          <p className="mb-4 rounded-md border border-blue-300 bg-blue-50/60 p-3 text-sm text-muted-foreground">
+            Este anuncio está en <strong>borrador</strong>: todavía no lo ve nadie. Revísalo y pulsa «Guardar y activar».
+            Si las fotos llevan la marca de agua de otra plataforma, quítalas con la ✕ y sube las tuyas.
+          </p>
+        )}
 
         <form onSubmit={handleSubmit}>
           <Card>
@@ -491,13 +549,37 @@ export default function PublicarPage() {
                 )}
               </div>
 
-              <Button
-                type="submit"
-                disabled={loading || uploadingCount > 0}
-                className="w-full bg-primary hover:bg-primary/90 h-12 text-base cursor-pointer"
-              >
-                {loading ? 'Publicando...' : uploadingCount > 0 ? 'Subiendo fotos...' : 'Publicar anuncio'}
-              </Button>
+              {editId ? (
+                <div className="flex flex-col sm:flex-row gap-2">
+                  {editStatus !== 'active' && editStatus !== 'sold' && (
+                    <Button
+                      type="submit"
+                      onClick={() => (saveMode.current = 'activate')}
+                      disabled={loading || uploadingCount > 0}
+                      className="flex-1 bg-primary hover:bg-primary/90 h-12 text-base cursor-pointer"
+                    >
+                      {loading ? 'Guardando...' : uploadingCount > 0 ? 'Subiendo fotos...' : 'Guardar y activar'}
+                    </Button>
+                  )}
+                  <Button
+                    type="submit"
+                    variant={editStatus !== 'active' && editStatus !== 'sold' ? 'outline' : 'default'}
+                    onClick={() => (saveMode.current = 'keep')}
+                    disabled={loading || uploadingCount > 0}
+                    className="flex-1 h-12 text-base cursor-pointer"
+                  >
+                    {editStatus === 'draft' ? 'Guardar borrador' : 'Guardar cambios'}
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  type="submit"
+                  disabled={loading || uploadingCount > 0}
+                  className="w-full bg-primary hover:bg-primary/90 h-12 text-base cursor-pointer"
+                >
+                  {loading ? 'Publicando...' : uploadingCount > 0 ? 'Subiendo fotos...' : 'Publicar anuncio'}
+                </Button>
+              )}
             </CardContent>
           </Card>
         </form>

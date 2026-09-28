@@ -523,6 +523,9 @@ export const client = {
       });
       return { data: response.data as { items: PlatformDetail[] } };
     },
+    async notifySellerDrafts(sellerEmail: string, count: number) {
+      await http.post(`${baseUrl()}/api/v1/catalog-import/notify-seller-drafts`, { seller_email: sellerEmail, count });
+    },
     // El vendedor: ver y aceptar la autorización que se le pide por el mensajero.
     async getConsent(id: number) {
       const response = await http.get(`${baseUrl()}/api/v1/catalog-import/consents/${id}`);
@@ -547,6 +550,8 @@ export const client = {
       location_city?: string;
       items: CatalogPublishItem[];
       seller_email?: string;
+      as_draft?: boolean;
+      cover_tc_watermark?: boolean;
     }) {
       const response = await http.post(`${baseUrl()}/api/v1/catalog-import/publish`, data);
       return {

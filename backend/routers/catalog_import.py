@@ -42,6 +42,7 @@ from services import catalog_import as ci
 from services.audit import log_admin_action
 from services.catalog_file import MAX_FILE_BYTES, CatalogFileError, parse_catalog_file
 from services import platform_import as pi
+from services.watermark import cover_todocoleccion_mark, is_todocoleccion_image
 from services.seller_plans import TIER_PRO, seller_tier
 from services.storage import StorageNotConfiguredError, StorageService
 
@@ -148,8 +149,12 @@ class PublishRequest(BaseModel):
     location_province: str
     location_city: Optional[str] = None
     items: list[PublishItem] = Field(min_length=1)
-    # Solo admin: publicar en la cuenta de otro vendedor (importación desde archivo).
+    # Solo admin: publicar en la cuenta de otro vendedor (importación desde archivo o plataforma).
     seller_email: Optional[str] = None
+    # Se guardan como borradores: el vendedor los revisa, cambia lo que quiera y los activa.
+    as_draft: bool = False
+    # Solo admin, fotos de Todocolección: tapar su marca de agua con un recuadro de VentaCofrade.
+    cover_tc_watermark: bool = False
 
 
 async def _target_user(db: AsyncSession, email: str) -> UserResponse:
@@ -242,6 +247,7 @@ async def publish(
             raise HTTPException(status_code=400, detail=f"«{item.title[:40]}»: elige el estado.")
 
     # Copia las fotos a nuestro bucket (si la web del vendedor cambia, sus anuncios no se quedan sin fotos).
+    cover_mark = on_behalf and payload.cover_tc_watermark
     wanted = {u for it in payload.items for u in it.images[:ci.MAX_PHOTOS] if not storage.is_own_url(u)}
     copied: dict[str, str] = {}
     semaphore = asyncio.Semaphore(DOWNLOAD_CONCURRENCY)
@@ -250,6 +256,11 @@ async def publish(
         async with semaphore:
             try:
                 data, content_type = await ci.download_image(client, url)
+                if cover_mark and is_todocoleccion_image(url):
+                    try:
+                        data, content_type = await asyncio.to_thread(cover_todocoleccion_mark, data)
+                    except Exception as exc:
+                        logger.info("No se pudo tapar la marca de %s (%s)", url, exc)
                 copied[url] = await asyncio.to_thread(storage.put_bytes, data, content_type, "products", user_id)
             except Exception as exc:
                 logger.info("Importar catálogo: foto no copiada %s (%s)", url, exc)
@@ -258,7 +269,7 @@ async def publish(
         async with ci.http_client() as client:
             await asyncio.gather(*(copy(u, client) for u in wanted))
 
-    vacation = bool(profile.vacation_mode)
+    vacation = bool(profile.vacation_mode) and not payload.as_draft
     city = (payload.location_city or "").strip()[:100] or None
     created, without_photos = [], 0
     for item in payload.items:
@@ -276,7 +287,7 @@ async def publish(
             location_province=payload.location_province,
             location_city=city,
             images=",".join(images) or None,
-            status="paused" if vacation else "active",
+            status="draft" if payload.as_draft else ("paused" if vacation else "active"),
             paused_by_vacation=vacation,
         )
         db.add(product)
@@ -562,3 +573,48 @@ async def accept_consent(
     except Exception as exc:
         logger.warning("No se pudo avisar de la autorización aceptada: %s", exc)
     return _consent_out(consent)
+
+
+
+class NotifyDraftsRequest(BaseModel):
+    seller_email: str
+    count: int = Field(ge=1)
+
+
+@router.post("/notify-seller-drafts")
+async def notify_seller_drafts(
+    payload: NotifyDraftsRequest,
+    current_user: UserResponse = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Avisa al vendedor (mensajero + email) de que tiene anuncios en borrador para revisar y activar."""
+    _require_admin(current_user)
+    seller = await _target_user(db, payload.seller_email)
+    n = payload.count
+    text = (
+        f"¡Hola! Ya tienes {n} {'anuncio preparado' if n == 1 else 'anuncios preparados'} en tu cuenta, "
+        "en borrador: todavía no los ve nadie.\n\n"
+        "Entra en «Mis anuncios», revísalos y pulsa «Activar» en los que estén bien (o «Activar todos»). "
+        "Con «Editar» puedes cambiar lo que quieras. Te recomendamos poner tus fotos originales: "
+        "las que vienen de otras plataformas pueden llevar su marca de agua."
+    )
+    db.add(Messages(
+        user_id=str(current_user.id), receiver_id=str(seller.id), product_id=SUPPORT_PRODUCT_ID,
+        content=text, is_read=False,
+    ))
+    await db.commit()
+    await log_admin_action(
+        db, current_user.id, current_user.email, "catalog_drafts_notified", target=seller.email.lower(), details=str(n)
+    )
+    try:
+        from services.email import SITE_URL, send_new_support_message_email
+
+        await send_new_support_message_email(
+            seller.email,
+            seller.name,
+            f"Tienes {n} {'anuncio' if n == 1 else 'anuncios'} en borrador listos para revisar y activar.",
+            f"{SITE_URL}/cuenta/anuncios",
+        )
+    except Exception as exc:
+        logger.warning("No se pudo avisar por email de los borradores: %s", exc)
+    return {"ok": True}

@@ -6,7 +6,22 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { client, type SellerPlanSummary, type SellerProductStats } from '@/lib/api';
-import { Church, Plus, Eye, Trash2, Sparkles, Heart, MessageCircle, Crown, RefreshCw, Palmtree } from 'lucide-react';
+import {
+  Church,
+  Plus,
+  Eye,
+  Trash2,
+  Sparkles,
+  Heart,
+  MessageCircle,
+  Crown,
+  RefreshCw,
+  Palmtree,
+  Pencil,
+  Play,
+  Pause,
+  FileText,
+} from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,6 +44,7 @@ const statusLabels: Record<string, { label: string; className: string }> = {
   active: { label: 'Activo', className: 'bg-green-100 text-green-700' },
   sold: { label: 'Vendido', className: 'bg-muted text-muted-foreground' },
   paused: { label: 'Pausado', className: 'bg-amber-100 text-amber-700' },
+  draft: { label: 'Borrador', className: 'bg-blue-100 text-blue-700' },
 };
 
 export default function MisAnunciosPage() {
@@ -41,6 +57,7 @@ export default function MisAnunciosPage() {
   const [stats, setStats] = useState<Record<number, SellerProductStats>>({});
   const [busyVacation, setBusyVacation] = useState(false);
   const [bumpingId, setBumpingId] = useState<number | null>(null);
+  const [statusBusy, setStatusBusy] = useState<number | 'all' | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
@@ -73,7 +90,7 @@ export default function MisAnunciosPage() {
     setLoading(true);
     loadPlan();
     try {
-      const res = await client.entities.products.mine({ sort: '-created_at', limit: 100 });
+      const res = await client.entities.products.mine({ sort: '-created_at', limit: 1000 });
       setProducts(res?.data?.items || []);
     } catch (err) {
       console.error('Error loading my products:', err);
@@ -90,6 +107,40 @@ export default function MisAnunciosPage() {
       .then(({ data }) => setPrices(data))
       .catch((err) => console.error('Error loading feature prices:', err));
   }, []);
+
+  const setStatus = async (productId: number, status: 'active' | 'paused') => {
+    setStatusBusy(productId);
+    try {
+      await client.entities.products.update({ id: productId, data: { status } });
+      setProducts((prev) => prev.map((p) => (p.id === productId ? { ...p, status } : p)));
+      toast.success(status === 'active' ? 'Anuncio activado: ya es visible' : 'Anuncio pausado');
+    } catch {
+      toast.error('No se pudo cambiar el anuncio');
+    } finally {
+      setStatusBusy(null);
+    }
+  };
+
+  const drafts = products.filter((p) => p.status === 'draft');
+  const draftsWithPhotos = drafts.filter((p) => p.images);
+
+  const activateAllDrafts = async () => {
+    if (!draftsWithPhotos.length) return;
+    if (!window.confirm(`¿Activar ${draftsWithPhotos.length} borradores? Serán visibles para todo el mundo.`)) return;
+    setStatusBusy('all');
+    let ok = 0;
+    for (const p of draftsWithPhotos) {
+      try {
+        await client.entities.products.update({ id: p.id, data: { status: 'active' } });
+        ok += 1;
+      } catch {
+        // sigue con los demás
+      }
+    }
+    setStatusBusy(null);
+    toast.success(`${ok} anuncios activados`);
+    load();
+  };
 
   const handleFeature = async (productId: number, days: 3 | 7 | 30) => {
     setFeaturingId(productId);
@@ -256,6 +307,33 @@ export default function MisAnunciosPage() {
         </Card>
       )}
 
+      {!loading && drafts.length > 0 && (
+        <Card className="mb-4 border-blue-300 bg-blue-50/60">
+          <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+            <FileText className="h-6 w-6 text-blue-700 shrink-0" />
+            <div className="flex-1 text-sm">
+              <p className="font-semibold text-foreground">
+                Tienes {drafts.length} {drafts.length === 1 ? 'anuncio en borrador' : 'anuncios en borrador'}
+              </p>
+              <p className="text-muted-foreground">
+                Todavía no los ve nadie. Revísalos con «Editar» y pulsa «Activar». Si las fotos vienen de otra
+                plataforma y llevan su marca de agua, cámbialas por tus fotos originales.
+              </p>
+            </div>
+            {draftsWithPhotos.length > 0 && (
+              <Button
+                size="sm"
+                className="cursor-pointer shrink-0"
+                disabled={statusBusy !== null}
+                onClick={activateAllDrafts}
+              >
+                {statusBusy === 'all' ? 'Activando…' : `Activar todos (${draftsWithPhotos.length})`}
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {[...Array(4)].map((_, i) => (
@@ -283,7 +361,7 @@ export default function MisAnunciosPage() {
             const status = statusLabels[product.status || 'active'] || statusLabels.active;
             return (
               <Card key={product.id}>
-                <CardContent className="p-4 flex items-center gap-4">
+                <CardContent className="p-4 flex flex-wrap sm:flex-nowrap items-center gap-4">
                   <div className="h-16 w-16 rounded-md bg-muted overflow-hidden shrink-0">
                     {product.images ? (
                       <img
@@ -332,39 +410,41 @@ export default function MisAnunciosPage() {
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="cursor-pointer gap-1"
-                          disabled={featuringId === product.id}
-                        >
-                          <Sparkles className="h-3 w-3" />
-                          {product.is_featured ? 'Ampliar' : 'Destacar'}
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {plan && plan.included_features_left > 0 && (product.status || 'active') === 'active' && (
-                          <DropdownMenuItem
-                            className="cursor-pointer font-medium text-primary"
-                            onClick={() => handleIncludedFeature(product.id)}
+                  <div className="flex flex-wrap items-center justify-end gap-1 w-full sm:w-auto sm:shrink-0">
+                    {(product.status || 'active') === 'active' && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="cursor-pointer gap-1"
+                            disabled={featuringId === product.id}
                           >
-                            {plan.included_feature_days} días — incluido en tu plan ({plan.included_features_left} restantes)
-                          </DropdownMenuItem>
-                        )}
-                        {[3, 7, 30].map((days) => (
-                          <DropdownMenuItem
-                            key={days}
-                            className="cursor-pointer"
-                            onClick={() => handleFeature(product.id, days as 3 | 7 | 30)}
-                          >
-                            {days} días — {prices[String(days)]?.toFixed(2) ?? '…'} €
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                            <Sparkles className="h-3 w-3" />
+                            {product.is_featured ? 'Ampliar' : 'Destacar'}
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {plan && plan.included_features_left > 0 && (product.status || 'active') === 'active' && (
+                            <DropdownMenuItem
+                              className="cursor-pointer font-medium text-primary"
+                              onClick={() => handleIncludedFeature(product.id)}
+                            >
+                              {plan.included_feature_days} días — incluido en tu plan ({plan.included_features_left} restantes)
+                            </DropdownMenuItem>
+                          )}
+                          {[3, 7, 30].map((days) => (
+                            <DropdownMenuItem
+                              key={days}
+                              className="cursor-pointer"
+                              onClick={() => handleFeature(product.id, days as 3 | 7 | 30)}
+                            >
+                              {days} días — {prices[String(days)]?.toFixed(2) ?? '…'} €
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                     {plan?.can_bump && (product.status || 'active') === 'active' && (
                       <Button
                         variant="outline"
@@ -382,6 +462,34 @@ export default function MisAnunciosPage() {
                         Renovar
                       </Button>
                     )}
+                    {(product.status === 'draft' || (product.status === 'paused' && !plan?.vacation_mode)) && (
+                      <Button
+                        size="sm"
+                        className="cursor-pointer gap-1"
+                        disabled={statusBusy !== null || !product.images}
+                        title={product.images ? 'Hacerlo visible para todos' : 'Añade al menos una foto antes de activarlo'}
+                        onClick={() => setStatus(product.id, 'active')}
+                      >
+                        <Play className="h-3 w-3" /> Activar
+                      </Button>
+                    )}
+                    {(product.status || 'active') === 'active' && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="cursor-pointer"
+                        title="Pausar (deja de verse, sin borrarlo)"
+                        disabled={statusBusy !== null}
+                        onClick={() => setStatus(product.id, 'paused')}
+                      >
+                        <Pause className="h-4 w-4" />
+                      </Button>
+                    )}
+                    <Link to={`/publicar?editar=${product.id}`}>
+                      <Button variant="ghost" size="icon" className="cursor-pointer" title="Editar anuncio">
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    </Link>
                     <Link to={`/producto/${product.id}`}>
                       <Button variant="ghost" size="icon" className="cursor-pointer" title="Ver anuncio">
                         <Eye className="h-4 w-4" />
