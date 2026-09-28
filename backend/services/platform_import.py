@@ -171,13 +171,17 @@ def _tc_list_page(html: str, page_url: str) -> list[dict]:
         if lot_id in items:
             continue
         card = html[begin:end]
-        texts = [ci.strip_html(t) for t in re.findall(r"~x" + lot_id + r"""["'][^>]*>(.*?)</a>""", card, re.S)]
-        texts += [
-            htmllib.unescape(a)
-            for a in TITLE_ATTR_RE.findall(card)
-            if not a.lower().startswith(("ver ", "añadir", "seguir", "comprar"))
+        # Solo textos de los propios enlaces de este lote (los atributos sueltos de la tarjeta pueden
+        # ser del lote de al lado).
+        anchors = re.findall(r"""<a\b([^>]*~x""" + lot_id + r"""["'][^>]*)>(.*?)</a>""", card, re.S | re.I)
+        texts = [ci.strip_html(inner) for _, inner in anchors]
+        if not any(len(t.strip()) >= 3 for t in texts):
+            for attrs, inner in anchors:
+                texts += [htmllib.unescape(a) for a in TITLE_ATTR_RE.findall(attrs + inner)]
+        texts = [
+            t.strip() for t in texts
+            if len(t.strip()) >= 3 and not t.strip().lower().startswith(("ver ", "añadir", "seguir", "comprar"))
         ]
-        texts = [t.strip() for t in texts if len(t.strip()) >= 3]
         title = max(texts, key=len) if texts else ""
         if not title:
             slug = re.search(r"/([a-z0-9-]+)~x\d+", url)
@@ -224,6 +228,34 @@ async def _tc_list(client, url: str, keywords: Optional[str] = None) -> list[dic
     return list(found.values())
 
 
+def _balanced_block(html: str, start: int) -> str:
+    """Contenido de la etiqueta que empieza en `start`, incluyendo sus etiquetas anidadas del mismo tipo."""
+    tag = re.match(r"<(\w+)", html[start:])
+    if not tag:
+        return ""
+    name = tag.group(1).lower()
+    depth = 0
+    for m in re.finditer(r"<(/?)" + name + r"\b[^>]*>", html[start:start + 200_000], re.I):
+        depth += -1 if m.group(1) else 1
+        if depth == 0:
+            return html[start:start + m.end()]
+    return html[start:start + 20_000]
+
+
+def _tc_description(html: str) -> str:
+    """Texto del bloque de descripción del lote (con tablas de ficha técnica incluidas)."""
+    for m in re.finditer(r"""<(div|section)\b[^>]+(?:id|class)=["'][^"']*descripci[oó]n[^"']*["'][^>]*>""", html, re.I):
+        block = _balanced_block(html, m.start())
+        block = re.sub(r"(?i)</(td|th)>", " ", block)
+        block = re.sub(r"(?i)</(tr|div|dt|dd)>", "\n", block)
+        text = ci.strip_html(block)
+        text = re.sub(r"^(descripci[oó]n\s*/\s*description\s*/\s*description\s*)", "", text, flags=re.I).strip()
+        text = "\n".join(line.strip() for line in text.splitlines() if line.strip())
+        if len(text) >= 20:
+            return text
+    return ""
+
+
 def _tc_detail(html: str, url: str) -> dict:
     lot_match = re.search(r"~x(\d+)", url)
     lot_id = lot_match.group(1) if lot_match else "~"
@@ -237,12 +269,7 @@ def _tc_detail(html: str, url: str) -> dict:
         h1 = re.search(r"<h1[^>]*>(.*?)</h1>", html, re.S | re.I)
         title = ci.strip_html(h1.group(1)) if h1 else ""
 
-    description = ""
-    block = re.search(
-        r"""<(div|section)[^>]+(?:id|class)=["'][^"']*descripci[oó]n[^"']*["'][^>]*>(.*?)</\1>""", html, re.S | re.I
-    )
-    if block:
-        description = ci.strip_html(block.group(2))
+    description = _tc_description(html)
     if len(description) < 20:
         description = base.get("description") or ci.strip_html(
             meta.get("og:description") or meta.get("description") or ""

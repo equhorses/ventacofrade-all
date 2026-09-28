@@ -416,7 +416,7 @@ export default function ImportarCatalogoPage() {
               ...r,
               prepared: true,
               prepError: undefined,
-              title: r.title || d.title || '',
+              title: d.title || r.title, // el de la ficha es el bueno
               description: d.description || r.description,
               price: d.price ? String(d.price).replace('.', ',') : r.price,
               images: d.images?.length ? d.images : r.images,
