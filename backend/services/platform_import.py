@@ -17,7 +17,7 @@ import json
 import logging
 import re
 from typing import Optional
-from urllib.parse import parse_qs, quote_plus, urljoin, urlparse
+from urllib.parse import parse_qs, quote_plus, unquote, urljoin, urlparse
 
 from services import catalog_import as ci
 
@@ -82,29 +82,44 @@ def _tc_nick(url: str) -> Optional[str]:
     return None
 
 
-async def _tc_catalog_filter(client, url: str) -> str:
-    """Parámetro del catálogo de Todocolección con todos los lotes en venta del vendedor."""
+async def _tc_catalog_filters(client, url: str) -> list[str]:
+    """Parámetros posibles del catálogo de Todocolección con todos los lotes en venta del vendedor."""
     parsed = urlparse(url)
     query = parse_qs(parsed.query)
     if query.get("identificadorvendedor"):
-        return "identificadorvendedor=" + quote_plus(query["identificadorvendedor"][0])
+        return ["identificadorvendedor=" + quote_plus(query["identificadorvendedor"][0])]
     if query.get("tienda"):
-        return "tienda=" + quote_plus(query["tienda"][0])
+        return ["tienda=" + quote_plus(query["tienda"][0])]
     m = re.match(r"^/tienda/([^/?#]+)", parsed.path)
     if m:
-        return "tienda=" + quote_plus(m.group(1))
+        return ["tienda=" + quote_plus(unquote(m.group(1)))]
     if re.match(r"^/usuario/[^/?#]+", parsed.path):
-        # El perfil enlaza a "todos sus lotes" con su identificador de vendedor (p. ej. Antiguedades_Riera).
+        # El perfil enlaza a "todos sus lotes" (identificador de vendedor, p. ej. Antiguedades_Riera) y a su tienda.
         html = await _get_html(client, f"https://{TC_HOST}{parsed.path}")
-        found = re.search(r"identificadorvendedor=([^\"'&<>\s]+)", html)
-        if found:
-            return "identificadorvendedor=" + quote_plus(htmllib.unescape(found.group(1)))
-        shop = re.search(r"todocoleccion\.net/tienda/([a-z0-9_-]+)", html, re.I)
-        if shop:
-            return "tienda=" + quote_plus(shop.group(1))
+        candidates = []
+        for raw in re.findall(r"identificadorvendedor=([^\"'&<>\s\\]+)", html):
+            value = "identificadorvendedor=" + quote_plus(unquote(htmllib.unescape(raw)))
+            if value not in candidates:
+                candidates.append(value)
+        for shop in re.findall(r"todocoleccion\.net/tienda/([a-z0-9_%-]+)", html, re.I):
+            value = "tienda=" + quote_plus(unquote(shop))
+            if value not in candidates:
+                candidates.append(value)
+        if candidates:
+            return candidates
         raise PlatformBlocked("No encontramos los lotes en venta de ese perfil. Prueba con la dirección de su tienda.")
     source_key(url)  # lanza el error explicativo
-    return ""
+    return []
+
+
+async def _try_html(client, url: str) -> Optional[str]:
+    """Como _get_html, pero devuelve None si la página no existe (404)."""
+    try:
+        return await _get_html(client, url)
+    except PlatformBlocked as exc:
+        if "(404)" in str(exc):
+            return None
+        raise
 
 
 async def _get_html(client, url: str) -> str:
@@ -178,24 +193,31 @@ def _tc_list_page(html: str, page_url: str) -> list[dict]:
 
 
 async def _tc_list(client, url: str, keywords: Optional[str] = None) -> list[dict]:
-    seller = await _tc_catalog_filter(client, url)
     search = f"&bu={quote_plus(keywords.strip())}" if keywords and keywords.strip() else ""
+    # Primera página: se prueba cada forma de pedir su catálogo (con palabras y, si no, sin ellas).
+    seller, first_html = "", None
+    for candidate in await _tc_catalog_filters(client, url):
+        for extra in ([search, ""] if search else [""]):
+            html = await _try_html(client, f"https://{TC_HOST}/s/catalogo?P=1&{candidate}{extra}")
+            if html and _tc_list_page(html, TC_HOST):
+                seller, search, first_html = candidate, extra, html
+                break
+        if first_html:
+            break
+    if not first_html:
+        raise PlatformBlocked("No hemos encontrado lotes en venta de ese vendedor. Comprueba la dirección.")
+
     found: dict[str, dict] = {}
     for page in range(1, LIST_MAX_PAGES + 1):
         page_url = f"https://{TC_HOST}/s/catalogo?P={page}&{seller}{search}"
-        html = await _get_html(client, page_url)
+        html = first_html if page == 1 else await _try_html(client, page_url)
+        if not html:
+            break
         new = 0
         for it in _tc_list_page(html, page_url):
             if it["source_url"] not in found:
                 found[it["source_url"]] = it
                 new += 1
-        if page == 1 and not new and search:
-            # Si la búsqueda por palabras no funciona, se lee todo el catálogo.
-            search = ""
-            html = await _get_html(client, f"https://{TC_HOST}/s/catalogo?P=1&{seller}")
-            for it in _tc_list_page(html, page_url):
-                found.setdefault(it["source_url"], it)
-            new = len(found)
         if not new or len(found) >= LIST_MAX_ITEMS:
             break
         await asyncio.sleep(PAGE_PAUSE)
