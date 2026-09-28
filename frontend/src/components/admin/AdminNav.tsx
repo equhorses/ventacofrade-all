@@ -17,6 +17,7 @@ const TABS: { to: string; label: string; allowedRoles?: string[] }[] = [
   { to: '/admin/auditoria', label: 'Auditoría', allowedRoles: [] }, // super admin only
   { to: '/admin/equipo', label: 'Equipo', allowedRoles: [] }, // super admin only
   { to: '/admin/plataformas', label: 'Plataformas', allowedRoles: [] }, // super admin only
+  { to: '/cuenta/importar', label: 'Importar catálogo', allowedRoles: [] }, // super admin only
 ];
 
 const UNREAD_POLL_MS = 30000;
