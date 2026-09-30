@@ -22,7 +22,7 @@ const provinces = [
   'Madrid', 'Barcelona', 'Valencia', 'Murcia', 'Otra',
 ];
 
-const MAX_IMAGES = 6;
+const MAX_IMAGES = 10;
 const MAX_FILE_SIZE_MB = 5;
 
 export default function PublicarPage() {

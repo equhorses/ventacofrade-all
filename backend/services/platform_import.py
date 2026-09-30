@@ -151,7 +151,8 @@ def _clean_img(url: str) -> str:
 def _tc_images(html: str, lot_id: str) -> list[str]:
     """Todas las fotos del lote que aparecen en la página (también dentro de JSON, con barras escapadas),
     sin repetir la misma foto en .jpg y .webp (se prefiere .jpg)."""
-    text = html.replace("\\/", "/")
+    # Todocolección mete la galería en un JSON con todo codificado (&#x2f; = "/", &quot; = comillas...).
+    text = htmllib.unescape(html).replace("\\/", "/")
     by_stem: dict[str, str] = {}
     for raw in TC_IMG_RE.findall(text):
         u = _clean_img(raw)

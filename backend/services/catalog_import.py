@@ -25,7 +25,7 @@ import httpx
 logger = logging.getLogger(__name__)
 
 MAX_ITEMS = 200
-MAX_PHOTOS = 6
+MAX_PHOTOS = 10
 MAX_PAGE_BYTES = 3 * 1024 * 1024
 MAX_IMAGE_BYTES = 8 * 1024 * 1024
 MAX_LINKED_PAGES = 60

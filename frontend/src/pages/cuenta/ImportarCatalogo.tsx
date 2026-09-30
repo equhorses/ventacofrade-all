@@ -39,7 +39,7 @@ const PROVINCES = [
   'Madrid', 'Barcelona', 'Valencia', 'Murcia', 'Otra',
 ];
 const BATCH = 20;
-const MAX_PHOTOS = 6;
+const MAX_PHOTOS = 10;
 const UPLOAD_CONCURRENCY = 4;
 const DRAFT_KEY = 'vc_catalog_import_draft';
 
@@ -461,9 +461,11 @@ export default function ImportarCatalogoPage() {
     const total = { created: 0, withoutPhotos: 0, vacation: false };
     const pending = [...selectedRows];
     try {
-      for (let i = 0; i < pending.length; i += BATCH) {
-        const chunk = pending.slice(i, i + BATCH);
-        const label = `Publicando y copiando fotos (${Math.min(i + BATCH, pending.length)} de ${pending.length})`;
+      // Con muchas fotos por anuncio (Todocolección), tandas más pequeñas para no agotar el tiempo del servidor.
+      const step = platform ? 6 : BATCH;
+      for (let i = 0; i < pending.length; i += step) {
+        const chunk = pending.slice(i, i + step);
+        const label = `Publicando y copiando fotos (${Math.min(i + step, pending.length)} de ${pending.length})`;
         setProgress({ label, value: Math.round((i / pending.length) * 100) });
         const localFiles = chunk.flatMap((r) => (r.local || []).map((l) => l.file));
         let uploadedCount = 0;
