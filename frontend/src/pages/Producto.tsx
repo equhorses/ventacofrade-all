@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import Layout from '@/components/Layout';
 import SellerBadge from '@/components/SellerBadge';
 import SellerContactLinks from '@/components/SellerContactLinks';
+import ProductGallery from '@/components/ProductGallery';
 import { client } from '@/lib/api';
 import { MapPin, Heart, Share2, MessageCircle, Eye, ArrowLeft, Church, User, Star } from 'lucide-react';
 import { toast } from 'sonner';
@@ -223,24 +224,7 @@ export default function ProductoPage() {
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           {/* Images */}
           <div className="lg:col-span-3">
-            <div className="aspect-[4/3] bg-muted rounded-lg overflow-hidden">
-              {images.length > 0 ? (
-                <img src={images[0]} alt={product.title} className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <Church className="h-20 w-20 text-muted-foreground/30" />
-                </div>
-              )}
-            </div>
-            {images.length > 1 && (
-              <div className="grid grid-cols-4 gap-2 mt-2">
-                {images.slice(1, 5).map((img, i) => (
-                  <div key={i} className="aspect-square bg-muted rounded overflow-hidden">
-                    <img src={img} alt={`${product.title} ${i + 2}`} className="w-full h-full object-cover" />
-                  </div>
-                ))}
-              </div>
-            )}
+            <ProductGallery images={images} title={product.title} />
           </div>
 
           {/* Details */}
