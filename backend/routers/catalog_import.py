@@ -256,7 +256,9 @@ async def publish(
         async with semaphore:
             try:
                 data, content_type = await ci.download_image(client, url)
-                if cover_mark and is_todocoleccion_image(url):
+                # Todas las fotos llevan el sello de VentaCofrade abajo a la derecha (en las de
+                # Todocolección, además, tapa su marca de agua).
+                if cover_mark or not is_todocoleccion_image(url):
                     try:
                         data, content_type = await asyncio.to_thread(cover_todocoleccion_mark, data)
                     except Exception as exc:

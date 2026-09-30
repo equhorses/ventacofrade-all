@@ -3,7 +3,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -824,6 +824,7 @@ async def get_support_thread(
 async def send_support_message(
     user_id: str,
     payload: SendMessageRequest,
+    background_tasks: BackgroundTasks,
     current_user: UserResponse = Depends(require_roles("admin", "soporte")),
     db: AsyncSession = Depends(get_db),
 ):
@@ -850,6 +851,22 @@ async def send_support_message(
     await log_admin_action(
         db, current_user.id, current_user.email, "send_support_message", target=target_user.email
     )
+    # Aviso por email (solo si no tenía ya mensajes nuestros sin leer).
+    from routers.messages import notify_new_message
+
+    earlier_unread = (
+        await db.execute(
+            select(func.count(Messages.id)).where(
+                Messages.user_id == current_user.id,
+                Messages.receiver_id == user_id,
+                Messages.product_id == SUPPORT_PRODUCT_ID,
+                Messages.is_read.is_not(True),
+                Messages.id != message.id,
+            )
+        )
+    ).scalar() or 0
+    if not earlier_unread:
+        background_tasks.add_task(notify_new_message, current_user, user_id, SUPPORT_PRODUCT_ID, message.content)
 
     return AdminChatMessage(
         id=message.id,

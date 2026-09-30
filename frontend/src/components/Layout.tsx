@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -45,6 +45,31 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
+// Dos notas suaves (sin archivo de sonido). Si el navegador aún no deja reproducir audio, no pasa nada.
+function playMessageSound() {
+  try {
+    const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!Ctx) return;
+    const ctx = new Ctx();
+    [880, 1320].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      const start = ctx.currentTime + i * 0.16;
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.18, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.28);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.3);
+    });
+    setTimeout(() => ctx.close(), 1000);
+  } catch {
+    // sin sonido
+  }
+}
+
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -65,6 +90,15 @@ export default function Layout({ children }: LayoutProps) {
       setCancelingDeletion(false);
     }
   };
+
+  // (N) en el título de la pestaña y un aviso sonoro cuando llega un mensaje nuevo.
+  const lastUnread = useRef<number | null>(null);
+  useEffect(() => {
+    const base = document.title.replace(/^\(\d+\+?\)\s*/, '');
+    document.title = unreadCount > 0 ? `(${unreadCount > 99 ? '99+' : unreadCount}) ${base}` : base;
+    if (lastUnread.current !== null && unreadCount > lastUnread.current) playMessageSound();
+    lastUnread.current = unreadCount;
+  }, [unreadCount, location.pathname]);
 
   useEffect(() => {
     if (!user) return;

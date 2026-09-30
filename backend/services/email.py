@@ -837,6 +837,23 @@ async def send_help_email(to_email: str, reason: str) -> bool:
     )
 
 
+async def send_new_message_email(
+    to_email: str, sender_name: str, about: str, preview: str, thread_url: str
+) -> bool:
+    """Aviso de mensaje nuevo en el mensajero (solo el primero de cada tanda sin leer)."""
+    body = (
+        f"<p><strong>{html_escape(sender_name)}</strong> te ha escrito sobre <strong>{html_escape(about)}</strong>:</p>"
+        f"<p style='background:#fff;border-left:3px solid #6d28d9;padding:10px 14px;color:#3f3f46;'>{html_escape(preview)}</p>"
+        "<p style='color:#71717a;font-size:13px;'>Contesta desde VentaCofrade para que quede todo en la conversación.</p>"
+    )
+    return await _send_via_resend(
+        to_email,
+        f"Nuevo mensaje de {sender_name} en VentaCofrade",
+        _email_shell("Tienes un mensaje nuevo", body, "Ver y contestar", thread_url),
+        "aviso de mensaje nuevo",
+    )
+
+
 async def send_new_support_message_email(to_email: str, name: Optional[str], preview: str, thread_url: str) -> bool:
     """Aviso de que VentaCofrade le ha escrito por el mensajero (p. ej. para pedir una autorización)."""
     hello = "Hola,"  # sin nombre: el de la cuenta no siempre es como le llaman

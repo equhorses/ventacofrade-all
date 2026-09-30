@@ -8,6 +8,83 @@ import { getStoredToken } from './auth';
 // keeps the exact same shape (client.auth.*, client.entities.X.query/get/create)
 // but talks to our own backend on Railway instead.
 
+// ---------- Sello de VentaCofrade en las fotos de anuncios ----------
+// Mismo recuadro que pone el servidor al importar (services/watermark.py): morado, logo + "VentaCofrade",
+// abajo a la derecha, escalado con el tamaño de la foto. Si el navegador no puede leer la foto (p. ej. HEIC),
+// se sube tal cual.
+const BADGE = { refW: 893, refH: 1200, left: 215, right: 8, top: 52, bottom: 3, maxSide: 2400 };
+let badgeLogo: Promise<HTMLImageElement | null> | null = null;
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+export async function brandProductPhoto(file: File): Promise<File> {
+  if (!/^image\/(jpeg|png|webp)$/i.test(file.type)) return file;
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await loadImage(url);
+    let w = img.naturalWidth;
+    let h = img.naturalHeight;
+    if (w < 200 || h < 150) return file;
+    const shrink = Math.min(1, BADGE.maxSide / Math.max(w, h));
+    w = Math.round(w * shrink);
+    h = Math.round(h * shrink);
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return file;
+    ctx.drawImage(img, 0, 0, w, h);
+
+    const scale = Math.max(1, w / BADGE.refW, h / BADGE.refH);
+    const x0 = Math.max(0, Math.round(w - BADGE.left * scale));
+    const x1 = Math.min(w, Math.round(w - BADGE.right * scale));
+    const y0 = Math.max(0, Math.round(h - BADGE.top * scale));
+    const y1 = Math.min(h, Math.round(h - BADGE.bottom * scale));
+    const boxH = y1 - y0;
+    const pad = Math.max(3, Math.round(boxH * 0.12));
+    ctx.fillStyle = '#6d28d9';
+    ctx.beginPath();
+    const r = Math.max(4, Math.round(boxH / 3));
+    ctx.roundRect(x0, y0, x1 - x0, boxH, r);
+    ctx.fill();
+
+    badgeLogo = badgeLogo || loadImage('/logo-circle-email.png').catch(() => null);
+    const logo = await badgeLogo;
+    const logoSize = boxH - 2 * pad;
+    let textLeft = x0 + pad;
+    if (logo) {
+      ctx.drawImage(logo, x0 + pad, y0 + pad, logoSize, logoSize);
+      textLeft = x0 + pad + logoSize + Math.max(3, pad);
+    }
+    const areaW = x1 - pad - textLeft;
+    let size = Math.round(boxH * 0.6);
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center';
+    do {
+      ctx.font = `bold ${size}px Outfit, Arial, sans-serif`;
+      size -= 1;
+    } while (size > 8 && ctx.measureText('VentaCofrade').width > areaW);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText('VentaCofrade', textLeft + areaW / 2, y0 + boxH / 2);
+
+    const blob: Blob | null = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.9));
+    if (!blob) return file;
+    const name = file.name.replace(/\.[a-z0-9]+$/i, '') + '.jpg';
+    return new File([blob], name, { type: 'image/jpeg' });
+  } catch {
+    return file;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 const http = axios.create();
 
 http.interceptors.request.use((config) => {
@@ -394,6 +471,8 @@ export const client = {
      * public URL where the image will be accessible.
      */
     async uploadImage(file: File, folder: 'products' | 'avatars' | 'ads' | 'shops'): Promise<string> {
+      // Las fotos de anuncios llevan el sello de VentaCofrade abajo a la derecha.
+      if (folder === 'products') file = await brandProductPhoto(file);
       const presignResponse = await http.post(`${baseUrl()}/api/v1/storage/presigned-upload`, {
         filename: file.name,
         content_type: file.type,

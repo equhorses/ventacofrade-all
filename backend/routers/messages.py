@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from datetime import datetime, date
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -182,9 +182,60 @@ async def get_messages(
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
+async def _had_unread(db: AsyncSession, sender_id: str, receiver_id: str, product_id: int) -> bool:
+    """¿Ya había mensajes sin leer de este remitente en esta conversación? (entonces no se repite el email)."""
+    from sqlalchemy import select
+    from models.messages import Messages
+
+    found = await db.execute(
+        select(Messages.id).where(
+            Messages.user_id == sender_id,
+            Messages.receiver_id == receiver_id,
+            Messages.product_id == product_id,
+            Messages.is_read.is_not(True),
+        ).limit(1)
+    )
+    return found.scalar_one_or_none() is not None
+
+
+async def notify_new_message(sender: UserResponse, receiver_id: str, product_id: int, content: str) -> None:
+    """Email al destinatario cuando le llega un mensaje nuevo. Nunca lanza errores."""
+    try:
+        from core.database import db_manager
+        from models.auth import User
+        from models.products import Products
+        from services.email import SITE_URL, send_new_message_email
+
+        async with db_manager.async_session_maker() as db:
+            receiver = await db.get(User, receiver_id)
+            if not receiver or not receiver.email:
+                return
+            if product_id == 0:
+                about = "Soporte VentaCofrade"
+            else:
+                product = await db.get(Products, product_id)
+                about = f"«{product.title}»" if product else "un anuncio"
+        sender_name = "VentaCofrade" if sender.role != "user" and product_id == 0 else (
+            (sender.name or sender.email.split("@")[0]).strip()
+        )
+        preview = content.strip()
+        if len(preview) > 220:
+            preview = preview[:220].rsplit(" ", 1)[0] + "…"
+        import re as _re
+
+        preview = _re.sub(r"\[\[autorizacion-catalogo:\d+\]\]", "", preview).strip()
+        await send_new_message_email(
+            receiver.email, sender_name, about, preview,
+            f"{SITE_URL}/cuenta/mensajes/{product_id}/{sender.id}",
+        )
+    except Exception as exc:
+        logger.warning(f"No se pudo avisar por email del mensaje nuevo: {exc}")
+
+
 @router.post("", response_model=MessagesResponse, status_code=201)
 async def create_messages(
     data: MessagesData,
+    background_tasks: BackgroundTasks,
     current_user: UserResponse = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -193,9 +244,14 @@ async def create_messages(
     
     service = MessagesService(db)
     try:
+        already_unread = await _had_unread(db, str(current_user.id), data.receiver_id, data.product_id)
         result = await service.create(data.model_dump(), user_id=str(current_user.id))
         if not result:
             raise HTTPException(status_code=400, detail="Failed to create messages")
+        if not already_unread and data.receiver_id != str(current_user.id):
+            background_tasks.add_task(
+                notify_new_message, current_user, data.receiver_id, data.product_id, data.content
+            )
         
         logger.info(f"Messages created successfully with id: {result.id}")
         return result
