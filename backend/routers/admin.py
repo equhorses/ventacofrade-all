@@ -861,6 +861,44 @@ async def send_support_message(
     )
 
 
+@router.delete("/support-messages/{message_id}")
+async def delete_support_message(
+    message_id: int,
+    current_user: UserResponse = Depends(require_roles("admin", "soporte")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Borra un mensaje que el equipo ha enviado por el chat de soporte (también los automáticos).
+
+    Si era una petición de autorización para importar el catálogo y seguía pendiente, se anula.
+    """
+    message = await db.get(Messages, message_id)
+    if not message or message.product_id != SUPPORT_PRODUCT_ID:
+        raise HTTPException(status_code=404, detail="Mensaje no encontrado")
+    sender = await db.get(User, message.user_id)
+    if not sender or sender.role not in STAFF_ROLES:
+        raise HTTPException(status_code=400, detail="Solo se pueden borrar mensajes enviados por el equipo")
+    if current_user.role != "admin" and message.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Solo puedes borrar tus propios mensajes")
+
+    import re as _re
+
+    marker = _re.search(r"\[\[autorizacion-catalogo:(\d+)\]\]", message.content or "")
+    if marker:
+        from models.catalog_import_consents import CatalogImportConsent
+
+        consent = await db.get(CatalogImportConsent, int(marker.group(1)))
+        if consent and consent.status == "pending":
+            consent.status = "revoked"
+    receiver = await db.get(User, message.receiver_id)
+    await db.delete(message)
+    await db.commit()
+    await log_admin_action(
+        db, current_user.id, current_user.email, "delete_support_message",
+        target=receiver.email if receiver else message.receiver_id, details=(message.content or "")[:80],
+    )
+    return {"ok": True}
+
+
 class AuditLogEntry(BaseModel):
     id: int
     actor_email: Optional[str] = None

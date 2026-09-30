@@ -760,6 +760,9 @@ export const client = {
       const response = await http.get(`${baseUrl()}/api/v1/admin/users/${userId}/messages`);
       return { data: response.data as AdminChatMessage[] };
     },
+    async deleteSupportMessage(messageId: number) {
+      await http.delete(`${baseUrl()}/api/v1/admin/support-messages/${messageId}`);
+    },
     async sendSupportMessage(userId: string, content: string) {
       const response = await http.post(`${baseUrl()}/api/v1/admin/users/${userId}/messages`, { content });
       return { data: response.data as AdminChatMessage };

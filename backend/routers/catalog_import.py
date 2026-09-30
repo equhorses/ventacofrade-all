@@ -405,7 +405,8 @@ async def platform_consent_request(
     await db.flush()
 
     name = PLATFORM_NAMES[platform]
-    hello = f"Hola {seller.name.split()[0]}" if seller.name else "Hola"
+    # Sin nombre: el de la cuenta no siempre es como le llaman (p. ej. "Francisco Víctor").
+    hello = "Hola"
     text = (
         f"{hello}, para que no tengas que subir tu catálogo a mano, podemos traer a VentaCofrade "
         f"tus anuncios de {name}, con sus fotos, descripciones y precios. "

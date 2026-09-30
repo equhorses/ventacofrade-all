@@ -31,7 +31,7 @@ DETAIL_BATCH_MAX = 20
 
 TC_HOST = "www.todocoleccion.net"
 TC_LOT_RE = re.compile(r"""href=["']((?:https?://www\.todocoleccion\.net)?/[a-z0-9-]+/[a-z0-9-]+~x(\d+))["']""", re.I)
-TC_IMG_RE = re.compile(r"""https?://cloud\d*\.todocoleccion\.online/[^"'\s<>)]+?\.(?:jpe?g|png|webp)""", re.I)
+TC_IMG_RE = re.compile(r"""(?:https?:)?//cloud\d*\.todocoleccion\.online/[^"'\s<>)\\]+?\.(?:jpe?g|png|webp)""", re.I)
 PRICE_RE = re.compile(r"(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:,\d{1,2})?)\s*(?:€|&euro;|&#8364;|EUR)", re.I)
 TITLE_ATTR_RE = re.compile(r"""(?:title|alt|aria-label)=["']([^"']{3,200})["']""", re.I)
 NEXT_DATA_RE = re.compile(r'<script[^>]+id=["\']__NEXT_DATA__["\'][^>]*>(.*?)</script>', re.S | re.I)
@@ -144,7 +144,24 @@ def _slug_title(slug: str) -> str:
 
 
 def _clean_img(url: str) -> str:
-    return url.split("?")[0]
+    url = url.split("?")[0]
+    return "https:" + url if url.startswith("//") else url
+
+
+def _tc_images(html: str, lot_id: str) -> list[str]:
+    """Todas las fotos del lote que aparecen en la página (también dentro de JSON, con barras escapadas),
+    sin repetir la misma foto en .jpg y .webp (se prefiere .jpg)."""
+    text = html.replace("\\/", "/")
+    by_stem: dict[str, str] = {}
+    for raw in TC_IMG_RE.findall(text):
+        u = _clean_img(raw)
+        name = u.rsplit("/", 1)[-1]
+        if lot_id not in name:
+            continue
+        stem = u.rsplit(".", 1)[0]
+        if stem not in by_stem or u.lower().endswith((".jpg", ".jpeg")):
+            by_stem[stem] = u
+    return list(by_stem.values())
 
 
 # ---------- Todocolección ----------
@@ -191,7 +208,7 @@ def _tc_list_page(html: str, page_url: str) -> list[dict]:
         if price_match:
             raw = price_match.group(1)
             price = ci.parse_price(raw.replace(".", "") if "," in raw else raw)
-        imgs = [_clean_img(u) for u in TC_IMG_RE.findall(card) if lot_id in u.rsplit("/", 1)[-1]]
+        imgs = _tc_images(card, lot_id)
         items[lot_id] = {"source_url": url, "title": title[: ci.TITLE_MAX], "price": price, "images": imgs[:1]}
     return list(items.values())
 
@@ -285,12 +302,7 @@ def _tc_detail(html: str, url: str) -> dict:
             raw = shown.group(1)
             price = ci.parse_price(raw.replace(".", "") if "," in raw else raw)
 
-    images = []
-    for u in TC_IMG_RE.findall(html):
-        u = _clean_img(u)
-        name = u.rsplit("/", 1)[-1]
-        if lot_id in name and u not in images:
-            images.append(u)
+    images = _tc_images(html, lot_id)
     for u in base.get("images") or []:
         u = _clean_img(u)
         if u not in images:

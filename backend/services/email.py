@@ -839,7 +839,7 @@ async def send_help_email(to_email: str, reason: str) -> bool:
 
 async def send_new_support_message_email(to_email: str, name: Optional[str], preview: str, thread_url: str) -> bool:
     """Aviso de que VentaCofrade le ha escrito por el mensajero (p. ej. para pedir una autorización)."""
-    hello = f"Hola {html_escape(name)}," if name else "Hola,"
+    hello = "Hola,"  # sin nombre: el de la cuenta no siempre es como le llaman
     body = (
         f"<p>{hello}</p>"
         f"<p>Te hemos escrito un mensaje en VentaCofrade:</p>"

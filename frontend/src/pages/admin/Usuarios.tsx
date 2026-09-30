@@ -179,6 +179,18 @@ export default function AdminUsuariosPage() {
     }
   };
 
+  const deleteChatMessage = async (messageId: number) => {
+    if (!window.confirm('¿Borrar este mensaje? La otra persona dejará de verlo.')) return;
+    try {
+      await client.admin.deleteSupportMessage(messageId);
+      setChatMessages((prev) => prev.filter((m) => m.id !== messageId));
+      toast.success('Mensaje borrado');
+    } catch (err) {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      toast.error(detail || 'No se pudo borrar el mensaje');
+    }
+  };
+
   return (
     <>
       <AdminNav />
@@ -371,6 +383,15 @@ export default function AdminUsuariosPage() {
                   <span className="whitespace-pre-line">{stripConsentMarker(m.content)}</span>
                   {CONSENT_MARKER_RE.test(m.content) && (
                     <ConsentCard consentId={Number(m.content.match(CONSENT_MARKER_RE)?.[1])} canAccept={false} />
+                  )}
+                  {m.is_from_staff && (
+                    <button
+                      type="button"
+                      onClick={() => deleteChatMessage(m.id)}
+                      className="mt-1 block ml-auto text-[11px] opacity-70 hover:opacity-100 underline cursor-pointer"
+                    >
+                      Borrar mensaje
+                    </button>
                   )}
                 </div>
               </div>
