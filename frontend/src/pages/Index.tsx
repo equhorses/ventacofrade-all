@@ -114,15 +114,15 @@ export default function HomePage() {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-28">
           <div className="text-center max-w-3xl mx-auto">
             <Badge variant="secondary" className="mb-4 bg-secondary/20 text-secondary border-secondary/30 hover:bg-secondary/30">
-              🕯️ El marketplace cofrade de referencia
+              🕯️ Arte sacro, antigüedades y artículos religiosos
             </Badge>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6">
               Compra y vende artículos{' '}
-              <span className="text-secondary">cofrades</span>
+              <span className="text-secondary">religiosos</span>
             </h1>
             <p className="text-lg md:text-xl text-primary-foreground/80 mb-8 max-w-2xl mx-auto">
-              Orfebrería, bordados, túnicas, cirios y todo lo que necesitas para tu hermandad. 
-              El punto de encuentro del mundo cofrade en Andalucía.
+              Imaginería, orfebrería, bordados, antigüedades y arte sacro.
+              Si es religioso, está aquí.
             </p>
 
             {/* Search Bar */}
@@ -131,7 +131,7 @@ export default function HomePage() {
                 <Input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Buscar orfebrería, bordados, cirios..."
+                  placeholder="Buscar imágenes, orfebrería, antigüedades..."
                   className="flex-1 bg-white text-foreground border-0 h-12 text-base placeholder:text-muted-foreground"
                 />
                 <Button type="submit" size="lg" className="bg-secondary text-secondary-foreground hover:bg-secondary/90 h-12 px-6 cursor-pointer">
@@ -143,8 +143,9 @@ export default function HomePage() {
 
             <div className="flex flex-wrap justify-center gap-2 mt-4 text-sm text-primary-foreground/60">
               <span>Popular:</span>
+              <Link to="/explorar?q=imagen" className="hover:text-primary-foreground underline cursor-pointer">Imágenes</Link>
+              <Link to="/explorar?q=antiguo" className="hover:text-primary-foreground underline cursor-pointer">Antigüedades</Link>
               <Link to="/explorar?q=candelabro" className="hover:text-primary-foreground underline cursor-pointer">Candelabros</Link>
-              <Link to="/explorar?q=tunica" className="hover:text-primary-foreground underline cursor-pointer">Túnicas</Link>
               <Link to="/explorar?q=bordado+oro" className="hover:text-primary-foreground underline cursor-pointer">Bordados en oro</Link>
               <Link to="/explorar?q=insignia" className="hover:text-primary-foreground underline cursor-pointer">Insignias</Link>
             </div>
@@ -235,15 +236,15 @@ export default function HomePage() {
               <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-primary/10 text-primary flex items-center justify-center">
                 <Users className="h-7 w-7" />
               </div>
-              <h3 className="font-semibold text-foreground mb-2">Comunidad cofrade</h3>
-              <p className="text-sm text-muted-foreground">Miles de cofrades conectados en toda Andalucía</p>
+              <h3 className="font-semibold text-foreground mb-2">Para todo el mundo</h3>
+              <p className="text-sm text-muted-foreground">Coleccionistas, anticuarios, hermandades y particulares de toda España</p>
             </div>
             <div className="text-center">
               <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-primary/10 text-primary flex items-center justify-center">
                 <Star className="h-7 w-7" />
               </div>
               <h3 className="font-semibold text-foreground mb-2">Artículos únicos</h3>
-              <p className="text-sm text-muted-foreground">Piezas exclusivas de orfebrería, bordados y más</p>
+              <p className="text-sm text-muted-foreground">Imaginería, orfebrería, bordados, antigüedades y más</p>
             </div>
           </div>
         </div>
@@ -252,7 +253,7 @@ export default function HomePage() {
       {/* CTA Section */}
       <section className="py-16 bg-gradient-to-r from-primary to-primary/80 text-primary-foreground">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-2xl md:text-3xl font-bold mb-4">¿Tienes artículos cofrades para vender?</h2>
+          <h2 className="text-2xl md:text-3xl font-bold mb-4">¿Tienes artículos religiosos o antigüedades para vender?</h2>
           <p className="text-primary-foreground/80 mb-6 max-w-xl mx-auto">
             Publica gratis todo lo que tengas guardado: sin límite de anuncios y sin comisiones por venta.
           </p>
