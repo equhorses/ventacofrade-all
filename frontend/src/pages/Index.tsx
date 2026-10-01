@@ -72,7 +72,6 @@ export default function HomePage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [totalProducts, setTotalProducts] = useState(0);
   const carouselRef = useRef<HTMLDivElement>(null);
   const scrollCarousel = (dir: 1 | -1) => {
     const el = carouselRef.current;
@@ -116,7 +115,6 @@ export default function HomePage() {
       const prods = prodRes?.data?.items || [];
       setCategories(cats.length > 0 ? cats : defaultCategories);
       setFeaturedProducts(prods);
-      setTotalProducts(prodRes?.data?.total ?? prods.length);
     } catch (err) {
       console.error('Error loading data:', err);
       setCategories(defaultCategories);
@@ -253,7 +251,7 @@ export default function HomePage() {
               </Button>
               <Link to="/explorar">
                 <Button variant="outline" className="cursor-pointer">
-                  Ver todos{totalProducts > 0 ? ` (${totalProducts})` : ''}
+                  Ver todos
                 </Button>
               </Link>
             </div>
@@ -284,7 +282,6 @@ export default function HomePage() {
                   className="snap-start shrink-0 w-[60%] sm:w-[30%] lg:w-[20%] rounded-lg border-2 border-dashed border-primary/30 flex flex-col items-center justify-center gap-2 text-primary hover:bg-primary/5 transition-colors cursor-pointer"
                 >
                   <span className="text-lg font-semibold">Ver todos</span>
-                  <span className="text-sm text-muted-foreground">{totalProducts} anuncios</span>
                   <ChevronRight className="h-6 w-6" />
                 </Link>
               )}
