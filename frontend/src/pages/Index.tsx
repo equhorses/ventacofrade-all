@@ -79,6 +79,27 @@ export default function HomePage() {
     if (el) el.scrollBy({ left: dir * el.clientWidth * 0.9, behavior: 'smooth' });
   };
 
+  // El carrusel avanza solo cada 4 s (una tarjeta); al llegar al final vuelve al principio.
+  // Se para mientras el usuario lo toca o pasa el ratón por encima, y si la pestaña no está visible.
+  const pausedUntil = useRef(0);
+  const pauseCarousel = (ms = 8000) => {
+    pausedUntil.current = Date.now() + ms;
+  };
+  useEffect(() => {
+    if (loading) return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    const id = window.setInterval(() => {
+      const el = carouselRef.current;
+      if (!el || document.hidden || Date.now() < pausedUntil.current) return;
+      const card = el.firstElementChild as HTMLElement | null;
+      const step = card ? card.offsetWidth + 16 : el.clientWidth * 0.8;
+      const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 8;
+      if (atEnd) el.scrollTo({ left: 0, behavior: 'smooth' });
+      else el.scrollBy({ left: step, behavior: 'smooth' });
+    }, 4000);
+    return () => window.clearInterval(id);
+  }, [loading]);
+
   useEffect(() => {
     loadData();
   }, []);
@@ -210,7 +231,10 @@ export default function HomePage() {
                 variant="outline"
                 size="icon"
                 aria-label="Anteriores"
-                onClick={() => scrollCarousel(-1)}
+                onClick={() => {
+                  pauseCarousel();
+                  scrollCarousel(-1);
+                }}
                 className="hidden md:inline-flex cursor-pointer"
               >
                 <ChevronLeft className="h-5 w-5" />
@@ -219,7 +243,10 @@ export default function HomePage() {
                 variant="outline"
                 size="icon"
                 aria-label="Siguientes"
-                onClick={() => scrollCarousel(1)}
+                onClick={() => {
+                  pauseCarousel();
+                  scrollCarousel(1);
+                }}
                 className="hidden md:inline-flex cursor-pointer"
               >
                 <ChevronRight className="h-5 w-5" />
@@ -235,6 +262,10 @@ export default function HomePage() {
           {!loading ? (
             <div
               ref={carouselRef}
+              onMouseEnter={() => pauseCarousel(60_000)}
+              onMouseLeave={() => pauseCarousel(1500)}
+              onTouchStart={() => pauseCarousel(10_000)}
+              onWheel={() => pauseCarousel(10_000)}
               className="flex gap-4 md:gap-6 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-4 -mx-4 px-4 sm:mx-0 sm:px-0 [scrollbar-width:thin]"
             >
               {featuredProducts.map((product) => (
