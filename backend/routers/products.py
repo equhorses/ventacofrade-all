@@ -165,6 +165,7 @@ async def query_productss_all(
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(20, ge=1, le=2000, description="Max number of records to return"),
     fields: str = Query(None, description="Comma-separated list of fields to return"),
+    q: str = Query(None, max_length=200, description="Texto a buscar en título y descripción"),
     db: AsyncSession = Depends(get_db),
 ):
     # Query productss with filtering, sorting, and pagination without user limitation
@@ -186,6 +187,7 @@ async def query_productss_all(
             query_dict=query_dict,
             sort=sort,
             boost_featured=True,
+            search=q,
         )
         result["items"] = [_refresh_featured_flag(p) for p in result["items"]]
         tiers = await tiers_for_users(db, [p.user_id for p in result["items"]])

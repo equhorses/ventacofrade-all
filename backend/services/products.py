@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List
 
-from sqlalchemy import select, func, case
+from sqlalchemy import select, func, case, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.products import Products
@@ -62,6 +62,7 @@ class ProductsService:
         query_dict: Optional[Dict[str, Any]] = None,
         sort: Optional[str] = None,
         boost_featured: bool = False,
+        search: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Get paginated list of productss (user can only see their own records)"""
         try:
@@ -78,6 +79,13 @@ class ProductsService:
                         query = query.where(getattr(Products, field) == value)
                         count_query = count_query.where(getattr(Products, field) == value)
             
+            # Búsqueda por texto en título y descripción: cada palabra tiene que aparecer en alguno.
+            for word in (search or "").split()[:8]:
+                pattern = f"%{word.strip()}%"
+                condition = or_(Products.title.ilike(pattern), Products.description.ilike(pattern))
+                query = query.where(condition)
+                count_query = count_query.where(condition)
+
             count_result = await self.db.execute(count_query)
             total = count_result.scalar()
 

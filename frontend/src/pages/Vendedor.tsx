@@ -68,7 +68,7 @@ export default function VendedorPage() {
           client.entities.products.query({
             query: { user_id: sellerProfile.user_id, status: 'active' },
             sort: '-created_at',
-            limit: 50,
+            limit: 500,
           }),
           client.reviews.list(sellerProfile.id),
         ]);

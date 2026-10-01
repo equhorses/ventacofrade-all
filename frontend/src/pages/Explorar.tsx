@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -40,11 +40,18 @@ const conditionLabels: Record<string, string> = {
   restaurado: 'Restaurado',
 };
 
+const PAGE_SIZE = 24;
+
 export default function ExplorarPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [total, setTotal] = useState(0);
+  // Al llegar al final de la lista se cargan más solos (sobre todo en el móvil).
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const hasMore = products.length < total;
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get('categoria') || 'todas');
   const [selectedCondition, setSelectedCondition] = useState('todas');
@@ -77,8 +84,9 @@ export default function ExplorarPage() {
     }
   };
 
-  const loadProducts = async () => {
-    setLoading(true);
+  const loadProducts = async (more = false) => {
+    if (more) setLoadingMore(true);
+    else setLoading(true);
     try {
       const query: Record<string, unknown> = { status: 'active' };
       
@@ -90,32 +98,39 @@ export default function ExplorarPage() {
         query.condition = selectedCondition;
       }
 
+      // La búsqueda la hace el servidor sobre TODOS los anuncios, de PAGE_SIZE en PAGE_SIZE.
       const res = await client.entities.products.query({
         query,
+        q: searchParams.get('q') || undefined,
         sort: sortBy,
-        limit: 20,
+        limit: PAGE_SIZE,
+        skip: more ? products.length : 0,
       });
-      
-      let items = res?.data?.items || [];
-      
-      // Client-side text search filter
-      const q = searchParams.get('q');
-      if (q) {
-        const lower = q.toLowerCase();
-        items = items.filter((p: Product) =>
-          p.title.toLowerCase().includes(lower) ||
-          (p.description && p.description.toLowerCase().includes(lower))
-        );
-      }
-      
-      setProducts(items);
+      const items: Product[] = res?.data?.items || [];
+      setTotal(res?.data?.total ?? items.length);
+      setProducts((prev) => (more ? [...prev, ...items.filter((i) => !prev.some((p) => p.id === i.id))] : items));
     } catch (err) {
       console.error('Error loading products:', err);
-      setProducts([]);
+      if (!more) setProducts([]);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasMore || loading) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !loadingMore) loadProducts(true);
+      },
+      { rootMargin: '600px 0px' },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasMore, loading, loadingMore, products.length]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,7 +161,7 @@ export default function ExplorarPage() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground">Todos los anuncios</h1>
           <p className="text-muted-foreground mt-1">
-            <span className="font-semibold text-foreground">{products.length}</span> anuncios disponibles
+            <span className="font-semibold text-foreground">{total}</span> anuncios disponibles
           </p>
         </div>
 
@@ -278,6 +293,22 @@ export default function ExplorarPage() {
             {placeholders.map((item) => (
               <PlaceholderCard key={item.key} item={item} />
             ))}
+            {hasMore && (
+              <div ref={sentinelRef} className="col-span-full flex flex-col items-center gap-2 pt-4">
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={() => loadProducts(true)}
+                  disabled={loadingMore}
+                  className="cursor-pointer"
+                >
+                  {loadingMore ? 'Cargando…' : 'Ver más anuncios'}
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  Mostrando {products.length} de {total}
+                </span>
+              </div>
+            )}
           </div>
         ) : (
           <div className="text-center py-16 bg-muted/30 rounded-lg border border-border">

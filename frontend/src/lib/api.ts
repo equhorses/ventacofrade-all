@@ -125,6 +125,7 @@ function baseUrl() {
 
 interface QueryOptions {
   query?: Record<string, unknown>;
+  q?: string;
   sort?: string;
   limit?: number;
   skip?: number;
@@ -136,6 +137,7 @@ function makeEntity(entityName: string) {
     async query(options: QueryOptions = {}) {
       const params: Record<string, string | number> = {};
       if (options.query) params.query = JSON.stringify(options.query);
+      if (options.q) params.q = options.q;
       if (options.sort) params.sort = options.sort;
       if (options.limit !== undefined) params.limit = options.limit;
       if (options.skip !== undefined) params.skip = options.skip;
