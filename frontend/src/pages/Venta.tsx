@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { client, type LandingPage, type LandingProduct, type LandingSummary } from '@/lib/api';
 import { Church, MapPin, Plus, Search } from 'lucide-react';
+import FavoriteButton from '@/components/FavoriteButton';
 
 // Páginas de búsqueda para Google, tipo Milanuncios: /venta/paso-de-misterio, /venta/tunicas-de-nazareno...
 // El contenido (texto y anuncios) viene del backend: services/seo_landings.py.
@@ -77,9 +78,10 @@ function ProductCard({ product }: { product: LandingProduct }) {
           {product.is_featured && (
             <Badge className="absolute top-2 left-2 bg-secondary text-secondary-foreground text-xs">Destacado</Badge>
           )}
-          <Badge variant="outline" className="absolute top-2 right-2 bg-white/90 text-xs">
+          <Badge variant="outline" className="absolute bottom-2 left-2 bg-white/90 text-xs">
             {conditionLabels[product.condition] || product.condition}
           </Badge>
+          <FavoriteButton productId={product.id} className="absolute top-2 right-2" />
         </div>
         <CardContent className="p-4">
           <SellerBadge tier={product.seller_tier} className="mb-2" />

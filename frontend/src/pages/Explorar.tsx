@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigationType, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,7 @@ import AdSlot from '@/components/AdSlot';
 import { client } from '@/lib/api';
 import { Search, MapPin, Church, SlidersHorizontal } from 'lucide-react';
 import { getPlaceholders, PlaceholderCard } from '@/components/PlaceholderListings';
+import FavoriteButton from '@/components/FavoriteButton';
 
 interface Product {
   id: number;
@@ -42,6 +43,10 @@ const conditionLabels: Record<string, string> = {
 
 const PAGE_SIZE = 24;
 
+// Lo que ya se había cargado de la lista: al volver atrás desde un anuncio se muestra al momento
+// (con todo lo que habías ido cargando al bajar), así se puede volver al mismo punto.
+let listCache: { key: string; products: Product[]; total: number } | null = null;
+
 export default function ExplorarPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState<Product[]>([]);
@@ -57,6 +62,8 @@ export default function ExplorarPage() {
   const [selectedCondition, setSelectedCondition] = useState('todas');
   const [sortBy, setSortBy] = useState('-created_at');
   const location = useLocation();
+  const navigationType = useNavigationType();
+  const cacheKey = `${selectedCategory}|${selectedCondition}|${sortBy}|${searchParams.toString()}`;
 
   // Tarjetas de relleno mientras hay pocos anuncios (no en búsquedas ni en favoritos).
   const PLACEHOLDER_TARGET = 12;
@@ -70,8 +77,19 @@ export default function ExplorarPage() {
   }, []);
 
   useEffect(() => {
+    if (navigationType === 'POP' && listCache && listCache.key === cacheKey && listCache.products.length) {
+      setProducts(listCache.products);
+      setTotal(listCache.total);
+      setLoading(false);
+      return;
+    }
     loadProducts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCategory, selectedCondition, sortBy, searchParams]);
+
+  useEffect(() => {
+    if (!loading) listCache = { key: cacheKey, products, total };
+  }, [products, total, loading, cacheKey]);
 
   const loadCategories = async () => {
     try {
@@ -272,9 +290,10 @@ export default function ExplorarPage() {
                     {product.is_featured && (
                       <Badge className="absolute top-2 left-2 bg-secondary text-secondary-foreground text-xs">Destacado</Badge>
                     )}
-                    <Badge variant="outline" className="absolute top-2 right-2 bg-white/90 text-xs">
+                    <Badge variant="outline" className="absolute bottom-2 left-2 bg-white/90 text-xs">
                       {conditionLabels[product.condition] || product.condition}
                     </Badge>
+                    <FavoriteButton productId={product.id} className="absolute top-2 right-2" />
                   </div>
                   <CardContent className="p-4">
                     <SellerBadge tier={product.seller_tier} className="mb-2" />

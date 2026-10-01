@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import AccountLayout from '@/components/AccountLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { client } from '@/lib/api';
+import FavoriteButton from '@/components/FavoriteButton';
 import { Heart, Church, MapPin } from 'lucide-react';
 
 interface Product {
@@ -84,7 +85,7 @@ export default function FavoritosPage() {
                       </div>
                     )}
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="font-medium text-foreground truncate">{product.title}</p>
                     <p className="text-primary font-semibold text-sm mt-0.5">
                       {product.price?.toFixed(2)} €
@@ -96,6 +97,7 @@ export default function FavoritosPage() {
                       </div>
                     )}
                   </div>
+                  <FavoriteButton productId={product.id} className="shrink-0" />
                 </CardContent>
               </Card>
             </Link>

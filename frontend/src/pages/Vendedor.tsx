@@ -11,6 +11,7 @@ import { Store, Star, MapPin, Sparkles, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Review } from '@/lib/api';
+import FavoriteButton from '@/components/FavoriteButton';
 
 interface SellerProfile {
   id: number;
@@ -202,7 +203,7 @@ export default function VendedorPage() {
               {products.map((p) => (
                 <Link key={p.id} to={`/producto/${p.id}`}>
                   <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer">
-                    <div className="aspect-square bg-muted">
+                    <div className="aspect-square bg-muted relative">
                       {p.images && (
                         <img
                           src={p.images.split(',')[0]}
@@ -210,6 +211,7 @@ export default function VendedorPage() {
                           className="w-full h-full object-cover"
                         />
                       )}
+                      <FavoriteButton productId={p.id} className="absolute top-2 right-2" />
                     </div>
                     <CardContent className="p-3">
                       <p className="text-sm font-medium text-foreground truncate">{p.title}</p>

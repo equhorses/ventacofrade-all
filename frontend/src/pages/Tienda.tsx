@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { client, type PublicShop } from '@/lib/api';
 import { MapPin, Search, Sparkles, Star, Store } from 'lucide-react';
+import FavoriteButton from '@/components/FavoriteButton';
 
 interface Category {
   id: number;
@@ -218,6 +219,7 @@ export default function TiendaPage() {
                           Destacado
                         </span>
                       )}
+                      <FavoriteButton productId={p.id} className="absolute top-2 right-2" />
                     </div>
                     <CardContent className="p-3">
                       <p className="text-sm font-medium text-foreground truncate">{p.title}</p>

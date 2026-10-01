@@ -29,6 +29,7 @@ import {
   Users,
   Star,
 } from 'lucide-react';
+import FavoriteButton from '@/components/FavoriteButton';
 
 interface Category {
   id: number;
@@ -375,9 +376,10 @@ function ProductCard({ product }: { product: Product }) {
           {product.is_featured && (
             <Badge className="absolute top-2 left-2 bg-secondary text-secondary-foreground text-xs">Destacado</Badge>
           )}
-          <Badge variant="outline" className="absolute top-2 right-2 bg-white/90 text-xs capitalize">
+          <Badge variant="outline" className="absolute bottom-2 left-2 bg-white/90 text-xs capitalize">
             {product.condition}
           </Badge>
+          <FavoriteButton productId={product.id} className="absolute top-2 right-2" />
         </div>
         <CardContent className="p-4">
           <SellerBadge tier={product.seller_tier} className="mb-2" />
