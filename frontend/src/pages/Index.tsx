@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -12,6 +12,8 @@ import AdSlot from '@/components/AdSlot';
 import { client } from '@/lib/api';
 import {
   Search,
+  ChevronLeft,
+  ChevronRight,
   Shirt,
   Flame,
   Crown,
@@ -70,6 +72,12 @@ export default function HomePage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const scrollCarousel = (dir: 1 | -1) => {
+    const el = carouselRef.current;
+    if (el) el.scrollBy({ left: dir * el.clientWidth * 0.9, behavior: 'smooth' });
+  };
 
   useEffect(() => {
     loadData();
@@ -79,12 +87,15 @@ export default function HomePage() {
     try {
       const [catRes, prodRes] = await Promise.all([
         client.entities.categories.query({ sort: 'order_index', limit: 12 }),
-        client.entities.products.query({ query: { status: 'active' }, sort: '-created_at', limit: 6 }),
+        // El servidor ya los ordena: destacados primero, luego por plan del vendedor y después lo más
+        // reciente (publicado o renovado).
+        client.entities.products.query({ query: { status: 'active' }, sort: '-created_at', limit: 24 }),
       ]);
       const cats = catRes?.data?.items || [];
       const prods = prodRes?.data?.items || [];
       setCategories(cats.length > 0 ? cats : defaultCategories);
       setFeaturedProducts(prods);
+      setTotalProducts(prodRes?.data?.total ?? prods.length);
     } catch (err) {
       console.error('Error loading data:', err);
       setCategories(defaultCategories);
@@ -189,29 +200,68 @@ export default function HomePage() {
       {/* Featured Products */}
       <section className="py-16 bg-muted/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex items-end justify-between gap-4 mb-6">
             <div>
               <h2 className="text-2xl md:text-3xl font-bold text-foreground">Anuncios destacados</h2>
-              <p className="text-muted-foreground mt-1">Los últimos artículos publicados</p>
+              <p className="text-muted-foreground mt-1">Primero los destacados, después lo más nuevo</p>
             </div>
-            <Link to="/explorar">
-              <Button variant="outline" className="cursor-pointer">Ver todos</Button>
-            </Link>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="Anteriores"
+                onClick={() => scrollCarousel(-1)}
+                className="hidden md:inline-flex cursor-pointer"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="Siguientes"
+                onClick={() => scrollCarousel(1)}
+                className="hidden md:inline-flex cursor-pointer"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </Button>
+              <Link to="/explorar">
+                <Button variant="outline" className="cursor-pointer">
+                  Ver todos{totalProducts > 0 ? ` (${totalProducts})` : ''}
+                </Button>
+              </Link>
+            </div>
           </div>
 
           {!loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div
+              ref={carouselRef}
+              className="flex gap-4 md:gap-6 overflow-x-auto snap-x snap-mandatory scroll-smooth pb-4 -mx-4 px-4 sm:mx-0 sm:px-0 [scrollbar-width:thin]"
+            >
               {featuredProducts.map((product) => (
-                <ProductCard key={product.id} product={product} />
+                <div key={product.id} className="snap-start shrink-0 w-[78%] sm:w-[45%] lg:w-[31.5%]">
+                  <ProductCard product={product} />
+                </div>
               ))}
               {getPlaceholders(null, featuredProducts.length, 6).map((item) => (
-                <PlaceholderCard key={item.key} item={item} />
+                <div key={item.key} className="snap-start shrink-0 w-[78%] sm:w-[45%] lg:w-[31.5%]">
+                  <PlaceholderCard item={item} />
+                </div>
               ))}
+              {featuredProducts.length > 0 && (
+                <Link
+                  to="/explorar"
+                  className="snap-start shrink-0 w-[60%] sm:w-[30%] lg:w-[20%] rounded-lg border-2 border-dashed border-primary/30 flex flex-col items-center justify-center gap-2 text-primary hover:bg-primary/5 transition-colors cursor-pointer"
+                >
+                  <span className="text-lg font-semibold">Ver todos</span>
+                  <span className="text-sm text-muted-foreground">{totalProducts} anuncios</span>
+                  <ChevronRight className="h-6 w-6" />
+                </Link>
+              )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[...Array(6)].map((_, i) => (
-                <div key={i} className="aspect-[4/3] rounded-lg bg-muted animate-pulse" />
+            <div className="flex gap-6 overflow-hidden">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="shrink-0 w-[78%] sm:w-[45%] lg:w-[31.5%] aspect-[4/3] rounded-lg bg-muted animate-pulse" />
               ))}
             </div>
           )}
