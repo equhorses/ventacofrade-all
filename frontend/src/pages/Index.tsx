@@ -78,7 +78,7 @@ export default function HomePage() {
     if (el) el.scrollBy({ left: dir * el.clientWidth * 0.9, behavior: 'smooth' });
   };
 
-  // El carrusel avanza solo cada 4 s (una tarjeta); al llegar al final vuelve al principio.
+  // El carrusel avanza solo (una tarjeta); al llegar al final vuelve al principio.
   // Se para mientras el usuario lo toca o pasa el ratón por encima, y si la pestaña no está visible.
   const pausedUntil = useRef(0);
   const pauseCarousel = (ms = 8000) => {
@@ -87,7 +87,7 @@ export default function HomePage() {
   useEffect(() => {
     if (loading) return;
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
-    const id = window.setInterval(() => {
+    const tick = () => {
       const el = carouselRef.current;
       if (!el || document.hidden || Date.now() < pausedUntil.current) return;
       const card = el.firstElementChild as HTMLElement | null;
@@ -95,8 +95,14 @@ export default function HomePage() {
       const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 8;
       if (atEnd) el.scrollTo({ left: 0, behavior: 'smooth' });
       else el.scrollBy({ left: step, behavior: 'smooth' });
-    }, 4000);
-    return () => window.clearInterval(id);
+    };
+    // Primer movimiento enseguida (para que se note que es un carrusel) y luego cada 3,5 s.
+    const first = window.setTimeout(tick, 1500);
+    const id = window.setInterval(tick, 3500);
+    return () => {
+      window.clearTimeout(first);
+      window.clearInterval(id);
+    };
   }, [loading]);
 
   useEffect(() => {
@@ -219,10 +225,9 @@ export default function HomePage() {
       {/* Featured Products */}
       <section className="py-16 bg-muted/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-end justify-between gap-4 mb-6">
+          <div className="flex items-center justify-between gap-4 mb-6">
             <div>
-              <h2 className="text-2xl md:text-3xl font-bold text-foreground">Anuncios destacados</h2>
-              <p className="text-muted-foreground mt-1">Primero los destacados, después lo más nuevo</p>
+              <h2 className="text-2xl md:text-3xl font-bold text-foreground">Descubre piezas únicas</h2>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <Button
