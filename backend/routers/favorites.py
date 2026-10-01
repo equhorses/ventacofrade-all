@@ -184,7 +184,22 @@ async def create_favorites(
     
     service = FavoritesService(db)
     try:
-        result = await service.create(data.model_dump(), user_id=str(current_user.id))
+        # Si ya lo tenía guardado, se devuelve el mismo (sin duplicados al pulsar dos veces el corazón).
+        from sqlalchemy import select
+        from models.favorites import Favorites
+
+        payload = data.model_dump()
+        existing = (
+            await db.execute(
+                select(Favorites).where(
+                    Favorites.user_id == str(current_user.id),
+                    Favorites.product_id == payload.get("product_id"),
+                ).limit(1)
+            )
+        ).scalar_one_or_none()
+        if existing:
+            return existing
+        result = await service.create(payload, user_id=str(current_user.id))
         if not result:
             raise HTTPException(status_code=400, detail="Failed to create favorites")
         

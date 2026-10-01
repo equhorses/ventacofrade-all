@@ -10,6 +10,7 @@ import SellerBadge from '@/components/SellerBadge';
 import SellerContactLinks from '@/components/SellerContactLinks';
 import ProductGallery from '@/components/ProductGallery';
 import { client } from '@/lib/api';
+import { toggleFavorite, useIsFavorite } from '@/lib/favorites';
 import { MapPin, Heart, Share2, MessageCircle, Eye, ArrowLeft, Church, User, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -64,7 +65,7 @@ export default function ProductoPage() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
-  const [isFavorite, setIsFavorite] = useState(false);
+  const isFavorite = useIsFavorite(Number(id));
   const [seller, setSeller] = useState<SellerProfile | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [avgRating, setAvgRating] = useState(0);
@@ -136,16 +137,15 @@ export default function ProductoPage() {
 
   const handleFavorite = async () => {
     try {
-      if (isFavorite) {
-        setIsFavorite(false);
-        toast.success('Eliminado de favoritos');
+      const saved = await toggleFavorite(product!.id);
+      toast.success(saved ? 'Añadido a favoritos' : 'Eliminado de favoritos');
+    } catch (err) {
+      if (err instanceof Error && err.message === 'login') {
+        toast.info('Inicia sesión para guardar favoritos');
+        client.auth.toLogin();
       } else {
-        await client.entities.favorites.create({ data: { product_id: product!.id } });
-        setIsFavorite(true);
-        toast.success('Añadido a favoritos');
+        toast.error('No se pudo guardar. Inténtalo de nuevo.');
       }
-    } catch {
-      toast.error('Inicia sesión para guardar favoritos');
     }
   };
 
