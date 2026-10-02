@@ -163,7 +163,7 @@ export default function LoginPage() {
     // checkbox is our only signal here — required for every new signup,
     // not just people arriving through a raffle invite.
     if (mode === 'register' && !ageConfirmed) {
-      toast.error('Confirma que eres mayor de 18 años para crear una cuenta');
+      toast.error('Marca la casilla de mayor de edad y aceptación de los Términos para crear tu cuenta');
       return;
     }
     localStorage.removeItem(INVITE_TOKEN_STORAGE_KEY);
@@ -187,7 +187,7 @@ export default function LoginPage() {
     }
 
     if (mode === 'register' && !ageConfirmed) {
-      toast.error('Confirma que eres mayor de 18 años para crear una cuenta');
+      toast.error('Marca la casilla de mayor de edad y aceptación de los Términos para crear tu cuenta');
       return;
     }
 
@@ -272,7 +272,22 @@ export default function LoginPage() {
                   onChange={(e) => setAgeConfirmed(e.target.checked)}
                   className="mt-0.5 cursor-pointer"
                 />
-                Confirmo que soy mayor de 18 años.
+                <span>
+                  Confirmo que soy mayor de 18 años y acepto los{' '}
+                  <a href="/legal/terminos" target="_blank" rel="noopener noreferrer" className="underline text-primary">
+                    Términos y Condiciones
+                  </a>{' '}
+                  y el{' '}
+                  <a href="/legal/aviso-legal" target="_blank" rel="noopener noreferrer" className="underline text-primary">
+                    Aviso Legal
+                  </a>
+                  , incluido que VentaCofrade use las fotos y textos de mis anuncios para promocionarlos en la web,
+                  redes sociales y publicidad. He leído la{' '}
+                  <a href="/legal/privacidad" target="_blank" rel="noopener noreferrer" className="underline text-primary">
+                    Política de Privacidad
+                  </a>
+                  .
+                </span>
               </label>
             )}
             <Button

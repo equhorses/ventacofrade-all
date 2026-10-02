@@ -5,6 +5,7 @@ from urllib.parse import urlencode
 import httpx
 from core.config import settings
 from core.database import get_db
+from core.legal import TERMS_VERSION
 from dependencies.auth import get_current_user
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
@@ -57,6 +58,7 @@ async def register(payload: RegisterRequest, request: Request, db: AsyncSession 
         password=payload.password,
         name=payload.name,
         age_confirmed=payload.age_confirmed,
+        client_ip=client_ip,
     )
     token, expires_at, _ = await auth_service.issue_app_token(user=user)
     return AuthTokenResponse(token=token, user=UserResponse.model_validate(user))
@@ -226,7 +228,7 @@ async def google_callback(
     auth_service = AuthService(db)
     try:
         user, is_new_user = await auth_service.get_or_create_google_user(
-            email=email, name=userinfo.get("name"), age_confirmed=age_confirmed
+            email=email, name=userinfo.get("name"), age_confirmed=age_confirmed, client_ip=client_ip
         )
     except HTTPException as exc:
         await log_login_attempt(
@@ -265,6 +267,22 @@ async def google_callback(
 async def get_current_user_info(current_user: UserResponse = Depends(get_current_user)):
     """Get current user info."""
     return current_user
+
+
+@router.post("/accept-terms", response_model=UserResponse)
+async def accept_terms(
+    request: Request,
+    current_user: UserResponse = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """La persona acepta la versión vigente de los Términos y el Aviso Legal (se guarda cuándo y desde qué IP)."""
+    user = (await db.execute(select(User).where(User.id == current_user.id))).scalar_one()
+    user.terms_version = TERMS_VERSION
+    user.terms_accepted_at = datetime.now(timezone.utc)
+    user.terms_accepted_ip = request.client.host if request.client else None
+    await db.commit()
+    await db.refresh(user)
+    return UserResponse.model_validate(user)
 
 
 @router.get("/logout")

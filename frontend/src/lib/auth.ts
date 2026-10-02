@@ -61,6 +61,11 @@ class RPApi {
     }
   }
 
+  async acceptTerms() {
+    const response = await this.client.post(`${this.getBaseURL()}/api/v1/auth/accept-terms`);
+    return response.data;
+  }
+
   async register(email: string, password: string, name?: string, captchaToken?: string) {
     try {
       const response = await this.client.post(`${this.getBaseURL()}/api/v1/auth/register`, {

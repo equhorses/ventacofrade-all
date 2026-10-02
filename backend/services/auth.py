@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional, Tuple
 from core.auth import create_access_token
 from core.config import settings
 from core.database import db_manager
+from core.legal import TERMS_VERSION
 from core.security import hash_password, verify_password
 from fastapi import HTTPException, status
 from models.auth import User
@@ -22,7 +23,12 @@ class AuthService:
         self.db = db
 
     async def register_user(
-        self, email: str, password: str, name: Optional[str] = None, age_confirmed: bool = False
+        self,
+        email: str,
+        password: str,
+        name: Optional[str] = None,
+        age_confirmed: bool = False,
+        client_ip: Optional[str] = None,
     ) -> User:
         """Create a new user account with email + password.
 
@@ -33,7 +39,7 @@ class AuthService:
         if not age_confirmed:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Debes confirmar que eres mayor de 18 años para crear una cuenta",
+                detail="Debes confirmar que eres mayor de 18 años y aceptar los Términos para crear una cuenta",
             )
 
         normalized_email = email.strip().lower()
@@ -51,6 +57,9 @@ class AuthService:
             role="user",
             last_login=datetime.now(timezone.utc),
             age_confirmed_at=datetime.now(timezone.utc),
+            terms_version=TERMS_VERSION,
+            terms_accepted_at=datetime.now(timezone.utc),
+            terms_accepted_ip=client_ip,
         )
         self.db.add(user)
         await self.db.commit()
@@ -95,7 +104,11 @@ class AuthService:
         return user
 
     async def get_or_create_google_user(
-        self, email: str, name: Optional[str] = None, age_confirmed: bool = False
+        self,
+        email: str,
+        name: Optional[str] = None,
+        age_confirmed: bool = False,
+        client_ip: Optional[str] = None,
     ) -> Tuple[User, bool]:
         """Find a user by email (created via Google or previously via password),
         or create a new one. Google-authenticated accounts have no password_hash,
@@ -127,7 +140,7 @@ class AuthService:
             if not age_confirmed:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Debes confirmar que eres mayor de 18 años para crear una cuenta",
+                    detail="Debes confirmar que eres mayor de 18 años y aceptar los Términos para crear una cuenta",
                 )
             is_new_user = True
             user = User(
@@ -138,6 +151,9 @@ class AuthService:
                 role="user",
                 last_login=datetime.now(timezone.utc),
                 age_confirmed_at=datetime.now(timezone.utc),
+                terms_version=TERMS_VERSION,
+                terms_accepted_at=datetime.now(timezone.utc),
+                terms_accepted_ip=client_ip,
             )
             self.db.add(user)
 

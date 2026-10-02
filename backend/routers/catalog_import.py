@@ -321,7 +321,9 @@ def _consent_text(platform: str, url: str) -> str:
     return (
         f"Autorizo a VentaCofrade a copiar los anuncios de mi tienda en {name} ({url}) que elijamos, "
         "con sus títulos, descripciones, precios y fotos, y a publicarlos en mi cuenta de VentaCofrade. "
-        "Declaro que esos anuncios, sus textos y sus fotos son míos. "
+        "Declaro que esos anuncios, sus textos y sus fotos son míos, y autorizo a VentaCofrade a usarlos "
+        "también para promocionar mis anuncios y la plataforma (redes sociales y publicidad), "
+        "según la licencia del apartado 4 de los Términos y Condiciones. "
         "Puedo cambiar, pausar o borrar cualquiera de ellos cuando quiera desde «Mis anuncios»."
     )
 

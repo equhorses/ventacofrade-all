@@ -16,6 +16,8 @@ interface User {
   last_login?: string;
   account_status?: string;
   scheduled_purge_at?: string;
+  terms_version?: string | null;
+  terms_required_version?: string;
 }
 
 interface AuthContextType {
@@ -25,6 +27,7 @@ interface AuthContextType {
   login: () => Promise<void>;
   logout: () => Promise<void>;
   refetch: () => Promise<void>;
+  setUser: (user: User | null) => void;
   isAdmin: boolean;
   isSuperAdmin: boolean;
   isStaff: boolean;
@@ -92,6 +95,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     login,
     logout,
     refetch: checkAuthStatus,
+    setUser,
     isAdmin: user?.role === 'admin',
     isSuperAdmin: user?.role === 'admin',
     isStaff: !!user && STAFF_ROLES.has(user.role),

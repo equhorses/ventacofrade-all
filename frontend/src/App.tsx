@@ -45,6 +45,7 @@ import ProtectedAdminRoute from './components/ProtectedAdminRoute';
 import { AuthProvider } from './contexts/AuthContext';
 import ComingSoonGate from './components/ComingSoonGate';
 import CookieBanner from './components/CookieBanner';
+import TermsGate from './components/TermsGate';
 import AvisoLegal from './pages/legal/AvisoLegal';
 import Privacidad from './pages/legal/Privacidad';
 import Terminos from './pages/legal/Terminos';
@@ -195,6 +196,7 @@ const App = () => (
             <AppRoutes />
           </ComingSoonGate>
           <CookieBanner />
+          <TermsGate />
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
