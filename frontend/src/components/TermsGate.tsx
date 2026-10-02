@@ -57,12 +57,12 @@ export default function TermsGate() {
             Acepto los{' '}
             <a href="/legal/terminos" target="_blank" rel="noopener noreferrer" className="underline text-primary">
               Términos y Condiciones
-            </a>{' '}
-            y el{' '}
+            </a>
+            , el{' '}
             <a href="/legal/aviso-legal" target="_blank" rel="noopener noreferrer" className="underline text-primary">
               Aviso Legal
-            </a>
-            , y he leído la{' '}
+            </a>{' '}
+            y la{' '}
             <a href="/legal/privacidad" target="_blank" rel="noopener noreferrer" className="underline text-primary">
               Política de Privacidad
             </a>

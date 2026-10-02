@@ -276,13 +276,12 @@ export default function LoginPage() {
                   Confirmo que soy mayor de 18 años y acepto los{' '}
                   <a href="/legal/terminos" target="_blank" rel="noopener noreferrer" className="underline text-primary">
                     Términos y Condiciones
-                  </a>{' '}
-                  y el{' '}
+                  </a>
+                  , el{' '}
                   <a href="/legal/aviso-legal" target="_blank" rel="noopener noreferrer" className="underline text-primary">
                     Aviso Legal
-                  </a>
-                  , incluido que VentaCofrade use las fotos y textos de mis anuncios para promocionarlos en la web,
-                  redes sociales y publicidad. He leído la{' '}
+                  </a>{' '}
+                  y la{' '}
                   <a href="/legal/privacidad" target="_blank" rel="noopener noreferrer" className="underline text-primary">
                     Política de Privacidad
                   </a>

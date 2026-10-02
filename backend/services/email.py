@@ -869,3 +869,19 @@ async def send_new_support_message_email(to_email: str, name: Optional[str], pre
         "mensaje de soporte",
         reply_to="contacto@ventacofrade.com",
     )
+
+
+async def send_terms_accepted_notice_email(to_email: str, who: str, who_email: str, version: str, when, ip) -> bool:
+    """Aviso interno: una cuenta vigilada (core/legal.py) ha aceptado los Términos."""
+    from zoneinfo import ZoneInfo
+
+    fecha = when.astimezone(ZoneInfo("Europe/Madrid")).strftime("%d/%m/%Y %H:%M") if when else "-"
+    html = _email_shell(
+        f"{who} ha aceptado los Términos",
+        f"<p><strong>{who}</strong> ({who_email}) ha aceptado los Términos y Condiciones, el Aviso Legal "
+        f"y la Política de Privacidad.</p>"
+        f"<p>Versión: {version}<br>Fecha: {fecha} (hora de España)<br>IP: {ip or '-'}</p>"
+        "<p>Ya podéis usar las fotos y textos de sus anuncios para promoción según la licencia del "
+        "apartado 4 de los Términos.</p>",
+    )
+    return await _send_via_resend(to_email, f"{who} ha aceptado los Términos de VentaCofrade", html, "aviso aceptación términos")

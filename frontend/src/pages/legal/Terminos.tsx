@@ -14,8 +14,8 @@ export default function Terminos() {
           profesionales del sector (la "Red Profesional").
         </p>
         <p>
-          Al crear tu cuenta aceptas expresamente estos Términos y el Aviso Legal, y declaras haber
-          leído la Política de Privacidad, marcando la casilla habilitada para ello. VentaCofrade
+          Al crear tu cuenta aceptas expresamente estos Términos, el Aviso Legal y la Política de
+          Privacidad, marcando la casilla habilitada para ello. VentaCofrade
           guarda la fecha, la versión aceptada y la dirección IP desde la que se aceptó.
         </p>
         <p>

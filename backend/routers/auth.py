@@ -5,7 +5,7 @@ from urllib.parse import urlencode
 import httpx
 from core.config import settings
 from core.database import get_db
-from core.legal import TERMS_VERSION
+from core.legal import TERMS_NOTIFY_USER_IDS, TERMS_VERSION
 from dependencies.auth import get_current_user
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
@@ -19,7 +19,11 @@ from services.auth import AuthService
 from services.audit import log_login_attempt, is_locked_out
 from services.hcaptcha import verify_hcaptcha_token
 from services import password_reset
-from services.email import send_google_account_hint_email, send_password_reset_email
+from services.email import (
+    send_google_account_hint_email,
+    send_password_reset_email,
+    send_terms_accepted_notice_email,
+)
 from core.security import hash_password
 from models.auth import User
 from models.audit import LoginAttempt
@@ -282,6 +286,18 @@ async def accept_terms(
     user.terms_accepted_ip = request.client.host if request.client else None
     await db.commit()
     await db.refresh(user)
+    logger.info("Términos %s aceptados por %s", TERMS_VERSION, user.id)
+    if user.id in TERMS_NOTIFY_USER_IDS:
+        admins = (await db.execute(select(User.email).where(User.role == "admin"))).scalars().all()
+        for admin_email in admins:
+            await send_terms_accepted_notice_email(
+                admin_email,
+                who=user.name or user.email,
+                who_email=user.email,
+                version=user.terms_version,
+                when=user.terms_accepted_at,
+                ip=user.terms_accepted_ip,
+            )
     return UserResponse.model_validate(user)
 
 
