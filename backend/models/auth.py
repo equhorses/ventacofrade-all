@@ -15,6 +15,9 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     last_login = Column(DateTime(timezone=True), nullable=True)
     age_confirmed_at = Column(DateTime(timezone=True), nullable=True)  # self-declared 18+ at signup
+    terms_version = Column(String(20), nullable=True)  # versión de Términos/Aviso Legal aceptada (core/legal.py)
+    terms_accepted_at = Column(DateTime(timezone=True), nullable=True)
+    terms_accepted_ip = Column(String(64), nullable=True)
     account_status = Column(String(20), default="active", nullable=False)  # active/suspended/pending_deletion
     deletion_reasons = Column(String(500), nullable=True)  # comma-separated survey options
     deletion_feedback = Column(Text, nullable=True)  # free-text feedback

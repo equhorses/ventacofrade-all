@@ -11,9 +11,18 @@ export default function Terminos() {
           Estos Términos y Condiciones (en adelante, "los Términos") regulan el acceso y uso de
           VentaCofrade, un marketplace que conecta a personas compradoras y vendedoras de
           artículos relacionados con el mundo cofrade, y que además aloja un directorio de
-          profesionales del sector (la "Red Profesional"). El registro de una cuenta y el uso
-          continuado de la Plataforma implican la aceptación plena y sin reservas de estos
-          Términos, del Aviso Legal y de la Política de Privacidad.
+          profesionales del sector (la "Red Profesional").
+        </p>
+        <p>
+          Al crear tu cuenta aceptas expresamente estos Términos, el Aviso Legal y la Política de
+          Privacidad, marcando la casilla habilitada para ello. VentaCofrade
+          guarda la fecha, la versión aceptada y la dirección IP desde la que se aceptó.
+        </p>
+        <p>
+          Sin perjuicio de esa aceptación expresa, el acceso a la Plataforma y su uso continuado,
+          con o sin cuenta, implican igualmente la aceptación plena y sin reservas de estos
+          Términos y del Aviso Legal en la versión vigente en cada momento. Si no estás de acuerdo
+          con ellos, debes abstenerte de usar la Plataforma.
         </p>
 
         <h2 className="text-xl font-semibold mt-6 mb-2">2. Capacidad y registro de cuenta</h2>
@@ -52,6 +61,29 @@ export default function Terminos() {
           histórico-artístico y bienes de interés cultural, cuando resulte aplicable).
           VentaCofrade se reserva el derecho de retirar cualquier anuncio que incumpla estas
           condiciones, sin perjuicio de otras acciones legales que pudieran corresponder.
+        </p>
+        <p>
+          <strong>Uso de las fotografías y textos de tus anuncios.</strong> Al publicar un anuncio, o
+          al autorizar que importemos tu catálogo desde otra plataforma, concedes a VentaCofrade,
+          de forma gratuita y no exclusiva y para todo el mundo, una licencia para reproducir,
+          adaptar, distribuir y comunicar públicamente las fotografías y textos de tus anuncios,
+          tanto en la Plataforma como fuera de ella (redes sociales, campañas de publicidad online y
+          offline, boletines por email y material promocional), con el fin de promocionar tus
+          anuncios y la propia Plataforma. La adaptación incluye, entre otras cosas, recortar o
+          reencuadrar las fotos, quitar o añadir marcas y sellos, añadir textos, música o efectos y
+          combinarlas en montajes y vídeos.
+        </p>
+        <p>
+          Esta licencia se mantiene mientras el anuncio esté publicado y durante los cinco años
+          siguientes a su retirada. El material promocional ya difundido antes de que retires el
+          anuncio podrá seguir publicado. Si nos lo pides escribiendo a contacto@ventacofrade.com,
+          dejaremos de crear material nuevo con las fotos de un anuncio retirado.
+        </p>
+        <p>
+          Garantizas que eres el autor de esas fotografías y textos o que tienes los derechos
+          necesarios para conceder esta licencia, y mantendrás indemne a VentaCofrade frente a
+          cualquier reclamación de terceros por este motivo. Se respetarán en todo caso los derechos
+          morales que correspondan a su autor.
         </p>
 
         <h2 className="text-xl font-semibold mt-6 mb-2">5. Planes de vendedor, tarifas y facturación</h2>
@@ -160,6 +192,12 @@ export default function Terminos() {
           comunicará con antelación razonable a las personas usuarias con suscripción activa,
           quienes podrán cancelar su suscripción antes de que el cambio surta efecto.
         </p>
+        <p>
+          Cuando modifiquemos de forma relevante estos Términos o el Aviso Legal, te lo
+          comunicaremos y te pediremos que aceptes la nueva versión la próxima vez que entres en tu
+          cuenta. Si sigues usando la Plataforma después de haber sido informado del cambio, se
+          entenderá que aceptas la nueva versión.
+        </p>
 
         <h2 className="text-xl font-semibold mt-6 mb-2">14. Cesión</h2>
         <p>
@@ -192,7 +230,7 @@ export default function Terminos() {
         </p>
 
         <p className="text-xs text-muted-foreground mt-8">
-          Última actualización: septiembre de 2026.
+          Última actualización: octubre de 2026.
         </p>
       </div>
     </Layout>

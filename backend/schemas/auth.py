@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
+from core.legal import TERMS_VERSION
 from pydantic import BaseModel, EmailStr, Field
 
 
@@ -13,6 +14,8 @@ class UserResponse(BaseModel):
     last_login: Optional[datetime] = None
     account_status: str = "active"
     scheduled_purge_at: Optional[datetime] = None
+    terms_version: Optional[str] = None
+    terms_required_version: str = TERMS_VERSION
 
     class Config:
         from_attributes = True

@@ -98,13 +98,13 @@ export default function AvisoLegal() {
           "VentaCofrade" y textos propios) son titularidad de VentaCofrade o de sus licenciantes y
           están protegidos por la normativa de propiedad intelectual e industrial. Queda prohibida
           su reproducción, distribución o comunicación pública sin autorización expresa, salvo en
-          los casos permitidos por la ley. El contenido subido por las personas usuarias
-          (fotografías y descripciones de sus anuncios) pasa a ser propiedad de VentaCofrade desde
-          el momento de su publicación, sin perjuicio de los derechos morales que, conforme a la
-          normativa de propiedad intelectual, correspondan siempre a su autor. VentaCofrade podrá
-          usar dicho contenido con fines publicitarios y promocionales, en la Plataforma y fuera de
-          ella (incluyendo redes sociales y campañas de publicidad), además de para la prestación
-          del propio servicio.
+          los casos permitidos por la ley. Sobre el contenido subido por las personas usuarias
+          (fotografías y textos de sus anuncios), la persona usuaria concede a VentaCofrade una
+          licencia gratuita y no exclusiva para usarlo en la prestación del servicio y con fines
+          publicitarios y promocionales, en la Plataforma y fuera de ella (incluyendo redes sociales
+          y campañas de publicidad), en los términos del apartado 4 de los Términos y Condiciones, y
+          sin perjuicio de los derechos morales que, conforme a la normativa de propiedad
+          intelectual, correspondan siempre a su autor.
         </p>
 
         <h2 className="text-xl font-semibold mt-6 mb-2">8. Enlaces a terceros</h2>
@@ -142,7 +142,10 @@ export default function AvisoLegal() {
         <p>
           VentaCofrade se reserva el derecho a modificar, sin previo aviso, la presentación,
           configuración y contenido del sitio web, así como este Aviso Legal, para adaptarlo a
-          novedades legislativas o cambios en el servicio.
+          novedades legislativas o cambios en el servicio. El acceso al sitio web y su uso continuado
+          implican la aceptación de este Aviso Legal en la versión vigente en cada momento. Las
+          personas con cuenta lo aceptan además de forma expresa al registrarse y, cuando se
+          modifique de forma relevante, se les pedirá que acepten la nueva versión.
         </p>
 
         <h2 className="text-xl font-semibold mt-6 mb-2">12. Nulidad e ineficacia de las cláusulas</h2>
@@ -176,7 +179,7 @@ export default function AvisoLegal() {
         </p>
 
         <p className="text-xs text-muted-foreground mt-8">
-          Última actualización: agosto de 2026.
+          Última actualización: octubre de 2026.
         </p>
       </div>
     </Layout>
